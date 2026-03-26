@@ -13,7 +13,7 @@ def classify_report(report):
     """
     
      # Hardcoded description for testing
-    description = "Streetlight not working in front of main library"
+    description = report.get("description", "No description provided")
 
     prompt = CLASSIFICATION_PROMPT.format(description=description)
 
@@ -21,7 +21,7 @@ def classify_report(report):
     try:
         response = requests.post(
             f"{OLLAMA_BASE_URL}/api/generate",
-            json={"model": "llama3/mistral", "prompt": prompt},
+            json={"model": "llava-llama3", "prompt": prompt},
             timeout=10
         )
         response.raise_for_status()
