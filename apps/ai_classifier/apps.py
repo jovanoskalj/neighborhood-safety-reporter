@@ -2,4 +2,4 @@ from django.apps import AppConfig
 
 
 class AiConfig(AppConfig):
-    name = 'ai'
+    name = 'apps.ai_classifier'
