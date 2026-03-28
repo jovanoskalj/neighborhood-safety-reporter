@@ -42,7 +42,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'apps.accounts',
     'apps.reports',
-    'apps.ai_classifier',
+    'apps.ai_classifier','reports',
+
     
 ]
 
