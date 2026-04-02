@@ -22,7 +22,7 @@ jobs:
 
     env:
       PYTHONPATH: .
-      DJANGO_SETTINGS_MODULE: neighborhood_safety_reporter.settings
+      DJANGO_SETTINGS_MODULE: config.settings
       DATABASE_URL: postgresql://user:password@localhost:5432/safety_reporter
       SECRET_KEY: test-secret-key-for-ci
       DEBUG: "True"
