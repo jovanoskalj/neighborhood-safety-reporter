@@ -4,7 +4,7 @@ on:
   push:
     branches: [ t7/qa-environment-setup ]
   pull_request:
-    branches: [ main ]
+    branches: [ master ]
 
 jobs:
   test:
@@ -19,6 +19,14 @@ jobs:
           POSTGRES_DB: safety_reporter
         ports:
           - 5432:5432
+
+    env:
+      PYTHONPATH: .
+      DJANGO_SETTINGS_MODULE: neighborhood_safety_reporter.settings
+      DATABASE_URL: postgresql://user:password@localhost:5432/safety_reporter
+      SECRET_KEY: test-secret-key-for-ci
+      DEBUG: "True"
+      ALLOWED_HOSTS: "localhost,127.0.0.1"
 
     steps:
       - uses: actions/checkout@v4
