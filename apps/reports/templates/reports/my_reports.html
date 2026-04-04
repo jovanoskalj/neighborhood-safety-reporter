@@ -1,0 +1,149 @@
+
+{% load static %}
+
+{% block title %}Безбедно Соседство<br>
+Република Северна Македонија
+{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root {
+    --green-accent: #2ecc71;
+    --green-btn:    #27ae60;
+    --border:       #e2e8e5;
+    --radius:       12px;
+    --radius-sm:    8px;
+    --shadow:       0 1px 4px rgba(0,0,0,.07), 0 4px 16px rgba(0,0,0,.05);
+  }
+  .my-reports-page { padding: 2rem 10%; }
+  .page-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+  .page-top h1 { font-size: 1.6rem; font-weight: 700; color: #1a2238; }
+  .btn-new { display: inline-flex; align-items: center; gap: 6px; background: var(--green-accent); color: #fff; padding: 0.55rem 1.25rem; border-radius: var(--radius-sm); font-size: 0.875rem; font-weight: 600; text-decoration: none; transition: background .15s; }
+  .btn-new:hover { background: var(--green-btn); }
+  .filter-card { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 0.85rem 1.25rem; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+  .filter-selects { display: flex; align-items: center; gap: 0.65rem; flex: 1; flex-wrap: wrap; }
+  .filter-select { flex: 1; min-width: 140px; padding: 0.5rem 2rem 0.5rem 0.9rem; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 0.85rem; font-family: inherit; color: #666; background: #fff; appearance: none; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' viewBox='0 0 12 12'%3E%3Cpath stroke='%23999' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M2 4l4 4 4-4'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; transition: border-color .15s; }
+  .filter-select:focus { outline: none; border-color: var(--green-accent); }
+  .filter-btn { padding: 0.5rem 1.1rem; background: var(--green-accent); color: #fff; border: none; border-radius: var(--radius-sm); font-size: 0.85rem; font-family: inherit; font-weight: 600; cursor: pointer; transition: background .15s; }
+  .filter-btn:hover { background: var(--green-btn); }
+  .filter-reset { font-size: 0.8rem; color: #999; text-decoration: underline; cursor: pointer; background: none; border: none; font-family: inherit; }
+  .grid { display: grid; grid-template-columns: 1fr 340px; gap: 1.25rem; align-items: start; }
+  .table-card { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  thead tr { background: #f7f9f8; border-bottom: 1.5px solid var(--border); }
+  th { padding: 0.75rem 1.1rem; text-align: left; font-size: 0.78rem; font-weight: 600; color: #888; letter-spacing: 0.03em; }
+  td { padding: 0.85rem 1.1rem; border-bottom: 1px solid #f0f4f2; vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: #f7faf8; }
+  .report-id { color: var(--green-accent); font-weight: 700; font-size: 0.82rem; text-decoration: none; }
+  .report-id:hover { text-decoration: underline; }
+  .badge { display: inline-block; padding: 3px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+  .p-critical { background: #fde8e8; color: #c0392b; }
+  .p-high     { background: #fde8e8; color: #e05c5c; }
+  .p-medium   { background: #fff3d6; color: #c47a1e; }
+  .p-low      { background: #d9f5e8; color: #27ae60; }
+  .s-new         { background: #e8eeff; color: #4a6cf7; }
+  .s-in_progress { background: #fff3d0; color: #c47a1e; }
+  .s-resolved    { background: #d9f5e8; color: #27ae60; }
+  .s-rejected    { background: #fde8e8; color: #e05c5c; }
+  .date-cell { color: #999; font-size: 0.82rem; }
+  .empty-state { padding: 3.5rem 1rem; text-align: center; color: #aaa; font-size: 0.9rem; }
+  .empty-state a { color: var(--green-accent); }
+  .map-card { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  .map-card-header { padding: 0.9rem 1.1rem; font-size: 0.85rem; font-weight: 600; color: #333; border-bottom: 1px solid var(--border); }
+  #mini-map { height: 320px; width: 100%; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } .my-reports-page { padding: 1.5rem 5%; } }
+</style>
+
+<div class="my-reports-page">
+  <div class="page-top">
+    <h1>Мои пријави</h1>
+    <a href="{% url 'new_report' %}" class="btn-new">+ Нова пријава</a>
+  </div>
+
+  <form method="get" class="filter-card">
+    <div class="filter-selects">
+      <select name="category" class="filter-select">
+        <option value="">Категорија</option>
+        {% for value, label in category_choices %}
+          <option value="{{ value }}" {% if selected_category == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <select name="priority" class="filter-select">
+        <option value="">Приоритет</option>
+        {% for value, label in priority_choices %}
+          <option value="{{ value }}" {% if selected_priority == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <select name="status" class="filter-select">
+        <option value="">Статус</option>
+        {% for value, label in status_choices %}
+          <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </form>
+
+  <div class="grid">
+    <div class="table-card">
+      {% if reports %}
+      <table>
+        <thead>
+          <tr>
+            <th>ИД</th>
+            <th>Категорија</th>
+            <th>Приоритет</th>
+            <th>Статус</th>
+            <th>Датум</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for report in reports %}
+          <tr>
+            <td><a href="#" class="report-id">ПРЈ-{{ report.id|stringformat:"03d" }}</a></td>
+            <td>{{ report.get_category_display }}</td>
+            <td><span class="badge p-{{ report.priority }}">{{ report.get_priority_display }}</span></td>
+            <td><span class="badge s-{{ report.status }}">{{ report.get_status_display }}</span></td>
+            <td class="date-cell">{{ report.created_at|date:"Y-m-d" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state">
+        Нема пријави.<br><br>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="map-card">
+      <div class="map-card-header">Мои пријави на мапа</div>
+      <div id="mini-map"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  const pins = {{ map_pins|safe }};
+  const greenIcon = L.divIcon({
+    className: '',
+    html: `<div style="width:14px;height:14px;background:#2ecc71;border:2.5px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.3);"></div>`,
+    iconSize: [14,14], iconAnchor: [7,7],
+  });
+  const map = L.map('mini-map', { zoomControl: true, scrollWheelZoom: false });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+  if (pins.length > 0) {
+    const markers = [];
+    pins.forEach(pin => {
+      const m = L.marker([pin.lat, pin.lng], { icon: greenIcon }).addTo(map);
+      m.bindPopup(`<b>ПРЈ-${String(pin.id).padStart(3,'0')}</b><br>${pin.category}<br><i>${pin.status}</i>`);
+      markers.push(m);
+    });
+    map.fitBounds(L.featureGroup(markers).getBounds().pad(0.25));
+  } else {
+    map.setView([41.9965, 21.4314], 12);
+  }
+</script>
+{% endblock %}
