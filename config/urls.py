@@ -21,3 +21,10 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('reports.urls')),
 ]
+from django.urls import include, path
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('accounts/', include('apps.accounts.urls')),
+    path('verify/', include('verify_email.urls')),
+]
