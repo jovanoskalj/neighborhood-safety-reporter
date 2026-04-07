@@ -1,0 +1,183 @@
+{% extends 'base.html' %}
+
+{% block title %}Најава{% endblock %}
+
+{% block content %}
+<style>
+  :root {
+    --primary-blue: #1A2238;
+    --light-blue: #2a3b5f;
+    --primary-gradient: linear-gradient(135deg, #1A2238 0%, #2d3f66 100%);
+    --glass-bg: rgba(255, 255, 255, 0.8);
+    --accent-color: #1A2238;
+  }
+
+  body {
+    background-color: #f4f7ff;
+    /* Subtle Blue Mesh Gradient */
+    background-image: 
+        radial-gradient(at 0% 0%, rgba(26, 34, 56, 0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(45, 63, 102, 0.12) 0px, transparent 50%);
+    font-family: 'Inter', sans-serif;
+    overflow-x: hidden;
+  }
+
+  /* Decorative Background Elements */
+  .bg-shape {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(100px);
+    z-index: -1;
+    opacity: 0.5;
+  }
+
+  .shape-1 { width: 400px; height: 400px; background: #1A2238; top: -150px; left: -100px; }
+  .shape-2 { width: 350px; height: 350px; background: #2a3b5f; bottom: -100px; right: -50px; }
+
+  .login-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border-radius: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 20px 40px rgba(0, 41, 133, 0.08);
+    padding: 3rem 2.5rem;
+    transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+  }
+
+  .login-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 30px 60px rgba(0, 41, 133, 0.12);
+  }
+
+  .login-card h1 {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    color: #0F172A;
+    font-size: 30px;
+    margin-bottom: 0.25rem;
+  }
+
+  .subtitle {
+    color: #64748B;
+    font-size: 15px;
+    margin-bottom: 2.5rem;
+  }
+
+  .form-label {
+    font-weight: 600;
+    font-size: 13px;
+    color: #1E293B;
+    margin-bottom: 8px;
+  }
+
+  .form-control {
+    border-radius: 14px;
+    padding: 0.8rem 1.2rem;
+    border: 2px solid #E2E8F0;
+    background: rgba(255, 255, 255, 0.6);
+    transition: all 0.2s ease;
+  }
+
+  .form-control:focus {
+    border-color: var(--primary-blue);
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(26, 34, 56, 0.12);
+    outline: none;
+  }
+
+  .btn-primary {
+    background: var(--primary-gradient);
+    border: none;
+    border-radius: 14px;
+    padding: 0.9rem;
+    font-weight: 700;
+    font-size: 16px;
+    margin-top: 10px;
+    transition: all 0.3s;
+  }
+
+  .btn-primary:hover {
+    filter: brightness(1.05);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(26, 34, 56, 0.25);
+  }
+
+  .forgot-link {
+    color: var(--primary-blue);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .footer-text {
+    margin-top: 2rem;
+    font-size: 14px;
+    color: #64748B;
+  }
+
+  .footer-text a {
+    color: var(--primary-blue);
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .footer-text a:hover {
+    text-decoration: underline;
+  }
+
+  /* Smooth Slide-up Entrance */
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-card {
+    animation: slideUp 0.7s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+  }
+</style>
+
+<div class="bg-shape shape-1"></div>
+<div class="bg-shape shape-2"></div>
+
+<div class="container d-flex justify-content-center align-items-center min-vh-100">
+    <div class="col-12 col-md-7 col-lg-5 col-xl-4 animate-card">
+        <div class="card login-card border-0">
+            <div class="card-body p-0 text-center">
+                <h1>Најава</h1>
+                <p class="subtitle">Пристапете до вашиот профил</p>
+
+                {% if error %}
+                <div class="alert alert-danger border-0 rounded-4 mb-4" style="background: rgba(220, 38, 38, 0.1); color: #dc2626;">
+                    {{ error }}
+                </div>
+                {% endif %}
+
+                <form method="post" class="text-start">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Корисничко име</label>
+                        <input type="text" class="form-control" id="username" name="username" placeholder="Вашето корисничко име" required>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label for="password" class="form-label mb-0">Лозинка</label>
+                            <a href="#" class="forgot-link">Заборавена?</a>
+                        </div>
+                        <input type="password" class="form-control" id="password" name="password" placeholder="••••••••" required>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary text-white">Најави се</button>
+                    </div>
+                </form>
+
+                <div class="footer-text">
+                    Немате профил? <a href="{% url 'register' %}">Регистрирај се</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

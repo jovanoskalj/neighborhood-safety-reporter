@@ -1,0 +1,10 @@
+Django>=4.2,<5.0
+dj-database-url>=2.1.0
+python-dotenv>=1.0.0
+psycopg2-binary>=2.9.9
+requests>=2.32.0
+Pillow>=10.4.0
+django-verify-email>=3.0.3
+pytest>=8.2.0
+pytest-django>=4.8.0
+sendgrid

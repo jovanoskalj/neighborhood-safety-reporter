@@ -12,7 +12,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "${DB_EXTERNAL_PORT:-5433}:5432"
     # Healthcheck to see when Postgres is actually ready
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
@@ -39,6 +39,17 @@ services:
     depends_on:
       db:
         condition: service_healthy # Wait for the healthcheck to pass
+      ollama:
+        condition: service_started
+
+  ollama:
+    image: ollama/ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
 
 volumes:
   postgres_data:
+  ollama_data:
