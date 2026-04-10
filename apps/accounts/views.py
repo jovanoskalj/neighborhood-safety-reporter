@@ -78,7 +78,11 @@ def register_view(request):
             group, _ = Group.objects.get_or_create(name=group_name)
             user.groups.add(group)
 
-        verification_code = _generate_verification_code()
+        if settings.SENDGRID_ENABLED:
+            verification_code = _generate_verification_code()
+        else:
+            verification_code = str(settings.DEV_VERIFICATION_CODE)
+
         EmailVerificationCode.objects.update_or_create(
             user=user,
             defaults={
@@ -87,10 +91,14 @@ def register_view(request):
             },
         )
 
-        _send_verification_code_email(user, verification_code)
+        if settings.SENDGRID_ENABLED:
+            _send_verification_code_email(user, verification_code)
         request.session["pending_verification_user_id"] = user.id
 
-        messages.success(request, "Регистрацијата е успешна. Ви испративме 6-цифрен код на вашата е-пошта.")
+        if settings.SENDGRID_ENABLED:
+            messages.success(request, "Регистрацијата е успешна. Ви испративме 6-цифрен код на вашата е-пошта.")
+        else:
+            messages.success(request, f"Регистрацијата е успешна. Тест-кодот за верификација е: {verification_code}")
         return redirect("verify_email_code")
 
     return render(request, "accounts/register.html", {"form": form})
@@ -134,6 +142,18 @@ def verify_email_code_view(request):
         if not code.isdigit() or len(code) != 6:
             messages.error(request, "Кодот мора да има точно 6 цифри.")
             return redirect("verify_email_code")
+
+        if not settings.SENDGRID_ENABLED:
+            if code != str(settings.DEV_VERIFICATION_CODE):
+                messages.error(request, "Кодот е невалиден или истечен.")
+                return redirect("verify_email_code")
+
+            user.is_active = True
+            user.save(update_fields=["is_active"])
+            EmailVerificationCode.objects.filter(user=user).delete()
+            request.session.pop("pending_verification_user_id", None)
+            messages.success(request, "Е-поштата е успешно верификувана. Сега можете да се најавите.")
+            return redirect("login")
 
         verification = EmailVerificationCode.objects.filter(user=user, code=code).first()
         if not verification or verification.is_expired():
