@@ -1,14 +1,239 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 
 {% block title %}Поднеси пријава{% endblock %}
 
 {% block content %}
+
+<style>
+    .app-navbar { background: #1a2238 !important; }
+    .app-navbar .navbar-brand, .app-navbar .nav-link { color: white !important; }
+
+    #map {
+        height: 400px;
+        width: 100%;
+        border-radius: 12px;
+    }
+</style>
+
 <div class="container py-5">
     <div class="card shadow-sm border-0">
         <div class="card-body p-4 p-md-5">
-            <h1 class="h3 mb-2">Поднеси пријава</h1>
-            <p class="text-muted mb-0">Ова е страницата за поднесување нова пријава. Следно можеме да додадеме целосна форма со опис, локација и слика.</p>
+
+            <h3 class="mb-2">Поднеси пријава</h3>
+            <p class="text-muted">Опишете го проблемот и означете ја локацијата</p>
+
+            <form method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+
+                <!-- Category -->
+                <div class="mb-3">
+                    <label class="form-label">Категорија</label>
+                    <select class="form-select" name="category" required>
+                        <option value="" disabled selected>Изберете категорија</option>
+                        <option value="road">Дупка на пат</option>
+                        <option value="waste">Смет</option>
+                        <option value="light">Улично светло</option>
+                    </select>
+                </div>
+
+                <!-- Priority -->
+                <div class="mb-3">
+                    <label class="form-label">Приоритет</label>
+                    <select class="form-select" name="priority" required>
+                        <option value="" disabled selected>Изберете приоритет</option>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                    </select>
+                </div>
+
+                <!-- Municipality -->
+                <div class="mb-3">
+                    <label class="form-label">Општина</label>
+                    <select class="form-select" name="municipality" required>
+                        <option value="" disabled selected>Изберете општина</option>
+                        <option value="aerodrom">Аеродром</option>
+                        <option value="aracinovo">Арачиново</option>
+                        <option value="berovo">Берово</option>
+                        <option value="bitola">Битола</option>
+                        <option value="bogdanci">Богданци</option>
+                        <option value="bogovinje">Боговиње</option>
+                        <option value="bosilovo">Босилово</option>
+                        <option value="brvenica">Брвеница</option>
+                        <option value="butel">Бутел</option>
+                        <option value="valandovo">Валандово</option>
+                        <option value="vasilevo">Василево</option>
+                        <option value="veles">Велес</option>
+                        <option value="vinica">Виница</option>
+                        <option value="viseg?">Врапчиште</option>
+                        <option value="gevgelija">Гевгелија</option>
+                        <option value="gazi_baba">Гази Баба</option>
+                        <option value="gjorce_petrov">Ѓорче Петров</option>
+                        <option value="gostivar">Гостивар</option>
+                        <option value="gradsko">Градско</option>
+                        <option value="deb ar">Дебар</option>
+                        <option value="debarca">Дебарца</option>
+                        <option value="delcevo">Делчево</option>
+                        <option value="demir_kapija">Демир Капија</option>
+                        <option value="demir_hisar">Демир Хисар</option>
+                        <option value="doran">Долнени</option>
+                        <option value="dojran">Дојран</option>
+                        <option value="struga">Струга</option>
+                        <option value="strumica">Струмица</option>
+                        <option value="zrnovci">Зрновци</option>
+                        <option value="ilinden">Илинден</option>
+                        <option value="jegunovce">Јегуновце</option>
+                        <option value="kavadarci">Кавадарци</option>
+                        <option value="karbinci">Карбинци</option>
+                        <option value="karpos">Карпош</option>
+                        <option value="kisela_voda">Кисела Вода</option>
+                        <option value="kratovo">Кратово</option>
+                        <option value="kriva_palanka">Крива Паланка</option>
+                        <option value="krivogastani">Кривогаштани</option>
+                        <option value="krusevo">Крушево</option>
+                        <option value="kumanovo">Куманово</option>
+                        <option value="lipkovo">Липково</option>
+                        <option value="lozovo">Лозово</option>
+                        <option value="makedonska_kamenica">Македонска Каменица</option>
+                        <option value="makedonski_brod">Македонски Брод</option>
+                        <option value="mogila">Могила</option>
+                        <option value="negotino">Неготино</option>
+                        <option value="novaci">Новаци</option>
+                        <option value="novo_selo">Ново Село</option>
+                        <option value="ohrid">Охрид</option>
+                        <option value="petrovec">Петровец</option>
+                        <option value="pehcevo">Пехчево</option>
+                        <option value="pelince?">Пласница</option>
+                        <option value="prilep">Прилеп</option>
+                        <option value="probishtip">Пробиштип</option>
+                        <option value="radovis">Радовиш</option>
+                        <option value="rankovce">Ранковце</option>
+                        <option value="resen">Ресен</option>
+                        <option value="rosoman">Росоман</option>
+                        <option value="saraj">Сарај</option>
+                        <option value="sopište">Сопиште</option>
+                        <option value="staro_nagoricane">Старо Нагоричане</option>
+                        <option value="stip">Штип</option>
+                        <option value="studenicani">Студеничани</option>
+                        <option value="centar">Центар</option>
+                        <option value="caska">Чашка</option>
+                        <option value="cair">Чаир</option>
+                        <option value="cesinovo_obileshevo">Чешиново-Облешево</option>
+                        <option value="chucher_sandevo">Чучер-Сандево</option>
+                        <option value="suto_orizari">Шуто Оризари</option>
+                    </select>
+                </div>
+
+                <!-- Description -->
+                <div class="mb-3">
+                    <label class="form-label">Опис</label>
+                    <textarea class="form-control"
+                              name="description"
+                              rows="4"
+                              required
+                              placeholder="Опишете го проблемот..."></textarea>
+                </div>
+
+                <!-- GPS Button -->
+                <button type="button"
+                        class="btn btn-outline-secondary mb-2"
+                        onclick="getLocation()">
+                    📍 Користи моја локација
+                </button>
+
+                <!-- Map -->
+                <div class="mb-3">
+                    <label class="form-label">Локација</label>
+                    <input type="hidden" name="latitude" id="latitude">
+                    <input type="hidden" name="longitude" id="longitude">
+                    <div id="map"></div>
+                </div>
+
+                <!-- Image Upload -->
+                <div class="mb-3">
+                    <label class="form-label">Прикачи слика</label>
+                    <input type="file"
+                           class="form-control"
+                           id="imageInput"
+                           name="image"
+                           accept="image/png, image/jpeg">
+
+                    <img id="preview" style="display:none; max-width:100%; margin-top:10px;" alt="Preview">
+                </div>
+
+                <!-- Submit -->
+                <button type="submit" class="report-btn">
+                    Поднеси пријава
+                </button>
+
+            </form>
+
         </div>
     </div>
 </div>
+
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+    var map = L.map('map').setView([41.9981, 21.4254], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: 'OpenStreetMap'
+    }).addTo(map);
+
+    var marker;
+
+    function setMarker(lat, lng) {
+        if (marker) map.removeLayer(marker);
+        marker = L.marker([lat, lng]).addTo(map);
+        document.getElementById("latitude").value = lat;
+        document.getElementById("longitude").value = lng;
+    }
+
+    map.on('click', function(e) {
+        setMarker(e.latlng.lat, e.latlng.lng);
+    });
+
+    function getLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+                var lat = position.coords.latitude;
+                var lng = position.coords.longitude;
+                map.setView([lat, lng], 15);
+                setMarker(lat, lng);
+            }, function() {
+                alert("Не можев да ја добијам вашата локација.");
+            });
+        } else {
+            alert("Geolocation не е поддржано од овој прелистувач.");
+        }
+    }
+</script>
+
+<script>
+    document.getElementById("imageInput").addEventListener("change", function(event) {
+        const file = event.target.files[0];
+        const preview = document.getElementById("preview");
+
+        if (!file) {
+            preview.style.display = "none";
+            return;
+        }
+
+        if (!file.type.match(/^image\/(png|jpeg)$/)) {
+            alert("Молиме прикачете PNG или JPG слика.");
+            event.target.value = "";
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function() {
+            preview.src = reader.result;
+            preview.style.display = "block";
+        };
+        reader.readAsDataURL(file);
+    });
+</script>
+
 {% endblock %}
