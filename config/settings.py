@@ -30,7 +30,7 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.reports",
     "apps.ai_classifier",
-    "apps.notifications",
+    "apps.notifications.apps.NotificationsConfig",
     "apps.analytics",
 ]
 
