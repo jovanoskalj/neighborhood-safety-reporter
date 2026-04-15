@@ -28,7 +28,7 @@
                     <li class="nav-item"><a class="nav-link" href="#">Работен панел</a></li>
                 {% endif %}
                 {% if user|has_group:'admin' or user|has_group:'administrators' or user.is_superuser %}
-                    <li class="nav-item"><a class="nav-link" href="#">Админ панел</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'dashboard' %}">Админ панел</a></li>
                 {% endif %}
             </ul>
             <ul class="navbar-nav ms-auto">
