@@ -5,7 +5,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
-
+from django.shortcuts import get_object_or_404, render, redirect
 from .models import Report
 
 
@@ -29,11 +29,15 @@ def user_is_officer(user):
     return user.groups.filter(name__in=['officer', 'officers']).exists()
 
 
-def get_user_sector(user):
-    if hasattr(user, 'profile'):
-        return getattr(user.profile, 'sector', None)
-    return None
+# def get_user_sector(user):
+#     if hasattr(user, 'profile'):
+#         return getattr(user.profile, 'sector', None)
+#     return None
 
+def get_user_sector(user):
+    if hasattr(user, 'userprofile'):
+        return getattr(user.userprofile, 'sector', None)
+    return None
 
 @login_required
 @require_http_methods(["PATCH"])
@@ -65,4 +69,28 @@ def update_report_status(request, report_id):
         "status": report.status,
         "status_changed_at": report.status_changed_at.isoformat(),
         "assigned_officer": request.user.username,
+    })
+
+
+
+# # 
+@login_required
+def officer_panel(request):
+    if not user_is_officer(request.user):
+        return redirect('dashboard')
+    
+    sector = get_user_sector(request.user)
+    reports = Report.objects.filter(sector=sector).order_by('-created_at')
+    
+    status_filter = request.GET.get('status')
+    if status_filter:
+        reports = reports.filter(status=status_filter)
+    
+    priority_filter = request.GET.get('priority')
+    if priority_filter:
+        reports = reports.filter(priority=priority_filter)
+        
+    return render(request, "reports/officer_panel.html", {
+        "reports": reports,
+        "sector": sector,
     })
