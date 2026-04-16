@@ -1,0 +1,243 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Аналитички Панел{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <div>
+            <h1 class="h3 fw-bold mb-0">Аналитички Панел</h1>
+            <p class="text-muted mb-0">Преглед на статистички податоци и трендови</p>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="home-stat-card h-100">
+                <h2 id="totalCount">0</h2>
+                <p>Вкупно пријави</p>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="home-stat-card h-100 border-start border-4 border-primary">
+                <h2 id="newCount">0</h2>
+                <p>Нови</p>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="home-stat-card h-100 border-start border-4 border-warning">
+                <h2 id="progressCount">0</h2>
+                <p>Во тек</p>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="home-stat-card h-100 border-start border-4 border-success">
+                <h2 id="resolvedCount">0</h2>
+                <p>Решени</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Charts -->
+    <div class="row g-4">
+        <!-- Line Chart: Reports Over Time -->
+        <div class="col-12">
+            <div class="card border-0 shadow-sm" style="border-radius: 12px; overflow: hidden;">
+                <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0 fw-bold">Пријави низ времето</h5>
+                    <div class="d-flex align-items-center gap-2">
+                        <label for="periodSelect" class="small fw-bold text-muted text-nowrap">Период:</label>
+                        <select id="periodSelect" class="form-select form-select-sm border-0 bg-light"
+                            style="min-width: 130px; border-radius: 8px; cursor: pointer;">
+                            <option value="weekly">Неделно</option>
+                            <option value="monthly" selected>Месечно</option>
+                            <option value="yearly">Годишно</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="card-body p-4">
+                    <div style="height: 350px;">
+                        <canvas id="timeSeriesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bar Chart: Category Breakdown -->
+        <div class="col-md-7">
+            <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; overflow: hidden;">
+                <div class="card-header bg-white py-3 border-0">
+                    <h5 class="card-title mb-0 fw-bold">Дистрибуција по категории</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div style="height: 300px;">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pie Chart: Status Breakdown -->
+        <div class="col-md-5">
+            <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; overflow: hidden;">
+                <div class="card-header bg-white py-3 border-0">
+                    <h5 class="card-title mb-0 fw-bold">Статус на пријави</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div style="height: 300px;" class="d-flex align-items-center justify-content-center">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay"
+    class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-white bg-opacity-75 d-none"
+    style="z-index: 1050;">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Се вчита...</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+    (function () {
+        const labelsMap = {
+            'new': 'Нови',
+            'in_progress': 'Во тек',
+            'resolved': 'Решени',
+            'unclassified': 'Некласификувани',
+            'infrastructure': 'Инфраструктура',
+            'utilities': 'Комуналии',
+            'safety': 'Безбедност',
+            'health': 'Здравство',
+            'other': 'Останато',
+            'urgent': 'Итно',
+            'normal': 'Нормално',
+            'low': 'Ниско'
+        };
+
+        const translate = (key) => labelsMap[key] || key;
+        let timeChart, categoryChart, statusChart;
+
+        async function fetchData(period, isInitial = false) {
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) overlay.classList.remove('d-none');
+
+            try {
+                if (typeof Chart === 'undefined') throw new Error('Chart.js not loaded');
+
+                const response = await fetch(`/api/analytics/stats/?period=${period}`);
+                if (!response.ok) throw new Error(`Fetch error: ${response.status}`);
+                const data = await response.json();
+
+                if (isInitial) {
+                    document.getElementById('totalCount').innerText = data.total || 0;
+                    document.getElementById('newCount').innerText = (data.by_status.find(s => s.label === 'new')?.count || 0);
+                    document.getElementById('progressCount').innerText = (data.by_status.find(s => s.label === 'in_progress')?.count || 0);
+                    document.getElementById('resolvedCount').innerText = (data.by_status.find(s => s.label === 'resolved')?.count || 0);
+
+                    renderStaticCharts(data);
+                }
+
+                renderTimeSeriesChart(data);
+            } catch (err) {
+                console.error(err);
+            } finally {
+                if (overlay) overlay.classList.add('d-none');
+            }
+        }
+
+        function renderTimeSeriesChart(data) {
+            const ctx = document.getElementById('timeSeriesChart');
+            if (!ctx) return;
+            if (timeChart) timeChart.destroy();
+
+            timeChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.by_period.data.map(item => {
+                        const startDate = new Date(item.period);
+                        if (data.by_period.period_type === 'weekly') {
+                            const endDate = new Date(startDate);
+                            endDate.setDate(startDate.getDate() + 6);
+
+                            const startDay = startDate.getDate().toString().padStart(2, '0');
+                            const endStr = endDate.toLocaleDateString('mk-MK', { day: '2-digit', month: 'short', year: 'numeric' });
+
+                            if (startDate.getMonth() !== endDate.getMonth() || startDate.getFullYear() !== endDate.getFullYear()) {
+                                const startStr = startDate.toLocaleDateString('mk-MK', { day: '2-digit', month: 'short' });
+                                return `${startStr} - ${endStr}`;
+                            }
+
+                            return `${startDay} - ${endStr}`;
+                        } else if (data.by_period.period_type === 'monthly') {
+                            return startDate.toLocaleDateString('mk-MK', { month: 'short', year: 'numeric' });
+                        }
+                        return startDate.getFullYear();
+                    }),
+                    datasets: [{
+                        label: 'Пријави',
+                        data: data.by_period.data.map(item => item.count),
+                        borderColor: '#1a2238',
+                        backgroundColor: 'rgba(26, 34, 56, 0.05)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+        }
+
+        function renderStaticCharts(data) {
+            const catCtx = document.getElementById('categoryChart');
+            if (catCtx) {
+                if (categoryChart) categoryChart.destroy();
+                categoryChart = new Chart(catCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: data.by_category.map(item => translate(item.label)),
+                        datasets: [{
+                            label: 'Број',
+                            data: data.by_category.map(item => item.count),
+                            backgroundColor: '#1a2238',
+                            borderRadius: 6
+                        }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                });
+            }
+
+            const statCtx = document.getElementById('statusChart');
+            if (statCtx) {
+                if (statusChart) statusChart.destroy();
+                statusChart = new Chart(statCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: data.by_status.map(item => translate(item.label)),
+                        datasets: [{
+                            data: data.by_status.map(item => item.count),
+                            backgroundColor: ['#1a2238', '#f39c12', '#2ecc71', '#7f8c8d']
+                        }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'bottom' } } }
+                });
+            }
+        }
+
+        const periodSelect = document.getElementById('periodSelect');
+        if (periodSelect) {
+            periodSelect.addEventListener('change', (e) => fetchData(e.target.value));
+        }
+
+        fetchData('monthly', true);
+    })();
+</script>
+{% endblock %}

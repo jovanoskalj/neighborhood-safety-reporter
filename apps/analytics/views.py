@@ -1,3 +1,5 @@
+from django.contrib.auth.decorators import user_passes_test
+from django.shortcuts import render
 from django.db.models import Count
 from django.db.models.functions import TruncWeek, TruncMonth, TruncYear
 from django.http import JsonResponse
@@ -11,6 +13,19 @@ _TRUNC_MAP = {
     "yearly": TruncYear,
 }
 _DEFAULT_PERIOD = "monthly"
+
+
+def is_analytics_user(user) -> bool:
+    """Return True if user is an officer or administrator."""
+    if not user.is_authenticated:
+        return False
+    return user.is_superuser or user.groups.filter(name__in=['admin', 'administrators', 'officer', 'officers']).exists()
+
+
+@user_passes_test(is_analytics_user)
+def dashboard_view(request):
+    """Render the analytics dashboard page."""
+    return render(request, "analytics/dashboard.html")
 
 
 def _group_by_field(field: str) -> list[dict]:
@@ -37,6 +52,7 @@ def _time_series(period: str) -> list[dict]:
 
 
 @require_GET
+@user_passes_test(is_analytics_user)
 def stats(request) -> JsonResponse:
     """Provide aggregated statistics for dashboard visualization."""
     raw_period = (request.GET.get("period") or "").strip().lower()
