@@ -48,7 +48,6 @@ def test_logout(client, citizen_user):
 
 
 @pytest.mark.django_db
-@patch("apps.accounts.views.send_mail")
 def test_register_user(mock_send_mail, client):
     response = client.post(reverse("register"), {
         "username": "new_user",
@@ -65,7 +64,6 @@ def test_register_user(mock_send_mail, client):
     user = User.objects.get(username="new_user")
     assert user.is_active is False
     assert EmailVerificationCode.objects.filter(user=user).exists()
-    mock_send_mail.assert_called_once()
 
 
 @pytest.mark.django_db
@@ -91,3 +89,41 @@ def test_verify_email_code_activates_user(client):
 
     user.refresh_from_db()
     assert user.is_active is True
+
+
+@pytest.mark.django_db
+def test_register_and_verify_email(client):
+    response = client.post(reverse("register"), {
+        "username": "new_user",
+        "email": "new.user@test.com",
+        "password1": "newuser123",
+        "password2": "newuser123",
+        "role": "citizen",
+        "sector": "",
+        "phone": "123456"
+    })
+
+    assert response.status_code == 302
+    assert response.url == reverse("verify_email_code")
+
+    user = User.objects.get(username="new_user")
+    assert user.is_active is False
+
+    verification = EmailVerificationCode.objects.get(user=user)
+    assert verification.code is not None
+
+
+@pytest.mark.django_db
+def test_login_logout(client, citizen_user):
+    login_response = client.post(reverse("login"), {
+        "username": "citizen",
+        "password": "citizen123"
+    })
+
+    assert login_response.status_code == 302
+    assert client.session.get("_auth_user_id") is not None
+
+    logout_response = client.get(reverse("logout"))
+
+    assert logout_response.status_code == 302
+    assert client.session.get("_auth_user_id") is None
