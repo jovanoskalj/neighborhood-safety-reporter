@@ -1,7 +1,11 @@
 import json
 import logging
+from datetime import date
+from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
@@ -15,9 +19,108 @@ from .models import Report
 logger = logging.getLogger(__name__)
 
 
+def _parse_iso_date(value):
+    try:
+        return date.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _build_report_filters(request):
+    filters = Q()
+    category = request.GET.get("category")
+    status = request.GET.get("status")
+    sector = request.GET.get("sector")
+    priority = request.GET.get("priority")
+    date_from = request.GET.get("from")
+    date_to = request.GET.get("to")
+    keyword = request.GET.get("keyword")
+    latitude = request.GET.get("latitude")
+    longitude = request.GET.get("longitude")
+
+    if category:
+        filters &= Q(category=category)
+    if status:
+        filters &= Q(status=status)
+    if sector:
+        filters &= Q(sector=sector)
+    if priority:
+        filters &= Q(priority=priority)
+
+    from_date = _parse_iso_date(date_from)
+    if from_date:
+        filters &= Q(created_at__date__gte=from_date)
+
+    to_date = _parse_iso_date(date_to)
+    if to_date:
+        filters &= Q(created_at__date__lte=to_date)
+
+    if keyword:
+        filters &= Q(description__icontains=keyword)
+
+    if latitude:
+        try:
+            filters &= Q(latitude=Decimal(latitude))
+        except InvalidOperation:
+            pass
+    if longitude:
+        try:
+            filters &= Q(longitude=Decimal(longitude))
+        except InvalidOperation:
+            pass
+
+    return filters
+
+
+def _is_json_request(request):
+    accept = request.headers.get("Accept", "")
+    return "application/json" in accept.lower() or request.GET.get("format") == "json"
+
+
+def _serialize_reports_page(page):
+    return {
+        "count": page.paginator.count,
+        "num_pages": page.paginator.num_pages,
+        "page": page.number,
+        "results": [_serialize_report(report) for report in page.object_list],
+    }
+
+
 def home(request):
-    """Render project landing page."""
-    return render(request, "reports/home.html")
+    """Render project landing page or search/filter endpoint."""
+    should_filter = _is_json_request(request) or any(
+        request.GET.get(param)
+        for param in [
+            "category",
+            "status",
+            "sector",
+            "priority",
+            "from",
+            "to",
+            "keyword",
+            "latitude",
+            "longitude",
+            "page",
+        ]
+    )
+
+    if not should_filter:
+        return render(request, "reports/home.html")
+
+    filters = _build_report_filters(request)
+    queryset = Report.objects.filter(filters).order_by("-created_at")
+
+    paginator = Paginator(queryset, 20)
+    page_number = request.GET.get("page", 1)
+    try:
+        page_obj = paginator.page(page_number)
+    except (PageNotAnInteger, EmptyPage):
+        page_obj = paginator.page(1)
+
+    if _is_json_request(request):
+        return JsonResponse(_serialize_reports_page(page_obj), status=200)
+
+    return render(request, "reports/home.html", {"reports_page": page_obj})
 
 
 def dashboard(request):
