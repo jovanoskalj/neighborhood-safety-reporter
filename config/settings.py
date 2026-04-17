@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     "apps.ai_classifier",
     "apps.notifications",
     "apps.analytics",
+    "apps.ai_classifier",
 ]
 
 MIDDLEWARE = [
