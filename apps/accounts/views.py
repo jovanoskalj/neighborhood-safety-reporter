@@ -13,9 +13,11 @@ from django.core.mail import send_mail
 from django.shortcuts import redirect, render
 from django.template.loader import render_to_string
 from django.utils import timezone
+from django.contrib.admin.views.decorators import staff_member_required
+from apps.reports.models import Report
 
 from .forms import RegisterForm
-from .models import EmailVerificationCode, UserProfile
+from .models import EmailVerificationCode, UserProfile, AuditLog
 
 
 ROLE_GROUPS = {
@@ -192,3 +194,65 @@ def profile_view(request):
         return redirect("profile")
 
     return render(request, "accounts/profile.html", {"profile": profile, "sector_choices": UserProfile.SECTOR_CHOICES})
+
+
+@staff_member_required
+def admin_user_list(request):
+    """List all users with their roles and active status."""
+    users = User.objects.select_related('userprofile').all().order_by('id').distinct()
+    return render(request, 'accounts/admin_user_list.html', {'users': users})
+
+
+@staff_member_required
+def admin_user_toggle(request, user_id):
+    """Activate or deactivate a user account."""
+    if request.method == 'POST':
+        target_user = User.objects.get(id=user_id)
+        target_user.is_active = not target_user.is_active
+        target_user.save()
+        AuditLog.objects.create(
+            user=request.user,
+            action='toggle_active',
+            target_model='User',
+            target_id=user_id,
+            details={'is_active': target_user.is_active}
+        )
+        messages.success(request, f"User {target_user.username} updated.")
+        return redirect('admin_user_list')
+    
+
+@staff_member_required
+def admin_user_update_role(request, user_id):
+    """Update a user's role."""
+    if request.method == 'POST':
+        target_user = User.objects.get(id=user_id)
+        profile, _ = UserProfile.objects.get_or_create(user=target_user)
+        new_role = request.POST.get('role')
+        if new_role in dict(UserProfile.ROLE_CHOICES):
+            UserProfile.objects.filter(user=target_user).update(role=new_role)
+            AuditLog.objects.create(
+                user=request.user,
+                action='update_role',
+                target_model='User',
+                target_id=user_id,
+                details={'new_role': new_role}
+            )
+            messages.success(request, f"Role updated to {new_role}.")
+        return redirect('admin_user_list')
+    
+
+@staff_member_required
+def admin_system_log(request):
+    """Read-only view of all audit log entries."""
+    logs = AuditLog.objects.select_related('user').order_by('-timestamp')[:200]
+    return render(request, 'accounts/admin_system_log.html', {'logs': logs})
+
+@staff_member_required
+def admin_category_list(request):
+    """List available report categories and sectors."""
+    categories = Report.CATEGORY_CHOICES
+    sectors = Report.SECTOR_CHOICES
+    return render(request, 'accounts/admin_categories.html', {
+        'categories': categories,
+        'sectors': sectors
+    })
