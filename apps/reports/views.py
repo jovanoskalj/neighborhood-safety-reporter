@@ -1,9 +1,8 @@
 import csv
 import io
-from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from .models import Report
 
 try:
@@ -12,24 +11,27 @@ try:
 except ImportError:
     OPENPYXL_AVAILABLE = False
 
+    
 def home(request):
-    """Render project landing page."""
     return render(request, "reports/home.html")
 
 
 def dashboard(request):
-    """Render post-login dashboard page."""
     return render(request, "reports/dashboard.html")
 
 
 @login_required
 def submit_report(request):
-    """Render report submission page (login required)."""
     return render(request, "reports/submit_report.html")
 
-@staff_member_required
+@login_required
 def export_reports(request):
-    """Export reports to CSV or Excel with optional filters."""
+    try:
+        profile = request.user.userprofile
+        if profile.role != 'admin' and not request.user.is_superuser:
+            return redirect('dashboard')
+    except:
+        return redirect('dashboard')
     fmt = request.GET.get('format', 'csv')
     date_from = request.GET.get('from')
     date_to = request.GET.get('to')
