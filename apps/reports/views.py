@@ -28,8 +28,8 @@ def submit_report(request):
 def export_reports(request):
     try:
         profile = request.user.userprofile
-        if profile.role != 'admin' and not request.user.is_superuser:
-            return redirect('dashboard')
+        if profile.role != 'admin':
+             return redirect('dashboard')
     except:
         return redirect('dashboard')
     fmt = request.GET.get('format', 'csv')
