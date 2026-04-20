@@ -80,7 +80,11 @@ def reports_json(request):
     return JsonResponse({"results": data})
 
 def user_is_officer(user):
-    return user.groups.filter(name__in=['officer', 'officers']).exists()
+    if not user.is_authenticated:
+        return False
+    if not hasattr(user, "userprofile"):
+        return False
+    return user.userprofile.role == "officer"
 
 
 # def get_user_sector(user):
