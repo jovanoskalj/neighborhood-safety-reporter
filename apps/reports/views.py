@@ -5,9 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Count
 from django.db.models.functions import Round
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, redirect, render, redirect
-from .models import Report
-from .services import generate_ai_summary
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -33,8 +31,8 @@ def submit_report(request):
     GET returns an empty ``ReportSubmissionForm``. POST validates the
     submitted data; on success the report is saved with the current
     user as ``citizen`` and the user is redirected back to the same
-    page with a success message. On failure the page re-renders with
-    per-field errors and previously submitted values preserved.
+    page with a success message. The AI classification pipeline runs
+    via a ``post_save`` signal on ``Report`` (see ``apps/reports/signals.py``).
     """
     if request.method == "POST":
         form = ReportSubmissionForm(request.POST, request.FILES)
@@ -139,8 +137,6 @@ def create_report(request):
     return JsonResponse(_serialize_report(report), status=201)
 
 
-
-
 @login_required
 def heatmap(request):
     """Returns lat/lng/weight data for Leaflet.heat heatmap plugin."""
@@ -158,24 +154,3 @@ def heatmap(request):
     ]
 
     return JsonResponse(result, safe=False)
-
-
-@login_required
-def submit_report(request):
-    if request.method == "POST":
-        report = Report.objects.create(
-            citizen=request.user,
-            description=request.POST.get("description"),
-            latitude=request.POST.get("latitude"),
-            longitude=request.POST.get("longitude"),
-        )
-
-        ai_summary = generate_ai_summary(report.description)
-
-        report.internal_note = ai_summary
-        report.ai_processed = True
-        report.save()
-
-        return redirect("dashboard")
-
-    return render(request, "reports/submit_report.html")

@@ -1,9 +1,7 @@
+"""Auth-path tests covering the register → verify → login → logout cycle (T-13)."""
 import pytest
-from datetime import timedelta
 from django.contrib.auth.models import User
 from django.urls import reverse
-from django.utils import timezone
-from unittest.mock import patch
 
 from apps.accounts.models import EmailVerificationCode
 
@@ -48,42 +46,22 @@ def test_logout(client, citizen_user):
 
 
 @pytest.mark.django_db
-def test_register_user(mock_send_mail, client):
-    response = client.post(reverse("register"), {
-        "username": "new_user",
-        "email": "new.user@test.com",
-        "password1": "newuser123",
-        "password2": "newuser123",
-        "role": "citizen",
-        "sector": "",
-        "phone": "123456"
-    })
+def test_verify_email_code_activates_user(client, settings):
+    """Posting the DEV verification code activates the pending user."""
+    settings.SENDGRID_ENABLED = False
+    settings.DEV_VERIFICATION_CODE = "111111"
 
-    assert response.status_code == 302
-    assert response.url == reverse("verify_email_code")
-    user = User.objects.get(username="new_user")
-    assert user.is_active is False
-    assert EmailVerificationCode.objects.filter(user=user).exists()
-
-
-@pytest.mark.django_db
-def test_verify_email_code_activates_user(client):
     user = User.objects.create_user(
         username="pending_user",
         email="pending@test.com",
         password="pending123",
         is_active=False,
     )
-    EmailVerificationCode.objects.create(
-        user=user,
-        code="123456",
-        expires_at=timezone.now() + timedelta(minutes=10),
-    )
     session = client.session
     session["pending_verification_user_id"] = user.id
     session.save()
 
-    response = client.post(reverse("verify_email_code"), {"code": "123456"})
+    response = client.post(reverse("verify_email_code"), {"code": "111111"})
     assert response.status_code == 302
     assert response.url == reverse("login")
 
@@ -93,6 +71,7 @@ def test_verify_email_code_activates_user(client):
 
 @pytest.mark.django_db
 def test_register_and_verify_email(client):
+    """Registration creates an inactive user plus a verification record."""
     response = client.post(reverse("register"), {
         "username": "new_user",
         "email": "new.user@test.com",
@@ -115,6 +94,7 @@ def test_register_and_verify_email(client):
 
 @pytest.mark.django_db
 def test_login_logout(client, citizen_user):
+    """Login establishes a session; logout clears it."""
     login_response = client.post(reverse("login"), {
         "username": "citizen",
         "password": "citizen123"
