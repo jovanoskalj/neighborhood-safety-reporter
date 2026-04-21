@@ -31,8 +31,8 @@ def submit_report(request):
     GET returns an empty ``ReportSubmissionForm``. POST validates the
     submitted data; on success the report is saved with the current
     user as ``citizen`` and the user is redirected back to the same
-    page with a success message. On failure the page re-renders with
-    per-field errors and previously submitted values preserved.
+    page with a success message. The AI classification pipeline runs
+    via a ``post_save`` signal on ``Report`` (see ``apps/reports/signals.py``).
     """
     if request.method == "POST":
         form = ReportSubmissionForm(request.POST, request.FILES)
@@ -135,8 +135,6 @@ def create_report(request):
 
     report.refresh_from_db()
     return JsonResponse(_serialize_report(report), status=201)
-
-
 
 
 @login_required
