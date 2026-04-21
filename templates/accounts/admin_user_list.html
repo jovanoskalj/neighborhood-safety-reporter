@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>User Management</h2>
+  <table class="table table-bordered">
+    <thead>
+      <tr>
+        <th>ID</th><th>Username</th><th>Email</th><th>Role</th><th>Active</th><th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr>
+        <td>{{ u.id }}</td>
+        <td>{{ u.username }}</td>
+        <td>{{ u.email }}</td>
+        <td>
+          <form method="post" action="{% url 'admin_user_update_role' u.id %}">
+            {% csrf_token %}
+            <select name="role" onchange="this.form.submit()">
+              <option value="citizen" {% if u.userprofile.role == 'citizen' %}selected{% endif %}>Citizen</option>
+              <option value="officer" {% if u.userprofile.role == 'officer' %}selected{% endif %}>Officer</option>
+              <option value="admin" {% if u.userprofile.role == 'admin' %}selected{% endif %}>Admin</option>
+            </select>
+          </form>
+        </td>
+        <td>{{ u.is_active|yesno:"Yes,No" }}</td>
+        <td>
+          <form method="post" action="{% url 'admin_user_toggle' u.id %}">
+            {% csrf_token %}
+            <button class="btn btn-sm {% if u.is_active %}btn-danger{% else %}btn-success{% endif %}">
+              {% if u.is_active %}Deactivate{% else %}Activate{% endif %}
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+ 
+</div>
+{% endblock %}
