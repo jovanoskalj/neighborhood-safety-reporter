@@ -1,7 +1,6 @@
 from django.contrib.auth.decorators import user_passes_test
-from django.shortcuts import render
 from django.db.models import Count
-from django.db.models.functions import TruncWeek, TruncMonth, TruncYear
+from django.db.models.functions import TruncMonth, TruncWeek, TruncYear
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
@@ -22,13 +21,7 @@ def is_analytics_user(user) -> bool:
     return user.is_superuser or user.groups.filter(name__in=['admin', 'administrators', 'officer', 'officers']).exists()
 
 
-@user_passes_test(is_analytics_user)
-def dashboard_view(request):
-    """Render the analytics dashboard page."""
-    return render(request, "analytics/dashboard.html")
-
-
-def _group_by_field(field: str) -> list[dict]:
+def _group_by_field(field):
     """Return [{label, count}] for a Report CharField using a single query."""
     return [
         {"label": row[field], "count": row["count"]}
@@ -36,7 +29,7 @@ def _group_by_field(field: str) -> list[dict]:
     ]
 
 
-def _time_series(period: str) -> list[dict]:
+def _time_series(period):
     """Return chronological [{period, count}] bucketed by the requested period."""
     trunc_fn = _TRUNC_MAP.get(period, _TRUNC_MAP[_DEFAULT_PERIOD])
     qs = (

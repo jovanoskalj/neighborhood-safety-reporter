@@ -108,19 +108,63 @@
     <div class="card border-0 shadow-sm">
         <div class="card-body p-3 p-md-4">
             {% if active_tab == 'analytics' %}
-                <h2 class="h4 mb-3 admin-section-title">Аналитика</h2>
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+                    <h2 class="h4 mb-0 admin-section-title">Аналитика</h2>
+                    <div class="d-flex align-items-center gap-2">
+                        <label for="periodSelect" class="small fw-bold text-muted text-nowrap mb-0">Период:</label>
+                        <select id="periodSelect" class="form-select form-select-sm border-0 bg-light"
+                                style="min-width: 130px; border-radius: 8px; cursor: pointer;">
+                            <option value="weekly">Неделно</option>
+                            <option value="monthly" selected>Месечно</option>
+                            <option value="yearly">Годишно</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div class="row g-4">
-                    <div class="col-lg-6">
-                        <h3 class="h6 text-muted text-uppercase">Категории</h3>
-                        <div class="admin-chart-shell">
-                            <canvas id="categoryChart"></canvas>
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-white py-3 border-0">
+                                <h3 class="h6 mb-0 fw-bold">Пријави низ времето</h3>
+                            </div>
+                            <div class="card-body p-4">
+                                <div style="height: 320px;">
+                                    <canvas id="timeSeriesChart"></canvas>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="col-lg-6">
-                        <h3 class="h6 text-muted text-uppercase">Статуси</h3>
-                        <div class="admin-chart-shell">
-                            <canvas id="statusChart"></canvas>
+                    <div class="col-lg-7">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-white py-3 border-0">
+                                <h3 class="h6 mb-0 fw-bold">Дистрибуција по категории</h3>
+                            </div>
+                            <div class="card-body p-4">
+                                <div style="height: 300px;">
+                                    <canvas id="categoryChart"></canvas>
+                                </div>
+                            </div>
                         </div>
+                    </div>
+                    <div class="col-lg-5">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-white py-3 border-0">
+                                <h3 class="h6 mb-0 fw-bold">Статус на пријави</h3>
+                            </div>
+                            <div class="card-body p-4 d-flex align-items-center justify-content-center">
+                                <div style="height: 300px; width: 100%;">
+                                    <canvas id="statusChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="analyticsLoading"
+                     class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-white bg-opacity-75 d-none"
+                     style="z-index: 1050;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Се вчита...</span>
                     </div>
                 </div>
             {% elif active_tab == 'users' %}
@@ -284,50 +328,132 @@
 </section>
 
 {% if active_tab == 'analytics' %}
-{{ category_counts|json_script:"category-data" }}
-{{ status_counts|json_script:"status-data" }}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
-    const categoryData = JSON.parse(document.getElementById("category-data").textContent || "[]");
-    const statusData = JSON.parse(document.getElementById("status-data").textContent || "[]");
-    const categoryLabels = categoryData.map(item => item.category);
-    const categoryValues = categoryData.map(item => item.total);
-    const statusLabels = statusData.map(item => item.status);
-    const statusValues = statusData.map(item => item.total);
+    (function () {
+        const LABELS = {
+            new: 'Нови', in_progress: 'Во тек', resolved: 'Решени', unclassified: 'Некласификувани',
+            infrastructure: 'Инфраструктура', utilities: 'Комуналии', safety: 'Безбедност',
+            health: 'Здравство', other: 'Останато',
+            urgent: 'Итно', normal: 'Нормално', low: 'Ниско'
+        };
+        const translate = (key) => LABELS[key] || key;
 
-    const categoryCanvas = document.getElementById("categoryChart");
-    const statusCanvas = document.getElementById("statusChart");
+        const endpoint = "{% url 'api_analytics:stats' %}";
+        const overlay = document.getElementById('analyticsLoading');
 
-    if (categoryCanvas) {
-        new Chart(categoryCanvas, {
-            type: "bar",
-            data: {
-                labels: categoryLabels,
-                datasets: [{
-                    label: "Пријави по категорија",
-                    data: categoryValues,
-                    backgroundColor: "rgba(26, 34, 56, 0.75)",
-                    borderRadius: 8
-                }]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
-    }
+        let timeChart = null;
+        let categoryChart = null;
+        let statusChart = null;
 
-    if (statusCanvas) {
-        new Chart(statusCanvas, {
-            type: "doughnut",
-            data: {
-                labels: statusLabels,
-                datasets: [{
-                    label: "Пријави по статус",
-                    data: statusValues,
-                    backgroundColor: ["#1a2238", "#2ecc71", "#f39c12", "#95a5a6"]
-                }]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
-    }
+        function formatPeriodLabel(value, periodType) {
+            const d = new Date(value);
+            if (periodType === 'weekly') {
+                const end = new Date(d);
+                end.setDate(d.getDate() + 6);
+                const endStr = end.toLocaleDateString('mk-MK', { day: '2-digit', month: 'short' });
+                const startStr = d.toLocaleDateString('mk-MK', { day: '2-digit', month: 'short' });
+                return `${startStr} – ${endStr}`;
+            }
+            if (periodType === 'monthly') {
+                return d.toLocaleDateString('mk-MK', { month: 'short', year: 'numeric' });
+            }
+            return d.getFullYear();
+        }
+
+        function renderTimeSeries(data) {
+            const ctx = document.getElementById('timeSeriesChart');
+            if (!ctx) return;
+            if (timeChart) timeChart.destroy();
+            timeChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.by_period.data.map(item => formatPeriodLabel(item.period, data.by_period.period_type)),
+                    datasets: [{
+                        label: 'Пријави',
+                        data: data.by_period.data.map(item => item.count),
+                        borderColor: '#1a2238',
+                        backgroundColor: 'rgba(26, 34, 56, 0.08)',
+                        tension: 0.4,
+                        fill: true,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                },
+            });
+        }
+
+        function renderCategory(data) {
+            const ctx = document.getElementById('categoryChart');
+            if (!ctx) return;
+            if (categoryChart) categoryChart.destroy();
+            categoryChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.by_category.map(item => translate(item.label)),
+                    datasets: [{
+                        label: 'Број',
+                        data: data.by_category.map(item => item.count),
+                        backgroundColor: '#1a2238',
+                        borderRadius: 6,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                },
+            });
+        }
+
+        function renderStatus(data) {
+            const ctx = document.getElementById('statusChart');
+            if (!ctx) return;
+            if (statusChart) statusChart.destroy();
+            statusChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.by_status.map(item => translate(item.label)),
+                    datasets: [{
+                        data: data.by_status.map(item => item.count),
+                        backgroundColor: ['#1a2238', '#f39c12', '#2ecc71', '#7f8c8d'],
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: { legend: { position: 'bottom' } },
+                },
+            });
+        }
+
+        async function load(period) {
+            if (overlay) overlay.classList.remove('d-none');
+            try {
+                const resp = await fetch(`${endpoint}?period=${period}`);
+                if (!resp.ok) throw new Error(`status ${resp.status}`);
+                const data = await resp.json();
+                renderTimeSeries(data);
+                renderCategory(data);
+                renderStatus(data);
+            } catch (err) {
+                console.error('Analytics fetch failed:', err);
+            } finally {
+                if (overlay) overlay.classList.add('d-none');
+            }
+        }
+
+        const select = document.getElementById('periodSelect');
+        if (select) {
+            select.addEventListener('change', (e) => load(e.target.value));
+        }
+
+        load(select ? select.value : 'monthly');
+    })();
 </script>
 {% endif %}
 {% endblock %}

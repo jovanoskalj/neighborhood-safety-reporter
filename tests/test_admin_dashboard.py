@@ -40,6 +40,26 @@ def test_dashboard_renders_for_admin(client, admin_with_profile):
 
 
 @pytest.mark.django_db
+def test_analytics_tab_includes_t27_chart_widgets(client, admin_with_profile):
+    client.login(username="admin_user", password="AdminStrongPass9!")
+    response = client.get(reverse("dashboard") + "?tab=analytics")
+    content = response.content.decode()
+
+    assert response.status_code == 200
+    assert 'id="timeSeriesChart"' in content
+    assert 'id="categoryChart"' in content
+    assert 'id="statusChart"' in content
+    assert 'id="periodSelect"' in content
+    # Period selector exposes all three buckets the API understands.
+    for bucket in ("weekly", "monthly", "yearly"):
+        assert f'value="{bucket}"' in content
+    # Chart.js is loaded on this tab.
+    assert "chart.umd.min.js" in content
+    # JS fetches the stats API via Django URL reversing.
+    assert "/api/analytics/stats/" in content
+
+
+@pytest.mark.django_db
 def test_dashboard_redirects_citizen_to_home(client, citizen_user):
     """Citizens must not be bounced to the login page (old admin-only bug)."""
     client.login(username="citizen", password="citizen123")
