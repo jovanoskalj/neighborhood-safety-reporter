@@ -11,4 +11,6 @@ urlpatterns = [
 
     path('reports/<int:report_id>/status/', views.update_report_status, name='update_report_status'),
     path('officer/', views.officer_panel, name='officer_panel'),
+    path('reports/export/', views.export_reports, name='export_reports'),
 ]
+
