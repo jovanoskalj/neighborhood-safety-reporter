@@ -11,4 +11,5 @@ urlpatterns = [
     path('heatmap/', views.heatmap, name='heatmap'),
     path('map/', views.map_view, name='map_view'),
     path('api/reports/json/', views.reports_json, name='reports_json'),
+    path('officer/', views.officer_panel, name='officer_panel'),
 ]

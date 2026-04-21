@@ -60,6 +60,7 @@ def get_user_sector(user):
 @login_required
 @require_http_methods(["PATCH"])
 def update_report_status(request, report_id):
+    """Officer-only endpoint that updates a report's status and internal note."""
     if not user_is_officer(request.user):
         return JsonResponse({"error": "Only officers may update report status."}, status=403)
 
@@ -80,11 +81,18 @@ def update_report_status(request, report_id):
     report.status = new_status
     report.status_changed_at = timezone.now()
     report.assigned_officer = request.user
-    report.save(update_fields=["status", "status_changed_at", "assigned_officer"])
+
+    update_fields = ["status", "status_changed_at", "assigned_officer"]
+    if "internal_note" in payload:
+        report.internal_note = payload.get("internal_note") or ""
+        update_fields.append("internal_note")
+
+    report.save(update_fields=update_fields)
 
     return JsonResponse({
         "id": report.pk,
         "status": report.status,
+        "internal_note": report.internal_note,
         "status_changed_at": report.status_changed_at.isoformat(),
         "assigned_officer": request.user.username,
     })
@@ -214,3 +222,27 @@ def reports_json(request):
     ]
 
     return JsonResponse({"results": data})
+
+
+
+# # 
+@login_required
+def officer_panel(request):
+    if not user_is_officer(request.user):
+        return redirect('dashboard')
+    
+    sector = get_user_sector(request.user)
+    reports = Report.objects.filter(sector=sector).order_by('-created_at')
+    
+    status_filter = request.GET.get('status')
+    if status_filter:
+        reports = reports.filter(status=status_filter)
+    
+    priority_filter = request.GET.get('priority')
+    if priority_filter:
+        reports = reports.filter(priority=priority_filter)
+        
+    return render(request, "reports/officer_panel.html", {
+        "reports": reports,
+        "sector": sector,
+    })
