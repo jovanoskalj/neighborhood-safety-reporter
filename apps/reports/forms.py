@@ -1,9 +1,12 @@
-"""Forms for citizen-facing report submission (web and API)."""
+"""Forms for report submission (web + API) and admin dashboard CRUD."""
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from django import forms
+from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as CoreValidationError
 
-from .models import Report
+from .models import Report, ReportCategory, Sector
 
 
 _COORD_QUANTUM = Decimal("0.000001")
@@ -80,3 +83,49 @@ class ReportSubmissionForm(forms.ModelForm):
         if content_type not in {"image/jpeg", "image/png"}:
             raise forms.ValidationError("Дозволени се само JPG или PNG слики.")
         return image
+
+
+class ReportCategoryForm(forms.ModelForm):
+    """Form for creating and updating report categories from admin panel."""
+
+    class Meta:
+        model = ReportCategory
+        fields = ["key", "name", "is_active"]
+
+
+class SectorForm(forms.ModelForm):
+    """Form for creating and updating sectors from admin panel."""
+
+    class Meta:
+        model = Sector
+        fields = ["key", "name", "is_active"]
+
+
+class AdminUserCreateForm(forms.Form):
+    """Form for creating users from admin dashboard users tab."""
+
+    ROLE_CHOICES = [
+        ("citizen", "Граѓанин"),
+        ("officer", "Работник"),
+        ("admin", "Админ"),
+    ]
+
+    username = forms.CharField(max_length=150)
+    email = forms.EmailField(required=False)
+    password = forms.CharField(max_length=128, widget=forms.PasswordInput)
+    role = forms.ChoiceField(choices=ROLE_CHOICES)
+
+    def clean_username(self) -> str:
+        username = self.cleaned_data["username"].strip()
+        if User.objects.filter(username=username).exists():
+            raise forms.ValidationError("Корисничкото име веќе постои.")
+        return username
+
+    def clean_password(self) -> str:
+        """Enforce Django's configured password validators (min length, etc.)."""
+        password = self.cleaned_data.get("password", "")
+        try:
+            validate_password(password)
+        except CoreValidationError as error:
+            raise forms.ValidationError(list(error.messages))
+        return password

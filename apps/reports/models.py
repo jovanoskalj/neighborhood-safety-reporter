@@ -1,5 +1,37 @@
-from django.db import models
 from django.contrib.auth.models import User
+from django.db import models
+
+
+class ReportCategory(models.Model):
+    """Admin-managed report category option used in dashboard settings."""
+
+    key = models.SlugField(max_length=50, unique=True)
+    name = models.CharField(max_length=100, unique=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class Sector(models.Model):
+    """Admin-managed sector option used in dashboard settings."""
+
+    key = models.SlugField(max_length=50, unique=True)
+    name = models.CharField(max_length=100, unique=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        return self.name
 
 
 MUNICIPALITY_CHOICES = [
@@ -119,7 +151,6 @@ class Report(models.Model):
     municipality = models.CharField(max_length=100, choices=MUNICIPALITY_CHOICES, blank=True, default='')
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='new')
     sector = models.CharField(max_length=50, choices=SECTOR_CHOICES, default='admin')
-    municipality = models.CharField(max_length=120, blank=True, default='')
     assigned_officer = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_reports')
     internal_note = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
