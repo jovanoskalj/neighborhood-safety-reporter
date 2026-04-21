@@ -45,6 +45,9 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
+# Required for OpenStreetMap tile usage policy: keep origin referrer on cross-site tile requests.
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+
 ROOT_URLCONF = "config.urls"
 
 TEMPLATES = [

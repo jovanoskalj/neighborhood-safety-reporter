@@ -11,7 +11,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from .forms import ReportCreateForm, ReportSubmissionForm
-from .models import Report
+from .models import MUNICIPALITY_CHOICES, Report
 
 
 def home(request):
@@ -154,3 +154,63 @@ def heatmap(request):
     ]
 
     return JsonResponse(result, safe=False)
+
+
+
+@login_required
+def map_view(request):
+    """Render interactive map page with report filters."""
+    municipality_labels = dict(MUNICIPALITY_CHOICES)
+    distinct_slugs = (
+        Report.objects.exclude(municipality="")
+        .values_list("municipality", flat=True)
+        .distinct()
+    )
+    municipalities = sorted(
+        ((slug, municipality_labels.get(slug, slug)) for slug in distinct_slugs),
+        key=lambda item: item[1],
+    )
+
+    context = {
+        "category_choices": Report.CATEGORY_CHOICES,
+        "status_choices": Report.STATUS_CHOICES,
+        "municipalities": municipalities,
+    }
+    return render(request, "reports/map.html", context)
+
+
+@login_required
+def reports_json(request):
+    """Return reports as JSON for AJAX-based Leaflet map rendering."""
+    queryset = Report.objects.all().order_by("-created_at")
+
+    category = request.GET.get("category", "").strip()
+    status = request.GET.get("status", "").strip()
+    municipality = request.GET.get("municipality", "").strip()
+
+    if category:
+        queryset = queryset.filter(category=category)
+    if status:
+        queryset = queryset.filter(status=status)
+    if municipality:
+        queryset = queryset.filter(municipality=municipality)
+
+    status_labels = dict(Report.STATUS_CHOICES)
+    category_labels = dict(Report.CATEGORY_CHOICES)
+
+    data = [
+        {
+            "id": report.pk,
+            "description": report.description,
+            "status": report.status,
+            "status_label": status_labels.get(report.status, report.status),
+            "category": report.category,
+            "category_label": category_labels.get(report.category, report.category),
+            "municipality": report.municipality or "",
+            "lat": float(report.latitude),
+            "lng": float(report.longitude),
+        }
+        for report in queryset
+    ]
+
+    return JsonResponse({"results": data})

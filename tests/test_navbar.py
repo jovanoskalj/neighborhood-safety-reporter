@@ -26,7 +26,7 @@ def test_citizen_navbar(client, citizen_user):
     submit_link = reverse("submit_report")
 
     assert 'class="nav-link" href="/">Дома</a>' not in content
-    assert "Мапа" not in content
+    assert "Мапа" in content
     assert f'class="dropdown-item" href="{submit_link}">Поднеси пријава</a>' in content
     assert "Мои пријави" in content
     assert "Профил" in content
@@ -43,7 +43,7 @@ def test_officer_navbar(client, officer_user):
     submit_link = reverse("submit_report")
 
     assert 'class="nav-link" href="/">Дома</a>' not in content
-    assert "Мапа" not in content
+    assert "Мапа" in content
     assert "Работен панел" in content
     assert "Профил" in content
     assert "Одјава" in content
@@ -60,7 +60,7 @@ def test_admin_navbar(client, admin_user):
     submit_link = reverse("submit_report")
 
     assert 'class="nav-link" href="/">Дома</a>' not in content
-    assert "Мапа" not in content
+    assert "Мапа" in content
     assert "Админ панел" in content
     assert "Профил" in content
     assert "Одјава" in content
