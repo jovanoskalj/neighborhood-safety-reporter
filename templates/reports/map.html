@@ -50,8 +50,8 @@
                     <label class="form-label" for="filter-municipality">Општина</label>
                     <select id="filter-municipality" class="form-select">
                         <option value="">Сите општини</option>
-                        {% for municipality in municipalities %}
-                            <option value="{{ municipality }}">{{ municipality }}</option>
+                        {% for slug, label in municipalities %}
+                            <option value="{{ slug }}">{{ label }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -63,6 +63,7 @@
                     <li><span class="legend-dot dot-new"></span> Нов</li>
                     <li><span class="legend-dot dot-in-progress"></span> Во тек</li>
                     <li><span class="legend-dot dot-resolved"></span> Решен</li>
+                    <li><span class="legend-dot dot-unclassified"></span> Некласиран</li>
                 </ul>
             </div>
         </aside>

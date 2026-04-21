@@ -371,6 +371,10 @@ form textarea {
     background-color: #198754;
 }
 
+.dot-unclassified {
+    background-color: #6c757d;
+}
+
 .map-pin {
     border-radius: 50%;
     border: 2px solid #ffffff;

@@ -11,7 +11,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from .forms import ReportCreateForm, ReportSubmissionForm
-from .models import Report
+from .models import MUNICIPALITY_CHOICES, Report
 
 
 def home(request):
@@ -160,11 +160,15 @@ def heatmap(request):
 @login_required
 def map_view(request):
     """Render interactive map page with report filters."""
-    municipalities = (
+    municipality_labels = dict(MUNICIPALITY_CHOICES)
+    distinct_slugs = (
         Report.objects.exclude(municipality="")
         .values_list("municipality", flat=True)
         .distinct()
-        .order_by("municipality")
+    )
+    municipalities = sorted(
+        ((slug, municipality_labels.get(slug, slug)) for slug in distinct_slugs),
+        key=lambda item: item[1],
     )
 
     context = {
