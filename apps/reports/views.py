@@ -1,3 +1,4 @@
+from ast import keyword
 import csv
 import json
 from datetime import date
@@ -16,6 +17,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+from urllib3 import request
 
 from apps.accounts.models import AuditLog, UserProfile
 from apps.notifications.senders import send_status_change_email
@@ -78,10 +80,22 @@ def _build_report_filters(request):
     if to_date:
         filters &= Q(created_at__date__lte=to_date)
 
+   
     keyword = request.GET.get("keyword")
     if keyword:
-        filters &= Q(description__icontains=keyword)
-
+        clean_keyword = keyword.strip()
+        if clean_keyword.upper().startswith("ПРЈ-"):
+            clean_keyword = clean_keyword[4:]
+        matching_slugs = [
+            slug for slug, label in MUNICIPALITY_CHOICES
+            if keyword.lower() in label.lower()
+        ]
+        filters &= (
+            Q(description__icontains=keyword) |
+            Q(id__icontains=clean_keyword) |
+            Q(municipality__in=matching_slugs) |
+            Q(category__icontains=keyword)
+        )
     for param, lookup in (
         ("lat_min", "latitude__gte"),
         ("lat_max", "latitude__lte"),
@@ -736,3 +750,47 @@ def officer_panel(request):
         "reports": reports,
         "sector": sector,
     })
+
+
+@login_required
+def search_page(request):
+    """Public search page with keyword, filters, list & map toggle."""
+    filters = _build_report_filters(request)
+    
+  
+    opshtina = request.GET.get("opshtina", "").strip()
+    if opshtina:
+        filters &= Q(municipality=opshtina)
+    
+    queryset = Report.objects.filter(filters).order_by("-created_at")
+    
+    # Sorting
+    sort_by = request.GET.get("sort", "date")
+    if sort_by == "priority":
+        priority_order = {"urgent": 0, "normal": 1, "low": 2}
+        queryset = sorted(queryset, key=lambda r: priority_order.get(r.priority, 99))
+    elif sort_by == "status":
+        queryset = queryset.order_by("status")
+    else:
+        queryset = queryset.order_by("-created_at")
+
+    municipality_labels = dict(MUNICIPALITY_CHOICES)
+    distinct_slugs = (
+        Report.objects.exclude(municipality="")
+        .values_list("municipality", flat=True)
+        .distinct()
+    )
+    municipalities = sorted(
+        ((slug, municipality_labels.get(slug, slug)) for slug in distinct_slugs),
+        key=lambda item: item[1],
+    )
+
+    context = {
+        "reports": queryset,
+        "query": request.GET,
+        "status_choices": Report.STATUS_CHOICES,
+        "priority_choices": Report.PRIORITY_CHOICES,
+        "municipalities": municipalities,
+        "total": len(queryset) if isinstance(queryset, list) else queryset.count(),
+    }
+    return render(request, "reports/search.html", context)

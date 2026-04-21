@@ -23,4 +23,6 @@ urlpatterns = [
     path('dashboard/sectors/<int:sector_id>/delete/', views.delete_sector, name='delete_sector'),
     path('dashboard/export/', views.export_reports_csv, name='export_reports_csv'),
     path('dashboard/import/', views.import_reports_stub, name='import_reports_stub'),
+    path('search/', views.search_page, name='search_page'),
+
 ]
