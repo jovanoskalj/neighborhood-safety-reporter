@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('reports', '0002_remove_auditlog_add_indexes'),
+        ('reports', '0003_report_municipality'),
     ]
 
     operations = [

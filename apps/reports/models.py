@@ -151,7 +151,6 @@ class Report(models.Model):
     municipality = models.CharField(max_length=100, choices=MUNICIPALITY_CHOICES, blank=True, default='')
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='new')
     sector = models.CharField(max_length=50, choices=SECTOR_CHOICES, default='admin')
-    municipality = models.CharField(max_length=120, blank=True, default='')
     assigned_officer = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_reports')
     internal_note = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

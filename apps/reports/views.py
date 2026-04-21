@@ -1,23 +1,33 @@
+import csv
 import json
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.models import User
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import Count, Q
+from django.db.models import Avg, Count, DurationField, ExpressionWrapper, F, Q
 from django.db.models.functions import Round
-from django.http import JsonResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.text import slugify
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
+from apps.accounts.models import AuditLog, UserProfile
 from apps.notifications.senders import send_status_change_email
 
-from .forms import ReportCreateForm, ReportSubmissionForm
-from .models import MUNICIPALITY_CHOICES, Report
+from .forms import (
+    AdminUserCreateForm,
+    ReportCategoryForm,
+    ReportCreateForm,
+    ReportSubmissionForm,
+    SectorForm,
+)
+from .models import MUNICIPALITY_CHOICES, Report, ReportCategory, Sector
 
 
 SEARCH_PARAMS = (
@@ -98,21 +108,6 @@ def _serialize_reports_page(page):
         "page": page.number,
         "results": [_serialize_report(report) for report in page.object_list],
     }
-import csv
-
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required, user_passes_test
-from django.contrib.auth.models import User
-from django.db.models import Avg, Count, DurationField, ExpressionWrapper, F
-from django.http import HttpRequest, HttpResponse
-from django.shortcuts import get_object_or_404, redirect, render
-from django.utils.text import slugify
-from django.urls import reverse
-
-from apps.accounts.models import AuditLog, UserProfile
-
-from .forms import AdminUserCreateForm, ReportCategoryForm, SectorForm
-from .models import Report, ReportCategory, Sector
 
 
 def home(request):
@@ -123,6 +118,30 @@ def home(request):
 
     if not should_filter:
         return render(request, "reports/home.html")
+
+    if not request.user.is_authenticated:
+        if _is_json_request(request):
+            return JsonResponse({"detail": "Authentication required."}, status=401)
+        return redirect(f"{reverse('login')}?next={request.get_full_path()}")
+
+    filters = _build_report_filters(request)
+    queryset = Report.objects.filter(filters).order_by("-created_at")
+
+    paginator = Paginator(queryset, 20)
+    page_number = request.GET.get("page", 1)
+    try:
+        page_obj = paginator.page(page_number)
+    except (PageNotAnInteger, EmptyPage):
+        page_obj = paginator.page(1)
+
+    if _is_json_request(request):
+        return JsonResponse(_serialize_reports_page(page_obj), status=200)
+
+    return render(
+        request,
+        "reports/search_results.html",
+        {"reports_page": page_obj, "query": request.GET},
+    )
 
 
 def _is_admin_user(user: User) -> bool:
@@ -137,7 +156,7 @@ def _admin_only() -> callable:
     return user_passes_test(_is_admin_user)
 
 
-def _write_audit_log(request: HttpRequest, action: str, target_model: str, target_id: int | None, details: dict) -> None:
+def _write_audit_log(request, action, target_model, target_id, details):
     """Persist admin action to system log."""
     AuditLog.objects.create(
         user=request.user,
@@ -148,7 +167,7 @@ def _write_audit_log(request: HttpRequest, action: str, target_model: str, targe
     )
 
 
-def _build_unique_key(model: type[ReportCategory] | type[Sector], raw_name: str) -> str:
+def _build_unique_key(model, raw_name):
     """Generate a unique slug key for settings entities based on name."""
     base_key = slugify(raw_name)[:45] or "item"
     key = base_key
@@ -163,9 +182,13 @@ def _build_unique_key(model: type[ReportCategory] | type[Sector], raw_name: str)
 
 
 @login_required
-@_admin_only()
 def dashboard(request):
-    """Render admin dashboard with analytics, users, settings, and logs."""
+    """Post-login landing: admin panel for admins, role-appropriate redirect otherwise."""
+    if not _is_admin_user(request.user):
+        if user_is_officer(request.user):
+            return redirect("officer_panel")
+        return redirect("home")
+
     total_reports = Report.objects.count()
     active_users = User.objects.filter(is_active=True).count()
     resolved_reports = Report.objects.filter(status="resolved").count()
@@ -193,11 +216,11 @@ def dashboard(request):
         Report.objects.values("status").annotate(total=Count("id")).order_by("status")
     )
 
-    missing_profile_users = User.objects.filter(userprofile__isnull=True)
+    missing_profile_users = User.objects.filter(profile__isnull=True)
     for listed_user in missing_profile_users:
         UserProfile.objects.get_or_create(user=listed_user)
 
-    users = User.objects.select_related("userprofile").order_by("username")
+    users = User.objects.select_related("profile").order_by("username")
     categories = ReportCategory.objects.order_by("name")
     sectors = Sector.objects.order_by("name")
     logs = AuditLog.objects.select_related("user").order_by("-timestamp")[:20]
