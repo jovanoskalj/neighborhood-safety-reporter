@@ -1,15 +1,19 @@
 import json
 import logging
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db.models import Count
+from django.db.models.functions import Round
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from apps.ai_classifier.classifier import classify_report
 from .forms import ReportCreateForm
+from .forms import ReportSubmissionForm
 from .models import Report
 
 logger = logging.getLogger(__name__)
@@ -27,8 +31,25 @@ def dashboard(request):
 
 @login_required
 def submit_report(request):
-    """Render report submission page (login required)."""
-    return render(request, "reports/submit_report.html")
+    """Render submission form and persist a new report on POST.
+
+    GET returns an empty ``ReportSubmissionForm``. POST validates the
+    submitted data; on success the report is saved with the current
+    user as ``citizen`` and the user is redirected back to the same
+    page with a success message. On failure the page re-renders with
+    per-field errors and previously submitted values preserved.
+    """
+    if request.method == "POST":
+        form = ReportSubmissionForm(request.POST, request.FILES)
+        if form.is_valid():
+            report = form.save(commit=False)
+            report.citizen = request.user
+            report.save()
+            messages.success(request, "Вашата пријава е успешно поднесена.")
+            return redirect("submit_report")
+    else:
+        form = ReportSubmissionForm()
+    return render(request, "reports/submit_report.html", {"form": form})
 
 
 def user_is_officer(user):
@@ -120,3 +141,23 @@ def create_report(request):
     report.refresh_from_db()
     return JsonResponse(_serialize_report(report), status=201)
 
+
+
+
+@login_required
+def heatmap(request):
+    """Returns lat/lng/weight data for Leaflet.heat heatmap plugin."""
+    data = Report.objects.filter(
+        latitude__isnull=False,
+        longitude__isnull=False
+    ).annotate(
+        lat_bucket=Round('latitude', 3),
+        lng_bucket=Round('longitude', 3)
+    ).values('lat_bucket', 'lng_bucket').annotate(weight=Count('id'))
+
+    result = [
+        [float(item['lat_bucket']), float(item['lng_bucket']), item['weight']]
+        for item in data
+    ]
+
+    return JsonResponse(result, safe=False)
