@@ -20,19 +20,19 @@ def submit_report(request):
     """Render report submission page (login required)."""
     return render(request, "reports/submit_report.html")
 
+@login_required
 def heatmap(request):
     """Returns lat/lng/weight data for Leaflet.heat heatmap plugin."""
     data = Report.objects.filter(
         latitude__isnull=False,
         longitude__isnull=False
-    ).values('latitude', 'longitude').annotate(weight=Count('id'))
+    ).annotate(
+        lat_bucket=Round('latitude', 3),
+        lng_bucket=Round('longitude', 3)
+    ).values('lat_bucket', 'lng_bucket').annotate(weight=Count('id'))
 
     result = [
-        {
-            'lat': float(item['latitude']),
-            'lng': float(item['longitude']),
-            'weight': item['weight']
-        }
+        [float(item['lat_bucket']), float(item['lng_bucket']), item['weight']]
         for item in data
     ]
 
