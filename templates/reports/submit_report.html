@@ -22,116 +22,76 @@
             <h3 class="mb-2">Поднеси пријава</h3>
             <p class="text-muted">Опишете го проблемот и означете ја локацијата</p>
 
-            <form method="POST" enctype="multipart/form-data">
+            <form method="POST" enctype="multipart/form-data" novalidate>
                 {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger" role="alert">
+                    {{ form.non_field_errors }}
+                </div>
+                {% endif %}
 
                 <!-- Category -->
                 <div class="mb-3">
-                    <label class="form-label">Категорија</label>
-                    <select class="form-select" name="category" required>
-                        <option value="" disabled selected>Изберете категорија</option>
-                        <option value="road">Дупка на пат</option>
-                        <option value="waste">Смет</option>
-                        <option value="light">Улично светло</option>
+                    <label class="form-label" for="id_category">Категорија</label>
+                    <select class="form-select {% if form.category.errors %}is-invalid{% endif %}"
+                            name="category" id="id_category" required>
+                        <option value="" disabled {% if not form.category.value %}selected{% endif %}>Изберете категорија</option>
+                        <option value="infrastructure" {% if form.category.value == "infrastructure" %}selected{% endif %}>Инфраструктура</option>
+                        <option value="utilities" {% if form.category.value == "utilities" %}selected{% endif %}>Комуналии</option>
+                        <option value="safety" {% if form.category.value == "safety" %}selected{% endif %}>Безбедност</option>
+                        <option value="health" {% if form.category.value == "health" %}selected{% endif %}>Здравство</option>
+                        <option value="other" {% if form.category.value == "other" %}selected{% endif %}>Друго</option>
                     </select>
+                    {% if form.category.errors %}
+                    <div class="invalid-feedback d-block">{{ form.category.errors|first }}</div>
+                    {% endif %}
                 </div>
 
                 <!-- Priority -->
                 <div class="mb-3">
-                    <label class="form-label">Приоритет</label>
-                    <select class="form-select" name="priority" required>
-                        <option value="" disabled selected>Изберете приоритет</option>
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
+                    <label class="form-label" for="id_priority">Приоритет</label>
+                    <select class="form-select {% if form.priority.errors %}is-invalid{% endif %}"
+                            name="priority" id="id_priority" required>
+                        <option value="" disabled {% if not form.priority.value %}selected{% endif %}>Изберете приоритет</option>
+                        <option value="urgent" {% if form.priority.value == "urgent" %}selected{% endif %}>Итно</option>
+                        <option value="normal" {% if form.priority.value == "normal" %}selected{% endif %}>Нормално</option>
+                        <option value="low" {% if form.priority.value == "low" %}selected{% endif %}>Ниско</option>
                     </select>
+                    {% if form.priority.errors %}
+                    <div class="invalid-feedback d-block">{{ form.priority.errors|first }}</div>
+                    {% endif %}
                 </div>
 
                 <!-- Municipality -->
                 <div class="mb-3">
-                    <label class="form-label">Општина</label>
-                    <select class="form-select" name="municipality" required>
-                        <option value="" disabled selected>Изберете општина</option>
-                        <option value="aerodrom">Аеродром</option>
-                        <option value="aracinovo">Арачиново</option>
-                        <option value="berovo">Берово</option>
-                        <option value="bitola">Битола</option>
-                        <option value="bogdanci">Богданци</option>
-                        <option value="bogovinje">Боговиње</option>
-                        <option value="bosilovo">Босилово</option>
-                        <option value="brvenica">Брвеница</option>
-                        <option value="butel">Бутел</option>
-                        <option value="valandovo">Валандово</option>
-                        <option value="vasilevo">Василево</option>
-                        <option value="veles">Велес</option>
-                        <option value="vinica">Виница</option>
-                        <option value="viseg?">Врапчиште</option>
-                        <option value="gevgelija">Гевгелија</option>
-                        <option value="gazi_baba">Гази Баба</option>
-                        <option value="gjorce_petrov">Ѓорче Петров</option>
-                        <option value="gostivar">Гостивар</option>
-                        <option value="gradsko">Градско</option>
-                        <option value="deb ar">Дебар</option>
-                        <option value="debarca">Дебарца</option>
-                        <option value="delcevo">Делчево</option>
-                        <option value="demir_kapija">Демир Капија</option>
-                        <option value="demir_hisar">Демир Хисар</option>
-                        <option value="doran">Долнени</option>
-                        <option value="dojran">Дојран</option>
-                        <option value="struga">Струга</option>
-                        <option value="strumica">Струмица</option>
-                        <option value="zrnovci">Зрновци</option>
-                        <option value="ilinden">Илинден</option>
-                        <option value="jegunovce">Јегуновце</option>
-                        <option value="kavadarci">Кавадарци</option>
-                        <option value="karbinci">Карбинци</option>
-                        <option value="karpos">Карпош</option>
-                        <option value="kisela_voda">Кисела Вода</option>
-                        <option value="kratovo">Кратово</option>
-                        <option value="kriva_palanka">Крива Паланка</option>
-                        <option value="krivogastani">Кривогаштани</option>
-                        <option value="krusevo">Крушево</option>
-                        <option value="kumanovo">Куманово</option>
-                        <option value="lipkovo">Липково</option>
-                        <option value="lozovo">Лозово</option>
-                        <option value="makedonska_kamenica">Македонска Каменица</option>
-                        <option value="makedonski_brod">Македонски Брод</option>
-                        <option value="mogila">Могила</option>
-                        <option value="negotino">Неготино</option>
-                        <option value="novaci">Новаци</option>
-                        <option value="novo_selo">Ново Село</option>
-                        <option value="ohrid">Охрид</option>
-                        <option value="petrovec">Петровец</option>
-                        <option value="pehcevo">Пехчево</option>
-                        <option value="pelince?">Пласница</option>
-                        <option value="prilep">Прилеп</option>
-                        <option value="probishtip">Пробиштип</option>
-                        <option value="radovis">Радовиш</option>
-                        <option value="rankovce">Ранковце</option>
-                        <option value="resen">Ресен</option>
-                        <option value="rosoman">Росоман</option>
-                        <option value="saraj">Сарај</option>
-                        <option value="sopište">Сопиште</option>
-                        <option value="staro_nagoricane">Старо Нагоричане</option>
-                        <option value="stip">Штип</option>
-                        <option value="studenicani">Студеничани</option>
-                        <option value="centar">Центар</option>
-                        <option value="caska">Чашка</option>
-                        <option value="cair">Чаир</option>
-                        <option value="cesinovo_obileshevo">Чешиново-Облешево</option>
-                        <option value="chucher_sandevo">Чучер-Сандево</option>
-                        <option value="suto_orizari">Шуто Оризари</option>
+                    <label class="form-label" for="id_municipality">Општина</label>
+                    <select class="form-select {% if form.municipality.errors %}is-invalid{% endif %}"
+                            name="municipality" id="id_municipality" required>
+                        <option value="" disabled {% if not form.municipality.value %}selected{% endif %}>Изберете општина</option>
+                        {% for value, label in form.fields.municipality.choices %}
+                        {% if value %}
+                        <option value="{{ value }}" {% if form.municipality.value == value %}selected{% endif %}>{{ label }}</option>
+                        {% endif %}
+                        {% endfor %}
                     </select>
+                    {% if form.municipality.errors %}
+                    <div class="invalid-feedback d-block">{{ form.municipality.errors|first }}</div>
+                    {% endif %}
                 </div>
 
                 <!-- Description -->
                 <div class="mb-3">
-                    <label class="form-label">Опис</label>
-                    <textarea class="form-control"
+                    <label class="form-label" for="id_description">Опис</label>
+                    <textarea class="form-control {% if form.description.errors %}is-invalid{% endif %}"
                               name="description"
+                              id="id_description"
                               rows="4"
                               required
-                              placeholder="Опишете го проблемот..."></textarea>
+                              placeholder="Опишете го проблемот...">{{ form.description.value|default:"" }}</textarea>
+                    {% if form.description.errors %}
+                    <div class="invalid-feedback d-block">{{ form.description.errors|first }}</div>
+                    {% endif %}
                 </div>
 
                 <!-- GPS Button -->
@@ -144,21 +104,29 @@
                 <!-- Map -->
                 <div class="mb-3">
                     <label class="form-label">Локација</label>
-                    <input type="hidden" name="latitude" id="latitude">
-                    <input type="hidden" name="longitude" id="longitude">
+                    <input type="hidden" name="latitude" id="latitude" value="{{ form.latitude.value|default:'' }}">
+                    <input type="hidden" name="longitude" id="longitude" value="{{ form.longitude.value|default:'' }}">
                     <div id="map"></div>
+                    {% if form.latitude.errors or form.longitude.errors %}
+                    <div class="invalid-feedback d-block">
+                        Кликнете на мапата или користете ја „моја локација“ за да означите место.
+                    </div>
+                    {% endif %}
                 </div>
 
                 <!-- Image Upload -->
                 <div class="mb-3">
-                    <label class="form-label">Прикачи слика</label>
+                    <label class="form-label" for="imageInput">Прикачи слика</label>
                     <input type="file"
-                           class="form-control"
+                           class="form-control {% if form.image.errors %}is-invalid{% endif %}"
                            id="imageInput"
                            name="image"
                            accept="image/png, image/jpeg">
 
                     <img id="preview" style="display:none; max-width:100%; margin-top:10px;" alt="Preview">
+                    {% if form.image.errors %}
+                    <div class="invalid-feedback d-block">{{ form.image.errors|first }}</div>
+                    {% endif %}
                 </div>
 
                 <!-- Submit -->
@@ -187,13 +155,22 @@
     function setMarker(lat, lng) {
         if (marker) map.removeLayer(marker);
         marker = L.marker([lat, lng]).addTo(map);
-        document.getElementById("latitude").value = lat;
-        document.getElementById("longitude").value = lng;
+        document.getElementById("latitude").value = Number(lat).toFixed(6);
+        document.getElementById("longitude").value = Number(lng).toFixed(6);
     }
 
     map.on('click', function(e) {
         setMarker(e.latlng.lat, e.latlng.lng);
     });
+
+    (function restorePreviousMarker() {
+        var lat = document.getElementById("latitude").value;
+        var lng = document.getElementById("longitude").value;
+        if (lat && lng) {
+            setMarker(parseFloat(lat), parseFloat(lng));
+            map.setView([parseFloat(lat), parseFloat(lng)], 15);
+        }
+    })();
 
     function getLocation() {
         if (navigator.geolocation) {
