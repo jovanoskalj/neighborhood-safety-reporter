@@ -1,13 +1,15 @@
 import json
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count
 from django.db.models.functions import Round
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
+from .forms import ReportSubmissionForm
 from .models import Report
 
 
@@ -23,8 +25,25 @@ def dashboard(request):
 
 @login_required
 def submit_report(request):
-    """Render report submission page (login required)."""
-    return render(request, "reports/submit_report.html")
+    """Render submission form and persist a new report on POST.
+
+    GET returns an empty ``ReportSubmissionForm``. POST validates the
+    submitted data; on success the report is saved with the current
+    user as ``citizen`` and the user is redirected back to the same
+    page with a success message. On failure the page re-renders with
+    per-field errors and previously submitted values preserved.
+    """
+    if request.method == "POST":
+        form = ReportSubmissionForm(request.POST, request.FILES)
+        if form.is_valid():
+            report = form.save(commit=False)
+            report.citizen = request.user
+            report.save()
+            messages.success(request, "Вашата пријава е успешно поднесена.")
+            return redirect("submit_report")
+    else:
+        form = ReportSubmissionForm()
+    return render(request, "reports/submit_report.html", {"form": form})
 
 
 def user_is_officer(user):
