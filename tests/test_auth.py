@@ -1,9 +1,9 @@
+"""Auth-path tests covering the register → verify → login → logout cycle (T-13)."""
+from unittest.mock import patch
+
 import pytest
-from datetime import timedelta
 from django.contrib.auth.models import User
 from django.urls import reverse
-from django.utils import timezone
-from unittest.mock import patch
 
 from apps.accounts.models import EmailVerificationCode
 
@@ -48,8 +48,32 @@ def test_logout(client, citizen_user):
 
 
 @pytest.mark.django_db
-@patch("apps.accounts.views.send_mail")
-def test_register_user(mock_send_mail, client):
+def test_verify_email_code_activates_user(client, settings):
+    """Posting the DEV verification code activates the pending user."""
+    settings.SENDGRID_ENABLED = False
+    settings.DEV_VERIFICATION_CODE = "111111"
+
+    user = User.objects.create_user(
+        username="pending_user",
+        email="pending@test.com",
+        password="pending123",
+        is_active=False,
+    )
+    session = client.session
+    session["pending_verification_user_id"] = user.id
+    session.save()
+
+    response = client.post(reverse("verify_email_code"), {"code": "111111"})
+    assert response.status_code == 302
+    assert response.url == reverse("login")
+
+    user.refresh_from_db()
+    assert user.is_active is True
+
+
+@pytest.mark.django_db
+def test_register_and_verify_email(client):
+    """Registration creates an inactive user plus a verification record."""
     response = client.post(reverse("register"), {
         "username": "new_user",
         "email": "new.user@test.com",
@@ -62,32 +86,46 @@ def test_register_user(mock_send_mail, client):
 
     assert response.status_code == 302
     assert response.url == reverse("verify_email_code")
+
     user = User.objects.get(username="new_user")
     assert user.is_active is False
-    assert EmailVerificationCode.objects.filter(user=user).exists()
-    mock_send_mail.assert_called_once()
+
+    verification = EmailVerificationCode.objects.get(user=user)
+    assert verification.code is not None
 
 
 @pytest.mark.django_db
-def test_verify_email_code_activates_user(client):
-    user = User.objects.create_user(
-        username="pending_user",
-        email="pending@test.com",
-        password="pending123",
-        is_active=False,
-    )
-    EmailVerificationCode.objects.create(
-        user=user,
-        code="123456",
-        expires_at=timezone.now() + timedelta(minutes=10),
-    )
-    session = client.session
-    session["pending_verification_user_id"] = user.id
-    session.save()
+def test_login_logout(client, citizen_user):
+    """Login establishes a session; logout clears it."""
+    login_response = client.post(reverse("login"), {
+        "username": "citizen",
+        "password": "citizen123"
+    })
 
-    response = client.post(reverse("verify_email_code"), {"code": "123456"})
+    assert login_response.status_code == 302
+    assert client.session.get("_auth_user_id") is not None
+
+    logout_response = client.get(reverse("logout"))
+
+    assert logout_response.status_code == 302
+    assert client.session.get("_auth_user_id") is None
+
+
+@pytest.mark.django_db
+@patch("apps.accounts.views.send_mail")
+def test_register_sends_email(mock_send_mail, client, settings):
+    """Registration triggers a verification email when SENDGRID is enabled."""
+    settings.SENDGRID_ENABLED = True
+
+    response = client.post(reverse("register"), {
+        "username": "testuser",
+        "email": "test@test.com",
+        "password1": "StrongPass123",
+        "password2": "StrongPass123",
+        "role": "citizen",
+        "sector": "",
+        "phone": "",
+    })
+
     assert response.status_code == 302
-    assert response.url == reverse("login")
-
-    user.refresh_from_db()
-    assert user.is_active is True
+    mock_send_mail.assert_called_once()

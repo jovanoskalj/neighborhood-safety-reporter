@@ -1,10 +1,9 @@
 # Use official Python image
 FROM python:3.11-slim
 
-# Set environment variables
-# don't write cache files
+# Don't write .pyc cache files
 ENV PYTHONDONTWRITEBYTECODE=1
-# more logs
+# Force stdout/stderr to be unbuffered for logs
 ENV PYTHONUNBUFFERED=1
 
 # Set work directory
