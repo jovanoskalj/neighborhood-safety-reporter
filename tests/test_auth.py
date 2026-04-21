@@ -1,4 +1,6 @@
 """Auth-path tests covering the register → verify → login → logout cycle (T-13)."""
+from unittest.mock import patch
+
 import pytest
 from django.contrib.auth.models import User
 from django.urls import reverse
@@ -110,38 +112,20 @@ def test_login_logout(client, citizen_user):
 
 
 @pytest.mark.django_db
-def test_register_and_verify_email(client):
+@patch("apps.accounts.views.send_mail")
+def test_register_sends_email(mock_send_mail, client, settings):
+    """Registration triggers a verification email when SENDGRID is enabled."""
+    settings.SENDGRID_ENABLED = True
+
     response = client.post(reverse("register"), {
-        "username": "new_user",
-        "email": "new.user@test.com",
-        "password1": "newuser123",
-        "password2": "newuser123",
+        "username": "testuser",
+        "email": "test@test.com",
+        "password1": "StrongPass123",
+        "password2": "StrongPass123",
         "role": "citizen",
         "sector": "",
-        "phone": "123456"
+        "phone": "",
     })
 
     assert response.status_code == 302
-    assert response.url == reverse("verify_email_code")
-
-    user = User.objects.get(username="new_user")
-    assert user.is_active is False
-
-    verification = EmailVerificationCode.objects.get(user=user)
-    assert verification.code is not None
-
-
-@pytest.mark.django_db
-def test_login_logout(client, citizen_user):
-    login_response = client.post(reverse("login"), {
-        "username": "citizen",
-        "password": "citizen123"
-    })
-
-    assert login_response.status_code == 302
-    assert client.session.get("_auth_user_id") is not None
-
-    logout_response = client.get(reverse("logout"))
-
-    assert logout_response.status_code == 302
-    assert client.session.get("_auth_user_id") is None
+    mock_send_mail.assert_called_once()

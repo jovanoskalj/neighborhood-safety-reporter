@@ -1,9 +1,6 @@
-"""Officer work panel tests (task T-15).
-
-Covers sector-scoped access, the priority/status filters on the list view,
-and the PATCH endpoint that persists status + internal notes.
-"""
+"""Officer work panel tests."""
 import json
+from unittest.mock import patch
 
 import pytest
 from django.contrib.auth.models import Group, User
@@ -183,3 +180,36 @@ def test_patch_rejected_for_non_officer(client, citizen_user, sector_reports):
     assert response.status_code == 403
     report.refresh_from_db()
     assert report.status == "new"
+
+
+@pytest.mark.django_db
+def test_officer_sector_isolation(client, safety_officer, sector_reports):
+    """Officer panel surfaces own-sector rows and hides other-sector rows."""
+    client.login(username="safety_officer", password="password123")
+    response = client.get(reverse("officer_panel"))
+    content = response.content.decode()
+
+    assert response.status_code == 200
+    assert "Urgent safety issue" in content
+    assert "Normal safety issue" in content
+    assert "Utilities issue" not in content
+
+
+@pytest.mark.django_db
+@patch("apps.notifications.senders.send_mail")
+def test_status_update_sends_email(mock_send_mail, client, safety_officer, sector_reports):
+    """Status change triggers an email to the report's citizen (FR-14)."""
+    client.login(username="safety_officer", password="password123")
+    report = sector_reports[0]  # sector=safety
+    assert report.citizen.email, "citizen fixture must have an email"
+
+    response = client.patch(
+        reverse("update_report_status", args=[report.pk]),
+        data=json.dumps({"status": "resolved"}),
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    mock_send_mail.assert_called_once()
+    recipient_list = mock_send_mail.call_args.kwargs["recipient_list"]
+    assert report.citizen.email in recipient_list
