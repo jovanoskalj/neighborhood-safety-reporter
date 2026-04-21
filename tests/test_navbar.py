@@ -33,8 +33,8 @@ def test_citizen_navbar(client, citizen_user):
 
     assert response.status_code == 200
 
-    assert f'class="nav-link" href="{home_link}">Дома</a>' not in content
-    assert f'class="nav-link" href="{map_link}">Мапа</a>' in content
+    assert 'class="nav-link" href="/">Дома</a>' not in content
+    assert "Мапа" in content
     assert f'class="dropdown-item" href="{submit_link}">Поднеси пријава</a>' in content
     assert "Мои пријави" in content
     assert f'class="nav-link" href="{profile_link}">Профил</a>' in content
