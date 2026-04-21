@@ -1,4 +1,6 @@
 """Auth-path tests covering the register → verify → login → logout cycle (T-13)."""
+from unittest.mock import patch
+
 import pytest
 from django.contrib.auth.models import User
 from django.urls import reverse
@@ -107,3 +109,23 @@ def test_login_logout(client, citizen_user):
 
     assert logout_response.status_code == 302
     assert client.session.get("_auth_user_id") is None
+
+
+@pytest.mark.django_db
+@patch("apps.accounts.views.send_mail")
+def test_register_sends_email(mock_send_mail, client, settings):
+    """Registration triggers a verification email when SENDGRID is enabled."""
+    settings.SENDGRID_ENABLED = True
+
+    response = client.post(reverse("register"), {
+        "username": "testuser",
+        "email": "test@test.com",
+        "password1": "StrongPass123",
+        "password2": "StrongPass123",
+        "role": "citizen",
+        "sector": "",
+        "phone": "",
+    })
+
+    assert response.status_code == 302
+    mock_send_mail.assert_called_once()

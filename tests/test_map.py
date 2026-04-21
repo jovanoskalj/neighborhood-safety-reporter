@@ -163,3 +163,30 @@ def test_reports_json_empty_filter_returns_nothing(client, citizen_user, map_dat
 
     # New + utilities doesn't match any seeded row
     assert response.json()["results"] == []
+
+
+@pytest.mark.django_db
+def test_map_endpoint_returns_coords(client):
+    user = User.objects.create_user(username="map_citizen", password="123")
+
+    Report.objects.create(
+        citizen=user,
+        description="Test",
+        latitude="41.998100",
+        longitude="21.425400",
+        category="safety",
+        status="new",
+        sector="safety",
+    )
+
+    client.login(username="map_citizen", password="123")
+    response = client.get(reverse("reports_json"))
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["results"]) == 1
+    report = data["results"][0]
+    assert report["lat"] == 41.9981
+    assert report["lng"] == 21.4254
+
+

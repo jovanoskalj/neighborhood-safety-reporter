@@ -14,6 +14,8 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
+from apps.notifications.senders import send_status_change_email
+
 from .forms import ReportCreateForm, ReportSubmissionForm
 from .models import MUNICIPALITY_CHOICES, Report
 
@@ -201,6 +203,7 @@ def update_report_status(request, report_id):
         update_fields.append("internal_note")
 
     report.save(update_fields=update_fields)
+    send_status_change_email(report)
 
     return JsonResponse({
         "id": report.pk,
