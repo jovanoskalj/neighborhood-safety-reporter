@@ -7,6 +7,9 @@ from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from .models import Report
+from django.http import JsonResponse
+from django.db.models import Count
+from .models import Report
 
 
 def home(request):
@@ -66,3 +69,21 @@ def update_report_status(request, report_id):
         "status_changed_at": report.status_changed_at.isoformat(),
         "assigned_officer": request.user.username,
     })
+
+@login_required
+def heatmap(request):
+    """Returns lat/lng/weight data for Leaflet.heat heatmap plugin."""
+    data = Report.objects.filter(
+        latitude__isnull=False,
+        longitude__isnull=False
+    ).annotate(
+        lat_bucket=Round('latitude', 3),
+        lng_bucket=Round('longitude', 3)
+    ).values('lat_bucket', 'lng_bucket').annotate(weight=Count('id'))
+
+    result = [
+        [float(item['lat_bucket']), float(item['lng_bucket']), item['weight']]
+        for item in data
+    ]
+
+    return JsonResponse(result, safe=False)
