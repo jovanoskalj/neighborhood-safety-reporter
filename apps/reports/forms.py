@@ -1,4 +1,4 @@
-"""Forms for citizen-facing report submission."""
+"""Forms for citizen-facing report submission (web and API)."""
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from django import forms
@@ -29,8 +29,23 @@ class _CoordinateField(forms.DecimalField):
             return value
 
 
+class ReportCreateForm(forms.Form):
+    """JSON/multipart form for the REST-style ``create_report`` endpoint."""
+
+    description = forms.CharField(required=True)
+    latitude = _CoordinateField(max_digits=9, decimal_places=6, min_value=-90, max_value=90)
+    longitude = _CoordinateField(max_digits=9, decimal_places=6, min_value=-180, max_value=180)
+    image = forms.ImageField(required=False)
+
+    def clean_description(self):
+        description = self.cleaned_data["description"].strip()
+        if not description:
+            raise forms.ValidationError("Description cannot be empty.")
+        return description
+
+
 class ReportSubmissionForm(forms.ModelForm):
-    """Validates citizen-submitted report fields before persistence.
+    """Validates citizen-submitted report fields from the web form.
 
     ``citizen``, ``status``, ``sector`` and AI-driven fields are set
     server-side (by the view and the AI classifier pipeline), so they

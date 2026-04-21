@@ -7,9 +7,10 @@ from django.db.models.functions import Round
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from .forms import ReportSubmissionForm
+from .forms import ReportCreateForm, ReportSubmissionForm
 from .models import Report
 
 
@@ -47,12 +48,12 @@ def submit_report(request):
 
 
 def user_is_officer(user):
-    return user.groups.filter(name__in=['officer', 'officers']).exists()
+    return user.groups.filter(name__in=["officer", "officers"]).exists()
 
 
 def get_user_sector(user):
-    if hasattr(user, 'profile'):
-        return getattr(user.profile, 'sector', None)
+    if hasattr(user, "profile"):
+        return getattr(user.profile, "sector", None)
     return None
 
 
@@ -67,11 +68,11 @@ def update_report_status(request, report_id):
         return JsonResponse({"error": "Officers may only update reports in their own sector."}, status=403)
 
     try:
-        payload = json.loads(request.body.decode('utf-8') or '{}')
+        payload = json.loads(request.body.decode("utf-8") or "{}")
     except json.JSONDecodeError:
         return JsonResponse({"error": "Invalid JSON payload."}, status=400)
 
-    new_status = payload.get('status')
+    new_status = payload.get("status")
     valid_statuses = {choice[0] for choice in Report.STATUS_CHOICES}
     if not new_status or new_status not in valid_statuses:
         return JsonResponse({"error": "Invalid or missing status."}, status=400)
@@ -79,7 +80,7 @@ def update_report_status(request, report_id):
     report.status = new_status
     report.status_changed_at = timezone.now()
     report.assigned_officer = request.user
-    report.save(update_fields=['status', 'status_changed_at', 'assigned_officer'])
+    report.save(update_fields=["status", "status_changed_at", "assigned_officer"])
 
     return JsonResponse({
         "id": report.pk,
@@ -87,6 +88,55 @@ def update_report_status(request, report_id):
         "status_changed_at": report.status_changed_at.isoformat(),
         "assigned_officer": request.user.username,
     })
+
+
+def _serialize_report(report):
+    return {
+        "id": report.id,
+        "description": report.description,
+        "latitude": float(report.latitude),
+        "longitude": float(report.longitude),
+        "image": report.image.url if report.image else None,
+        "category": report.category,
+        "priority": report.priority,
+        "sector": report.sector,
+        "status": report.status,
+        "ai_processed": report.ai_processed,
+        "created_at": report.created_at.isoformat(),
+    }
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def create_report(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({"detail": "Authentication required."}, status=401)
+
+    if request.content_type and request.content_type.startswith("application/json"):
+        try:
+            payload = json.loads(request.body.decode("utf-8") or "{}")
+        except json.JSONDecodeError:
+            return JsonResponse({"errors": {"non_field_errors": ["Invalid JSON payload."]}}, status=400)
+        form = ReportCreateForm(payload)
+    else:
+        form = ReportCreateForm(request.POST, request.FILES)
+
+    if not form.is_valid():
+        return JsonResponse({"errors": form.errors}, status=400)
+
+    report = Report.objects.create(
+        citizen=request.user,
+        description=form.cleaned_data["description"],
+        latitude=form.cleaned_data["latitude"],
+        longitude=form.cleaned_data["longitude"],
+        image=form.cleaned_data.get("image"),
+        status="new",
+    )
+
+    report.refresh_from_db()
+    return JsonResponse(_serialize_report(report), status=201)
+
+
 
 
 @login_required
