@@ -1,11 +1,15 @@
 import json
+from datetime import date
+from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.db.models import Count, Q
 from django.db.models.functions import Round
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -14,9 +18,118 @@ from .forms import ReportCreateForm, ReportSubmissionForm
 from .models import MUNICIPALITY_CHOICES, Report
 
 
+SEARCH_PARAMS = (
+    "category", "status", "sector", "priority",
+    "from", "to", "keyword",
+    "lat_min", "lat_max", "lng_min", "lng_max",
+    "page",
+)
+
+
+def _parse_iso_date(value):
+    """Return a ``date`` parsed from ISO-8601 input, or ``None`` on failure."""
+    try:
+        return date.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_decimal(value):
+    """Return a ``Decimal`` or ``None`` if the input is absent/invalid."""
+    if value is None or value == "":
+        return None
+    try:
+        return Decimal(value)
+    except InvalidOperation:
+        return None
+
+
+def _build_report_filters(request):
+    """Translate GET parameters into a ``Q()`` expression."""
+    filters = Q()
+
+    for param, field in (
+        ("category", "category"),
+        ("status", "status"),
+        ("sector", "sector"),
+        ("priority", "priority"),
+    ):
+        value = request.GET.get(param)
+        if value:
+            filters &= Q(**{field: value})
+
+    from_date = _parse_iso_date(request.GET.get("from"))
+    if from_date:
+        filters &= Q(created_at__date__gte=from_date)
+
+    to_date = _parse_iso_date(request.GET.get("to"))
+    if to_date:
+        filters &= Q(created_at__date__lte=to_date)
+
+    keyword = request.GET.get("keyword")
+    if keyword:
+        filters &= Q(description__icontains=keyword)
+
+    for param, lookup in (
+        ("lat_min", "latitude__gte"),
+        ("lat_max", "latitude__lte"),
+        ("lng_min", "longitude__gte"),
+        ("lng_max", "longitude__lte"),
+    ):
+        value = _parse_decimal(request.GET.get(param))
+        if value is not None:
+            filters &= Q(**{lookup: value})
+
+    return filters
+
+
+def _is_json_request(request):
+    """True if caller prefers JSON (via Accept header or ``?format=json``)."""
+    accept = request.headers.get("Accept", "")
+    return "application/json" in accept.lower() or request.GET.get("format") == "json"
+
+
+def _serialize_reports_page(page):
+    return {
+        "count": page.paginator.count,
+        "num_pages": page.paginator.num_pages,
+        "page": page.number,
+        "results": [_serialize_report(report) for report in page.object_list],
+    }
+
+
 def home(request):
-    """Render project landing page."""
-    return render(request, "reports/home.html")
+    """Landing page (no params) or paginated search endpoint (with params)."""
+    should_filter = _is_json_request(request) or any(
+        request.GET.get(param) for param in SEARCH_PARAMS
+    )
+
+    if not should_filter:
+        return render(request, "reports/home.html")
+
+    if not request.user.is_authenticated:
+        if _is_json_request(request):
+            return JsonResponse({"detail": "Authentication required."}, status=401)
+        return redirect(f"{reverse('login')}?next={request.get_full_path()}")
+
+    filters = _build_report_filters(request)
+    queryset = Report.objects.filter(filters).order_by("-created_at")
+
+    paginator = Paginator(queryset, 20)
+    page_number = request.GET.get("page", 1)
+    try:
+        page_obj = paginator.page(page_number)
+    except (PageNotAnInteger, EmptyPage):
+        page_obj = paginator.page(1)
+
+    if _is_json_request(request):
+        return JsonResponse(_serialize_reports_page(page_obj), status=200)
+
+    return render(
+        request,
+        "reports/search_results.html",
+        {"reports_page": page_obj, "query": request.GET},
+    )
 
 
 def dashboard(request):
