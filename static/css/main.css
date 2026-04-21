@@ -255,3 +255,173 @@ form textarea {
         grid-template-columns: 1fr;
     }
 }
+
+/* Report Form */
+.report-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 2rem;
+    max-width: 700px;
+    margin: 2rem auto;
+    border: 1px solid #e8edf3;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+}
+
+.report-title {
+    font-weight: 600;
+    font-size: 1.4rem;
+    margin-bottom: 0.3rem;
+}
+
+.report-subtitle {
+    color: var(--muted);
+    margin-bottom: 1.5rem;
+}
+
+.report-card .form-control,
+.report-card .form-select {
+    border-radius: 10px;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid #dbe3ec;
+}
+
+.report-card .form-control:focus,
+.report-card .form-select:focus {
+    border-color: var(--green);
+    box-shadow: 0 0 0 0.2rem rgba(46, 204, 113, 0.15);
+}
+
+#map {
+    height: 260px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+}
+
+#preview {
+    max-width: 140px;
+    margin-top: 10px;
+    border-radius: 8px;
+    display: none;
+}
+
+.report-btn {
+    background: var(--green);
+    border: none;
+    border-radius: 10px;
+    padding: 0.7rem;
+    font-weight: 600;
+    width: 100%;
+}
+
+.report-btn:hover {
+    background: #29bb68;
+}
+
+.report-card .mb-3 {
+    margin-bottom: 1.2rem !important;
+}
+
+
+.map-layout {
+    display: grid;
+    grid-template-columns: 320px minmax(0, 1fr);
+    gap: 1rem;
+    align-items: start;
+}
+
+.map-filter-panel {
+    position: sticky;
+    top: 92px;
+}
+
+.map-canvas-wrap {
+    min-height: 620px;
+}
+
+.reports-map {
+    width: 100%;
+    height: 620px;
+    border-radius: 0.6rem;
+}
+
+.map-legend li {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin-bottom: 0.4rem;
+    color: #334155;
+    font-size: 0.95rem;
+}
+
+.legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.dot-new {
+    background-color: #0d6efd;
+}
+
+.dot-in-progress {
+    background-color: #fd7e14;
+}
+
+.dot-resolved {
+    background-color: #198754;
+}
+
+.dot-unclassified {
+    background-color: #6c757d;
+}
+
+.map-pin {
+    border-radius: 50%;
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.35);
+}
+
+.map-pin.pin-new {
+    background-color: #0d6efd;
+}
+
+.map-pin.pin-in-progress {
+    background-color: #fd7e14;
+}
+
+.map-pin.pin-resolved {
+    background-color: #198754;
+}
+
+.map-pin.pin-unclassified {
+    background-color: #6c757d;
+}
+
+.map-popup {
+    min-width: 200px;
+    max-width: 260px;
+}
+
+@media (max-width: 992px) {
+    .map-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .map-filter-panel {
+        position: static;
+    }
+
+    .map-canvas-wrap,
+    .reports-map {
+        min-height: 520px;
+        height: 520px;
+    }
+}
+
+@media (max-width: 576px) {
+    .map-canvas-wrap,
+    .reports-map {
+        min-height: 430px;
+        height: 430px;
+    }
+}
