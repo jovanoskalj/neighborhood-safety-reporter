@@ -1,6 +1,7 @@
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+from concurrent.futures import ThreadPoolExecutor
 import logging
 
+from django.conf import settings
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -8,6 +9,9 @@ from apps.ai_classifier.classifier import classify_report
 from .models import Report
 
 logger = logging.getLogger(__name__)
+
+
+CLASSIFICATION_TIMEOUT_SECONDS = 2
 
 
 def _normalize_classification(classification):
@@ -29,37 +33,34 @@ def _normalize_classification(classification):
     if sector not in valid_sectors:
         raise ValueError(f"Invalid sector returned by classifier: {sector}")
 
-    return {
-        "category": category,
-        "priority": priority,
-        "sector": sector,
-    }
+    return {"category": category, "priority": priority, "sector": sector}
 
 
 @receiver(post_save, sender=Report)
 def classify_report_on_create(sender, instance, created, **kwargs):
     if not created:
         return
+    if not getattr(settings, "AI_CLASSIFICATION_ENABLED", True):
+        return
 
-    classification = {
-        "category": "other",
-        "priority": "normal",
-        "sector": "admin",
-    }
-
+    classification = None
     try:
         with ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(
-                classify_report,
-                instance.description
-            )
-            raw_classification = future.result(timeout=2)
+            future = executor.submit(classify_report, instance.description)
+            raw_classification = future.result(timeout=CLASSIFICATION_TIMEOUT_SECONDS)
         classification = _normalize_classification(raw_classification)
-    except (FuturesTimeoutError, Exception):
+    except Exception:
         logger.exception("AI classification failed or timed out for report id=%s", instance.pk)
 
-    Report.objects.filter(pk=instance.pk).update(
-        category=classification.get("category", "other") or "other",
-        priority=classification.get("priority", "normal") or "normal",
-        sector=classification.get("sector", "admin") or "admin",
-    )
+    if classification is not None:
+        Report.objects.filter(pk=instance.pk).update(
+            category=classification["category"],
+            priority=classification["priority"],
+            sector=classification["sector"],
+            ai_processed=True,
+        )
+    else:
+        Report.objects.filter(pk=instance.pk).update(
+            status="unclassified",
+            ai_processed=False,
+        )

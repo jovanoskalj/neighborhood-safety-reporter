@@ -1,5 +1,4 @@
 import json
-import logging
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -11,12 +10,8 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from apps.ai_classifier.classifier import classify_report
-from .forms import ReportCreateForm
-from .forms import ReportSubmissionForm
+from .forms import ReportCreateForm, ReportSubmissionForm
 from .models import Report
-
-logger = logging.getLogger(__name__)
 
 
 def home(request):
