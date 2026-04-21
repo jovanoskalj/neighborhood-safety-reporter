@@ -9,7 +9,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-from django.shortcuts import get_object_or_404, render, redirect
+
 from .forms import ReportCreateForm, ReportSubmissionForm
 from .models import MUNICIPALITY_CHOICES, Report
 
@@ -51,19 +51,16 @@ def user_is_officer(user):
     return user.groups.filter(name__in=["officer", "officers"]).exists()
 
 
-# def get_user_sector(user):
-#     if hasattr(user, 'profile'):
-#         return getattr(user.profile, 'sector', None)
-#     return None
-
 def get_user_sector(user):
     if hasattr(user, "profile"):
         return getattr(user.profile, "sector", None)
     return None
 
+
 @login_required
 @require_http_methods(["PATCH"])
 def update_report_status(request, report_id):
+    """Officer-only endpoint that updates a report's status and internal note."""
     if not user_is_officer(request.user):
         return JsonResponse({"error": "Only officers may update report status."}, status=403)
 
@@ -84,11 +81,18 @@ def update_report_status(request, report_id):
     report.status = new_status
     report.status_changed_at = timezone.now()
     report.assigned_officer = request.user
-    report.save(update_fields=["status", "status_changed_at", "assigned_officer"])
+
+    update_fields = ["status", "status_changed_at", "assigned_officer"]
+    if "internal_note" in payload:
+        report.internal_note = payload.get("internal_note") or ""
+        update_fields.append("internal_note")
+
+    report.save(update_fields=update_fields)
 
     return JsonResponse({
         "id": report.pk,
         "status": report.status,
+        "internal_note": report.internal_note,
         "status_changed_at": report.status_changed_at.isoformat(),
         "assigned_officer": request.user.username,
     })
