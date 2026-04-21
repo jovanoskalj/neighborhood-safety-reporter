@@ -19,7 +19,8 @@
           <button type="button" class="btn btn-warning btn-bulk-retry shadow-lg" data-bs-toggle="modal" data-bs-target="#bulkRetryModal">
             <i class="bi bi-arrow-repeat me-1"></i>Повтори неуспешни
           </button>
-          <button type="button" class="btn btn-primary btn-mass-notify shadow-lg" data-bs-toggle="modal" data-bs-target="#massNotifyModal">
+          <button type="button" class="btn btn-primary btn-mass-notify shadow-lg" disabled
+                  title="Планирано за T-30 (management command за масовно известување)">
             <i class="bi bi-megaphone-fill me-1"></i>Масовно известување
           </button>
         </div>
@@ -60,20 +61,20 @@
                 <div class="time-badge">{{ notification.time|date:"d.m.Y" }}</div>
                 <small class="time-small">{{ notification.time|date:"H:i" }}</small>
               </td>
-              <td><span class="type-badge">{{ notification.type }}</span></td>
+              <td><span class="type-badge">{{ notification.get_type_display }}</span></td>
               <td class="message-col">{{ notification.message|truncatechars:50 }}</td>
               <td class="recipient-col">{{ notification.recipient|truncatechars:25 }}</td>
               <td>
-                {% if notification.status == "Испратено" %}
-                <span class="status-badge status-success">Испратено</span>
-                {% elif notification.status == "Неуспешно" %}
-                <span class="status-badge status-failed">Неуспешно</span>
+                {% if notification.status == "sent" %}
+                <span class="status-badge status-success">{{ notification.get_status_display }}</span>
+                {% elif notification.status == "failed" %}
+                <span class="status-badge status-failed">{{ notification.get_status_display }}</span>
                 {% else %}
-                <span class="status-badge status-pending">Во чекање</span>
+                <span class="status-badge status-pending">{{ notification.get_status_display }}</span>
                 {% endif %}
               </td>
               <td>
-                {% if notification.status == "Неуспешно" %}
+                {% if notification.status == "failed" %}
                 <button type="button" class="btn-modern btn-retry" data-id="{{ notification.id }}">
                   <i class="bi bi-arrow-repeat"></i> Повтори
                 </button>
@@ -118,32 +119,6 @@
         <button type="button" class="btn btn-secondary-modern" data-bs-dismiss="modal">Откажи</button>
         <button type="button" class="btn btn-warning-modern" id="confirmBulkRetry">
           <i class="bi bi-arrow-repeat me-1"></i>Повтори сите
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Mass Notification Modal -->
-<div class="modal fade" id="massNotifyModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
-    <div class="modal-content-modern">
-      <div class="modal-header-modern">
-        <h5 class="modal-title-modern">
-          <i class="bi bi-megaphone-fill me-2"></i>Масовно известување
-        </h5>
-        <button type="button" class="btn-close-modern" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body-modern">
-        <div class="mb-4">
-          <label class="form-label-modern">Порака:</label>
-          <textarea class="form-control-modern" rows="4" id="massMessage" placeholder="Внесете порака за масовното известување..."></textarea>
-        </div>
-      </div>
-      <div class="modal-footer-modern">
-        <button type="button" class="btn btn-secondary-modern" data-bs-dismiss="modal">Откажи</button>
-        <button type="button" class="btn btn-primary-modern" id="sendMassNotify">
-          <i class="bi bi-send me-1"></i>Испрати до сите
         </button>
       </div>
     </div>
@@ -536,94 +511,122 @@
 </style>
 
 <script>
-  document.addEventListener('DOMContentLoaded', function() {
-    let currentNotificationId = null;
+  document.addEventListener('DOMContentLoaded', function () {
+    let pendingNotificationId = null;
 
-    function showToast(message, type = 'success') {
-      const types = {
+    function getCookie(name) {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(';').shift();
+      return '';
+    }
+
+    function showToast(message, variant) {
+      const colorClass = {
         success: 'bg-success text-white',
         error: 'bg-danger text-white',
         warning: 'bg-warning text-dark',
-        info: 'bg-info text-white'
-      };
+      }[variant] || 'bg-success text-white';
 
-      const toastHtml = `
-  <div class="toast align-items-center border-0 shadow-lg" role="alert" aria-live="assertive" aria-atomic="true" style="backdrop-filter: blur(20px);">
-    <div class="d-flex">
-      <div class="toast-body fw-semibold">${message}</div>
-      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-    </div>
-  </div>
-`;
+      const toastEl = document.createElement('div');
+      toastEl.className = 'toast align-items-center border-0 shadow-lg ' + colorClass;
+      toastEl.setAttribute('role', 'alert');
 
-      const toastContainer = document.querySelector('.toast-container');
-      toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+      const wrapper = document.createElement('div');
+      wrapper.className = 'd-flex';
+      const body = document.createElement('div');
+      body.className = 'toast-body fw-semibold';
+      body.textContent = message;
+      const closeBtn = document.createElement('button');
+      closeBtn.type = 'button';
+      closeBtn.className = 'btn-close btn-close-white me-2 m-auto';
+      closeBtn.setAttribute('data-bs-dismiss', 'toast');
+      wrapper.appendChild(body);
+      wrapper.appendChild(closeBtn);
+      toastEl.appendChild(wrapper);
 
-      const toastEl = toastContainer.lastElementChild;
-      toastEl.className += ` ${types[type] || types.success}`;
+      document.querySelector('.toast-container').appendChild(toastEl);
+      new bootstrap.Toast(toastEl, { delay: 4000 }).show();
+    }
 
-      const toast = new bootstrap.Toast(toastEl);
-      toast.show();
+    function recomputeFailedCount() {
+      const current = document.querySelectorAll('.status-failed').length;
+      const failedStats = document.getElementById('failedStats');
+      const failedCountEl = document.getElementById('failedCount');
+      if (failedStats) failedStats.textContent = 'Неуспешни: ' + current;
+      if (failedCountEl) failedCountEl.textContent = current;
+    }
 
-      setTimeout(() => {
-        toast.dispose();
-        toastEl.remove();
-      }, 5000);
+    async function postJson(url) {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken'),
+          'Accept': 'application/json',
+        },
+      });
+      return { ok: response.ok, data: await response.json().catch(() => ({})) };
+    }
+
+    function markRowSent(id, statusLabel) {
+      const row = document.querySelector('tr[data-notification-id="' + id + '"]');
+      if (!row) return;
+      const badge = row.querySelector('.status-badge');
+      if (badge) {
+        badge.className = 'status-badge status-success';
+        badge.textContent = statusLabel || 'Испратено';
+      }
+      const actionCell = row.querySelector('td:last-child');
+      if (actionCell) {
+        while (actionCell.firstChild) actionCell.removeChild(actionCell.firstChild);
+        const placeholder = document.createElement('span');
+        placeholder.className = 'action-placeholder';
+        placeholder.textContent = '-';
+        actionCell.appendChild(placeholder);
+      }
     }
 
     document.querySelectorAll('.btn-retry').forEach(btn => {
-      btn.addEventListener('click', function() {
-        currentNotificationId = this.dataset.id;
-        document.getElementById('retryModalText').textContent = `Дали сакате да го повторитe известувањето ${currentNotificationId}?`;
-        const retryModal = new bootstrap.Modal(document.getElementById('retryModal'));
-        retryModal.show();
+      btn.addEventListener('click', function () {
+        pendingNotificationId = this.dataset.id;
+        document.getElementById('retryModalText').textContent =
+          'Дали сакате да го повторите известувањето ' + pendingNotificationId + '?';
+        new bootstrap.Modal(document.getElementById('retryModal')).show();
       });
     });
 
-    document.getElementById('confirmRetryBtn').addEventListener('click', function() {
-      if (currentNotificationId) {
-        showToast(`Повторено известување ID: ${currentNotificationId} ✅`, 'success');
-        bootstrap.Modal.getInstance(document.getElementById('retryModal')).hide();
-        currentNotificationId = null;
+    document.getElementById('confirmRetryBtn').addEventListener('click', async function () {
+      if (!pendingNotificationId) return;
+      const id = pendingNotificationId;
+      pendingNotificationId = null;
+      bootstrap.Modal.getInstance(document.getElementById('retryModal')).hide();
+
+      const { ok, data } = await postJson('/notifications/' + id + '/retry/');
+      if (ok && data.status === 'sent') {
+        showToast('Известувањето ' + id + ' е повторно испратено', 'success');
+        markRowSent(id, data.status_label);
+        recomputeFailedCount();
+      } else {
+        showToast('Неуспешно повторување на известување ' + id, 'error');
       }
     });
 
-    const failedCount = document.querySelectorAll('.status-failed').length;
-    document.getElementById('failedCount').textContent = failedCount;
-    const failedStats = document.getElementById('failedStats');
-    if (failedStats) failedStats.textContent = `Неуспешни: ${failedCount}`;
-
-    document.querySelectorAll('.btn-retry').forEach(btn => {
-      btn.addEventListener('click', function() {
-        const id = this.dataset.id;
-        if (confirm(`Дали сакате да го повторитe известувањето ${id}?`)) {
-          // TODO: AJAX POST to /notifications/retry/${id}/
-          showToast(`Повторено известување ID: ${id} ✅`, 'success');
-        }
-      });
-    });
-
-    document.getElementById('sendMassNotify').addEventListener('click', function() {
-      const message = document.getElementById('massMessage').value.trim();
-      if (!message) {
-        showToast('Внесете порака', 'warning');
-        return;
-      }
-      if (confirm('Дали сакате да испратите масовно известување?')) {
-        showToast('Масовно известување испратено! 📧', 'success');
-        bootstrap.Modal.getInstance(document.getElementById('massNotifyModal')).hide();
-        document.getElementById('massMessage').value = '';
+    document.getElementById('confirmBulkRetry').addEventListener('click', async function () {
+      bootstrap.Modal.getInstance(document.getElementById('bulkRetryModal')).hide();
+      const { ok, data } = await postJson('/notifications/retry-all-failed/');
+      if (ok) {
+        const msg = 'Повторени ' + data.retried +
+          ' — успешни: ' + data.succeeded +
+          ', неуспешни: ' + data.still_failed;
+        showToast(msg, data.still_failed ? 'warning' : 'success');
+        setTimeout(function () { window.location.reload(); }, 1200);
+      } else {
+        showToast('Неуспешно повторување на пакетот', 'error');
       }
     });
 
-    document.querySelectorAll('.notification-row').forEach(row => {
-      row.addEventListener('mouseenter', function() {
-        this.style.transform = 'scale(1.01)';
-      });
-      row.addEventListener('mouseleave', function() {
-        this.style.transform = 'scale(1)';
-      });
-    });
+    recomputeFailedCount();
   });
 </script>
 {% endblock %}

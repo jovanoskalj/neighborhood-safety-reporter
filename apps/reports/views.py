@@ -736,11 +736,3 @@ def officer_panel(request):
         "reports": reports,
         "sector": sector,
     })
-
-
-@login_required
-def notifications_log(request):
-    """Render notifications log page (login required)."""
-    from apps.notifications.models import Notification
-    notifications = Notification.objects.order_by("-time")
-    return render(request, "reports/notifications_log.html", {"notifications": notifications})
