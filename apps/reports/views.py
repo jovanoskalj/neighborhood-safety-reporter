@@ -1,14 +1,13 @@
 import json
 
 from django.contrib.auth.decorators import login_required
+from django.db.models import Count
+from django.db.models.functions import Round
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
-from .models import Report
-from django.http import JsonResponse
-from django.db.models import Count
 from .models import Report
 
 
@@ -69,6 +68,7 @@ def update_report_status(request, report_id):
         "status_changed_at": report.status_changed_at.isoformat(),
         "assigned_officer": request.user.username,
     })
+
 
 @login_required
 def heatmap(request):
