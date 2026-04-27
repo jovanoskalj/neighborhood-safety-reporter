@@ -71,3 +71,28 @@ def retry_notification(notification):
         notification.status = "failed"
     notification.save(update_fields=["status"])
     return notification
+
+
+def send_bulk_resolved_email(report):
+    """Send a 'resolved' bulk notification for a single report (used by management command)."""
+    email = getattr(report.citizen, "email", "") or ""
+    if not email:
+        return None
+
+    subject = f"Вашата пријава #{report.pk} е решена"
+    message = (
+        f"Здраво {report.citizen.username},\n\n"
+        f"Со задоволство ве информираме дека вашата пријава #{report.pk} "
+        f"е успешно решена.\n\n"
+        f"Опис: {report.description[:200]}\n"
+        f"Општина: {report.get_municipality_display()}\n"
+        f"Сектор: {report.get_sector_display()}\n\n"
+        "Ви благодариме за вашата соработка.\n"
+        "Тим за безбедност на населба"
+    )
+    return _send_and_record(
+        type="bulk",
+        subject=subject,
+        message=message,
+        recipient=email,
+    )
