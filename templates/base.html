@@ -1,129 +1,136 @@
 {% load static accounts_extras %}
 <!doctype html>
 <html lang="mk">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Neighborhood Safety Reporter{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Syne:wght@600;700;800&display=swap"
+        rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/main.css' %}?v=20260407">
     {% block extra_head %}{% endblock %}
     {% block extra_css %}{% endblock %}
 </head>
+
 <body class="app-body d-flex flex-column min-vh-100">
-<nav class="navbar navbar-expand-lg navbar-dark app-navbar" style="background-color:#1a2238 !important;">
-    <div class="container app-navbar-wrap">
-        <a class="navbar-brand fw-bold text-white" href="{% url 'home' %}">
-            Безбеден Град
-            <small class="d-block text-white">Република Северна Македонија</small>
-        </a>
-        {% if user.is_authenticated %}
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar" aria-controls="mainNavbar" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="mainNavbar">
-            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-<li class="nav-item"><a class="nav-link" href="{% url 'map_view' %}">Мапа</a></li>
-<li class="nav-item"><a class="nav-link" href="{% url 'search_page' %}">Пребарај</a></li>                
-                {% if user|has_group:'officer' or user|has_group:'officers' %}
-                <li class="nav-item"><a class="nav-link" href="{% url 'officer_panel' %}">Работен панел</a></li>
-                {% endif %}
-                {% if user|has_group:'admin' or user|has_group:'administrators' or user.is_superuser %}
-                <li class="nav-item"><a class="nav-link" href="{% url 'dashboard' %}">Админ панел</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'notifications_log' %}">Известувања</a></li>
-                {% endif %}
-            </ul>
-            <ul class="navbar-nav ms-auto">
-                {% if user|has_group:'citizen' or user|has_group:'citizens' %}
-                {% if not user|has_group:'officer' and not user|has_group:'officers' and not user|has_group:'admin' and not user|has_group:'administrators' and not user.is_superuser %}
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="reportsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        Пријави
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="reportsDropdown">
-                        <li><a class="dropdown-item" href="{% url 'submit_report' %}">Поднеси пријава</a></li>
-                        <li><a class="dropdown-item" href="#">Мои пријави</a></li>
-                    </ul>
-                </li>
-                {% endif %}
-                {% endif %}
-                <li class="nav-item"><a class="nav-link" href="{% url 'profile' %}">Профил</a></li>
-                <li class="nav-item"><a class="nav-link nav-link-logout" href="{% url 'logout' %}">Одјава</a></li>
-            </ul>
+    <nav class="navbar navbar-expand-lg navbar-dark app-navbar" style="background-color:#1a2238 !important;">
+        <div class="container app-navbar-wrap">
+            <a class="navbar-brand fw-bold text-white" href="{% url 'home' %}">
+                Безбеден Град
+                <small class="d-block text-white">Република Северна Македонија</small>
+            </a>
+            {% if user.is_authenticated %}
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar"
+                aria-controls="mainNavbar" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="mainNavbar">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item"><a class="nav-link" href="{% url 'map_view' %}">Мапа</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'search_page' %}">Пребарај</a></li>
+                    {% if user|has_group:'officer' or user|has_group:'officers' %}
+                    <li class="nav-item"><a class="nav-link" href="{% url 'officer_panel' %}">Работен панел</a></li>
+                    {% endif %}
+                    {% if user|has_group:'admin' or user|has_group:'administrators' or user.is_superuser %}
+                    <li class="nav-item"><a class="nav-link" href="{% url 'dashboard' %}">Админ панел</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'notifications_log' %}">Известувања</a></li>
+                    {% endif %}
+                </ul>
+                <ul class="navbar-nav ms-auto">
+                    {% if user|has_group:'citizen' or user|has_group:'citizens' %}
+                    {% if not user|has_group:'officer' and not user|has_group:'officers' and not user|has_group:'admin' and not user|has_group:'administrators' and not user.is_superuser %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="reportsDropdown" role="button"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                            Пријави
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="reportsDropdown">
+                            <li><a class="dropdown-item" href="{% url 'submit_report' %}">Поднеси пријава</a></li>
+                            <li><a class="dropdown-item" href="{% url 'my_reports' %}">Мои пријави</a></li>
+                        </ul>
+                    </li>
+                    {% endif %}
+                    {% endif %}
+                    <li class="nav-item"><a class="nav-link" href="{% url 'profile' %}">Профил</a></li>
+                    <li class="nav-item"><a class="nav-link nav-link-logout" href="{% url 'logout' %}">Одјава</a></li>
+                </ul>
+            </div>
+            {% else %}
+            <div class="ms-auto">
+                <a class="btn app-login-btn text-white" href="{% url 'login' %}">Најава</a>
+            </div>
+            {% endif %}
         </div>
-        {% else %}
-        <div class="ms-auto">
-            <a class="btn app-login-btn text-white" href="{% url 'login' %}">Најава</a>
+    </nav>
+
+    <main class="app-main container-fluid px-0">
+        {% if messages %}
+        <div id="django-messages" class="d-none">
+            {% for message in messages %}
+            <div data-tag="{{ message.tags|default:'info' }}" data-message="{{ message|escape }}"></div>
+            {% endfor %}
         </div>
         {% endif %}
-    </div>
-</nav>
+        {% block content %}{% endblock %}
+    </main>
 
-<main class="app-main container-fluid px-0">
-    {% if messages %}
-    <div id="django-messages" class="d-none">
-        {% for message in messages %}
-        <div data-tag="{{ message.tags|default:'info' }}" data-message="{{ message|escape }}"></div>
-        {% endfor %}
-    </div>
-    {% endif %}
-    {% block content %}{% endblock %}
-</main>
+    <footer class="mt-auto app-footer py-4">
+        <div class="container d-flex justify-content-between flex-wrap gap-2 small">
+            <span>© 2026 Безбедно Соседство · Сите права задржани</span>
+            <div>safetyreport.mk@gmail.com · +389 2 223 456</div>
+        </div>
+    </footer>
 
-<footer class="mt-auto app-footer py-4">
-    <div class="container d-flex justify-content-between flex-wrap gap-2 small">
-        <span>© 2026 Безбедно Соседство · Сите права задржани</span>
-        <div>safetyreport.mk@gmail.com · +389 2 223 456</div>
-    </div>
-</footer>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        (function () {
+            const container = document.getElementById('django-messages');
+            if (!container) return;
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script>
-    (function () {
-        const container = document.getElementById('django-messages');
-        if (!container) return;
+            const items = container.querySelectorAll('[data-message]');
+            items.forEach((item, index) => {
+                const tag = (item.dataset.tag || 'info').toLowerCase();
+                const text = item.dataset.message || '';
 
-        const items = container.querySelectorAll('[data-message]');
-        items.forEach((item, index) => {
-            const tag = (item.dataset.tag || 'info').toLowerCase();
-            const text = item.dataset.message || '';
+                if (!text) return;
 
-            if (!text) return;
+                const iconMap = {
+                    success: 'success',
+                    error: 'error',
+                    warning: 'warning',
+                    info: 'info',
+                };
 
-            const iconMap = {
-                success: 'success',
-                error: 'error',
-                warning: 'warning',
-                info: 'info',
-            };
+                const icon = iconMap[tag] || 'info';
 
-            const icon = iconMap[tag] || 'info';
-
-            if (index === 0) {
-                Swal.fire({
-                    icon,
-                    text,
-                    confirmButtonColor: '#1a2238',
-                    backdrop: 'rgba(15, 23, 42, 0.35)',
-                });
-            } else {
-                const Toast = Swal.mixin({
-                    toast: true,
-                    position: 'top-end',
-                    showConfirmButton: false,
-                    timer: 3500,
-                    timerProgressBar: true,
-                });
-                Toast.fire({ icon, title: text });
-            }
-        });
-    })();
-</script>
-{% block extra_js %}{% endblock %}
+                if (index === 0) {
+                    Swal.fire({
+                        icon,
+                        text,
+                        confirmButtonColor: '#1a2238',
+                        backdrop: 'rgba(15, 23, 42, 0.35)',
+                    });
+                } else {
+                    const Toast = Swal.mixin({
+                        toast: true,
+                        position: 'top-end',
+                        showConfirmButton: false,
+                        timer: 3500,
+                        timerProgressBar: true,
+                    });
+                    Toast.fire({ icon, title: text });
+                }
+            });
+        })();
+    </script>
+    {% block extra_js %}{% endblock %}
 </body>
+
 </html>
