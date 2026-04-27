@@ -6,6 +6,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.models import User
 from django.contrib.auth.models import Group
 from django.contrib.auth.decorators import login_required
@@ -16,8 +17,8 @@ from django.utils import timezone
 from django.contrib.admin.views.decorators import staff_member_required
 from apps.reports.models import Report
 
-from .forms import RegisterForm
-from .models import EmailVerificationCode, UserProfile, AuditLog
+from .forms import LocalizedPasswordChangeForm, ProfileForm, RegisterForm
+from .models import EmailVerificationCode, UserProfile
 
 
 ROLE_GROUPS = {
@@ -107,15 +108,26 @@ def register_view(request):
 
 def login_view(request):
     if request.method == "POST":
-        username = request.POST.get("username", "")
+        identifier = (request.POST.get("username") or "").strip()
         password = request.POST.get("password", "")
-        user = authenticate(request, username=username, password=password)
+        user = authenticate(request, username=identifier, password=password)
+
+        # Support email-based login in the same input field.
+        if not user and identifier:
+            email_matches = User.objects.filter(email__iexact=identifier)
+            for email_user in email_matches:
+                user = authenticate(request, username=email_user.username, password=password)
+                if user:
+                    break
+
         if user:
             login(request, user)
             next_url = request.GET.get("next") or "dashboard"
             return redirect(next_url)
         else:
-            inactive_user = User.objects.filter(username=username, is_active=False).first()
+            inactive_user = User.objects.filter(username=identifier, is_active=False).first()
+            if not inactive_user:
+                inactive_user = User.objects.filter(email__iexact=identifier, is_active=False).first()
             if inactive_user and inactive_user.check_password(password):
                 messages.error(request, "Профилот сѐ уште не е верификуван. Проверете ја вашата е-пошта.")
                 return render(request, "accounts/login.html", status=200)
@@ -177,18 +189,33 @@ def logout_view(request):
 
 @login_required
 def profile_view(request):
-    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    """Allow users to edit profile info and update account password."""
+    profile_form = ProfileForm(instance=request.user, prefix="profile")
+    password_form = LocalizedPasswordChangeForm(user=request.user, prefix="password")
 
     if request.method == "POST":
-        profile.phone = request.POST.get("phone", profile.phone)
-        role = profile.role
-        if role == "officer":
-            profile.sector = request.POST.get("sector", profile.sector)
-        profile.save()
-        messages.success(request, "Профилот е успешно ажуриран.")
-        return redirect("profile")
+        if "save_profile" in request.POST:
+            profile_form = ProfileForm(request.POST, instance=request.user, prefix="profile")
+            if profile_form.is_valid():
+                profile_form.save()
+                messages.success(request, "Профилот е успешно ажуриран.")
+                return redirect("profile")
+        elif "change_password" in request.POST:
+            password_form = LocalizedPasswordChangeForm(user=request.user, data=request.POST, prefix="password")
+            if password_form.is_valid():
+                user = password_form.save()
+                update_session_auth_hash(request, user)
+                messages.success(request, "Лозинката е успешно променета.")
+                return redirect("profile")
 
-    return render(request, "accounts/profile.html", {"profile": profile, "sector_choices": UserProfile.SECTOR_CHOICES})
+    return render(
+        request,
+        "accounts/profile.html",
+        {
+            "profile_form": profile_form,
+            "password_form": password_form,
+        },
+    )
 
 
 @staff_member_required

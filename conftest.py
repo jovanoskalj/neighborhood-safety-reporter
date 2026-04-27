@@ -2,6 +2,18 @@ import pytest
 from django.contrib.auth.models import User, Group
 
 
+def pytest_configure(config):
+    """Disable the AI classification post_save signal by default for tests.
+
+    Classification calls an external Ollama service. Leaving the signal active
+    would let tests incidentally hit the network (or time out) for every
+    ``Report.objects.create()``. Tests that specifically exercise the pipeline
+    re-enable it with ``@override_settings(AI_CLASSIFICATION_ENABLED=True)``.
+    """
+    from django.conf import settings
+    settings.AI_CLASSIFICATION_ENABLED = False
+
+
 @pytest.fixture
 def citizen_user(db):
     group, _ = Group.objects.get_or_create(name='citizen')
