@@ -44,8 +44,7 @@
                 </ul>
                 <ul class="navbar-nav ms-auto">
                     {% if user|has_group:'citizen' or user|has_group:'citizens' %}
-                    {% if not user|has_group:'officer' and not user|has_group:'officers' and not user|has_group:'admin'
-                    and not user|has_group:'administrators' and not user.is_superuser %}
+                    {% if not user|has_group:'officer' and not user|has_group:'officers' and not user|has_group:'admin' and not user|has_group:'administrators' and not user.is_superuser %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="reportsDropdown" role="button"
                             data-bs-toggle="dropdown" aria-expanded="false">
