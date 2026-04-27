@@ -1,8 +1,10 @@
 """Auth-path tests covering the register → verify → login → logout cycle (T-13)."""
+import re
 from unittest.mock import patch
 
 import pytest
 from django.contrib.auth.models import User
+from django.core import mail
 from django.urls import reverse
 
 from apps.accounts.models import EmailVerificationCode
@@ -18,6 +20,13 @@ def test_register_page_loads(client):
 def test_login_page_loads(client):
     response = client.get(reverse("login"))
     assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_login_page_has_forgot_password_link(client):
+    response = client.get(reverse("login"))
+    content = response.content.decode()
+    assert reverse("password_reset") in content
 
 
 @pytest.mark.django_db
@@ -129,3 +138,50 @@ def test_register_sends_email(mock_send_mail, client, settings):
 
     assert response.status_code == 302
     mock_send_mail.assert_called_once()
+
+
+@pytest.mark.django_db
+def test_password_reset_flow_updates_password(client, settings):
+    settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    user = User.objects.create_user(
+        username="reset_user",
+        email="reset.user@test.com",
+        password="oldpass123",
+        is_active=True,
+    )
+
+    reset_response = client.post(reverse("password_reset"), {"email": user.email})
+    assert reset_response.status_code == 302
+    assert reset_response.url == reverse("password_reset_done")
+
+    assert len(mail.outbox) == 1
+    email_body = mail.outbox[0].body
+    match = re.search(r"http://testserver(?P<path>/accounts/reset/[^\s]+)", email_body)
+    assert match is not None
+
+    reset_link = match.group("path")
+    confirm_get = client.get(reset_link)
+    assert confirm_get.status_code == 302
+
+    set_password_link = confirm_get.url
+    confirm_form_get = client.get(set_password_link)
+    assert confirm_form_get.status_code == 200
+
+    confirm_post = client.post(
+        set_password_link,
+        {
+            "new_password1": "newpass1234",
+            "new_password2": "newpass1234",
+        },
+    )
+    assert confirm_post.status_code == 302
+    assert confirm_post.url == reverse("password_reset_complete")
+
+    login_response = client.post(
+        reverse("login"),
+        {
+            "username": "reset_user",
+            "password": "newpass1234",
+        },
+    )
+    assert login_response.status_code == 302
