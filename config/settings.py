@@ -30,7 +30,7 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.reports",
     "apps.ai_classifier",
-    "apps.notifications",
+    "apps.notifications.apps.NotificationsConfig",
     "apps.analytics",
 ]
 
@@ -44,6 +44,9 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+# Required for OpenStreetMap tile usage policy: keep origin referrer on cross-site tile requests.
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 
 ROOT_URLCONF = "config.urls"
 
@@ -111,7 +114,8 @@ EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.sendgrid.net")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
 EMAIL_USE_TLS = _env_bool("EMAIL_USE_TLS", "True")
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "apikey")
-EMAIL_HOST_PASSWORD = os.getenv("SENDGRID_API_KEY", "")
+# Prefer the standard Django SMTP variable and fallback to SENDGRID_API_KEY for backward compatibility.
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD") or os.getenv("SENDGRID_API_KEY", "")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "safetyreport.mk@gmail.com")
 SENDGRID_ENABLED = _env_bool("SENDGRID_ENABLED", "False")
 DEV_VERIFICATION_CODE = os.getenv("DEV_VERIFICATION_CODE", "111111")
@@ -126,3 +130,12 @@ LOGIN_URL = "login"
 # AI classifier settings
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
+# Set to False (e.g. in test/CI environments) to skip the post_save AI pipeline.
+AI_CLASSIFICATION_ENABLED = _env_bool("AI_CLASSIFICATION_ENABLED", "True")
+
+
+# Django Debug Toolbar
+if DEBUG:
+    INSTALLED_APPS += ["debug_toolbar"]
+    MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")
+    INTERNAL_IPS = ["127.0.0.1"]
