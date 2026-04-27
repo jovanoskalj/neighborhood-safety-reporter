@@ -27,4 +27,6 @@ urlpatterns = [
     path("reclassify/", views.reclassify_reports, name="reclassify_reports"),
     path('my-reports/', views.my_reports, name='my_reports'),
     path('new-report/', views.new_report, name='new_report'),
+    path('reports/submit/', views.submit_report, name='submit_report'),
+    path('reports/export/', views.export_reports, name='export_reports'),
 ]

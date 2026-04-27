@@ -59,7 +59,6 @@ def _send_verification_code_email(user: User, code: str) -> None:
 
 
 def register_view(request):
-    """Register a citizen user and send email verification."""
     form = RegisterForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         user = form.save(commit=False)
@@ -108,7 +107,6 @@ def register_view(request):
 
 
 def login_view(request):
-    """Authenticate user with Django session auth."""
     if request.method == "POST":
         identifier = (request.POST.get("username") or "").strip()
         password = request.POST.get("password", "")
@@ -139,7 +137,6 @@ def login_view(request):
 
 
 def verify_email_code_view(request):
-    """Verify newly registered account using a 6-digit code sent by email."""
     pending_user_id = request.session.get("pending_verification_user_id")
     if not pending_user_id:
         messages.info(request, "Нема активна верификација. Ве молиме регистрирајте се.")
@@ -186,7 +183,6 @@ def verify_email_code_view(request):
 
 @login_required
 def logout_view(request):
-    """Log out current user and redirect to login page."""
     logout(request)
     return redirect("login")
 
@@ -224,14 +220,12 @@ def profile_view(request):
 
 @staff_member_required
 def admin_user_list(request):
-    """List all users with their roles and active status."""
     users = User.objects.select_related('userprofile').all().order_by('id').distinct()
     return render(request, 'accounts/admin_user_list.html', {'users': users})
 
 
 @staff_member_required
 def admin_user_toggle(request, user_id):
-    """Activate or deactivate a user account."""
     if request.method == 'POST':
         target_user = User.objects.get(id=user_id)
         target_user.is_active = not target_user.is_active
@@ -249,7 +243,6 @@ def admin_user_toggle(request, user_id):
 
 @staff_member_required
 def admin_user_update_role(request, user_id):
-    """Update a user's role."""
     if request.method == 'POST':
         target_user = User.objects.get(id=user_id)
         profile, _ = UserProfile.objects.get_or_create(user=target_user)
@@ -269,13 +262,11 @@ def admin_user_update_role(request, user_id):
 
 @staff_member_required
 def admin_system_log(request):
-    """Read-only view of all audit log entries."""
     logs = AuditLog.objects.select_related('user').order_by('-timestamp')[:200]
     return render(request, 'accounts/admin_system_log.html', {'logs': logs})
 
 @staff_member_required
 def admin_category_list(request):
-    """List available report categories and sectors."""
     categories = Report.CATEGORY_CHOICES
     sectors = Report.SECTOR_CHOICES
     return render(request, 'accounts/admin_categories.html', {
