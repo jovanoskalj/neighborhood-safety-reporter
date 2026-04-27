@@ -164,6 +164,10 @@ class Report(models.Model):
             models.Index(fields=["sector"], name="report_sector_idx"),
             models.Index(fields=["category"], name="report_category_idx"),
             models.Index(fields=["municipality"], name="report_municipality_idx"),
+            models.Index(fields=["priority"], name="report_priority_idx"),
+            models.Index(fields=["latitude"], name="report_latitude_idx"),
+            models.Index(fields=["longitude"], name="report_longitude_idx"),
+            models.Index(fields=["sector", "status"], name="report_sector_status_idx"),
         ]
 
     def __str__(self) -> str:
