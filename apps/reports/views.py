@@ -650,6 +650,32 @@ def create_report(request):
 
 
 @login_required
+@require_http_methods(["POST"])
+def reclassify_reports(request):
+    if not request.user.is_staff:
+        return JsonResponse({"error": "Admin access required."}, status=403)
+
+    reports = Report.objects.filter(status="Unclassified")
+    processed = 0
+    failed = 0
+
+    for report in reports:
+        try:
+            result = classify_report(report.description)
+            report.category = result["category"]
+            report.priority = result["priority"]
+            report.sector = result["sector"]
+            report.save(update_fields=["category", "priority", "sector"])
+            logger.info(f"Reclassified report {report.id}")
+            processed += 1
+        except Exception as e:
+            logger.error(f"Failed to reclassify report {report.id}: {e}")
+            failed += 1
+
+    return JsonResponse({"processed": processed, "failed": failed})
+
+
+@login_required
 def heatmap(request):
     """Returns lat/lng/weight data for Leaflet.heat heatmap plugin."""
     data = Report.objects.filter(

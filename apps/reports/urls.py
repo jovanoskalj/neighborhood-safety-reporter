@@ -25,4 +25,5 @@ urlpatterns = [
     path('dashboard/import/', views.import_reports_stub, name='import_reports_stub'),
     path('search/', views.search_page, name='search_page'),
 
+    path("reclassify/", views.reclassify_reports, name="reclassify_reports"),
 ]
