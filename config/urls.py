@@ -30,3 +30,10 @@ urlpatterns = [
     path("verify/", include("verify_email.urls")),
     path("verification/", include("verify_email.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+
+from django.conf import settings
+
+if settings.DEBUG:
+    import debug_toolbar
+    urlpatterns += [path("__debug__/", include(debug_toolbar.urls))]
