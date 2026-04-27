@@ -1,0 +1,290 @@
+Here is your full translation into English, professionally structured and ready to use:
+
+---
+
+# **PROJECT SPECIFICATION: Neighborhood Safety Reporter**
+
+**Team:** MK31
+**Course:** ICT Project Management
+**Domain:** Smart and Safe City
+**Date:** March 2026
+
+---
+
+## **1. Project Description**
+
+The project **“Neighborhood Safety Reporter”** is a web-based software application designed to improve safety and quality of life in urban environments through efficient communication between citizens and public administration.
+
+The system is developed within the concept of a **“Smart and Safe City”** and enables centralized reporting, tracking, and management of issues within local communities.
+
+The application allows citizens to easily report various problems (infrastructure damage, poor lighting, safety risks, etc.) using:
+
+* textual description
+* GPS location
+* image upload
+
+A key feature of the system is the use of **Artificial Intelligence**, which automatically analyzes each report and performs:
+
+* classification by category
+* priority determination (urgent, normal, low)
+* routing to the appropriate sector (e.g., infrastructure, коммунални services, safety, healthcare)
+
+This enables reports to be immediately directed to the relevant institutions, significantly accelerating the resolution process.
+
+Sector officers have access only to reports relevant to their sector, where they can:
+
+* process reports
+* update status (new, in progress, resolved)
+* take corrective actions
+
+Throughout the process, citizens receive notifications about status changes of their reports.
+
+Additionally, the system provides **visualization of all reports on an interactive map**, enabling better spatial analysis and identification of critical areas. This helps institutions make data-driven decisions.
+
+The project also plays an important role in public administration by:
+
+* centralizing data collection and processing
+* improving inter-institutional coordination
+* increasing transparency
+
+By leveraging modern technologies and AI, **Neighborhood Safety Reporter** represents an innovative solution for efficient urban issue management and creating a safer, more organized community.
+
+---
+
+## **1.1 Key Features**
+
+* **Easy issue reporting**
+  Citizens can submit reports with description, GPS location, and image via web interface
+
+* **AI automatic processing**
+  Each report is analyzed by AI for:
+
+  * category classification
+  * priority detection
+  * sector assignment
+
+* **Automatic sector routing**
+  Reports are assigned to relevant institutions/sectors
+
+* **Report status management**
+  Statuses: New / In Progress / Resolved
+
+* **User notifications**
+  Automatic email notifications for status changes
+
+* **Interactive map visualization**
+
+* **Filtering and search**
+  By category, priority, status, sector
+
+* **Analytics and reports**
+  Statistics for reports, categories, priorities, locations
+
+* **Import/Export data**
+  CSV/Excel support
+
+* **Centralized management**
+  Admins have full control over system
+
+---
+
+## **1.2 Technology Stack**
+
+| Category            | Technology / Tool            |
+| ------------------- | ---------------------------- |
+| Frontend            | Django Templates + Bootstrap |
+| Maps / Geo          | OpenStreetMap + Leaflet.js   |
+| Backend             | Django                       |
+| Database            | PostgreSQL                   |
+| Version Control     | Git + GitHub                 |
+| Containers / DevOps | Docker                       |
+| ML Models           | Ollama                       |
+
+---
+
+## **2. Functional Requirements**
+
+### **2.1 User Management**
+
+| ID    | Requirement                             | Priority | Note                  |
+| ----- | --------------------------------------- | -------- | --------------------- |
+| FR-01 | User registration with email & password | High     | Email verification    |
+| FR-02 | Login / Logout                          | High     | Django sessions / JWT |
+| FR-03 | Roles: Citizen, Officer, Admin          | High     | RBAC                  |
+| FR-04 | Admin manages accounts                  | High     | Django Admin          |
+| FR-05 | Profile & password update               | Medium   | Django forms          |
+
+---
+
+### **2.2 Reporting & Management**
+
+| ID    | Requirement                    | Priority |
+| ----- | ------------------------------ | -------- |
+| FR-06 | Submit report with description | High     |
+| FR-07 | Add GPS location               | High     |
+| FR-08 | Upload image                   | Medium   |
+| FR-09 | AI classification              | High     |
+| FR-10 | Auto sector routing            | High     |
+| FR-11 | Officer manages reports        | High     |
+| FR-12 | Change report status           | High     |
+| FR-13 | Citizen tracks reports         | High     |
+
+---
+
+### **2.3 Notifications**
+
+| ID    | Requirement            | Priority |
+| ----- | ---------------------- | -------- |
+| FR-14 | Email on status change | High     |
+| FR-15 | Confirmation email     | Medium   |
+| FR-16 | Mass notifications     | Low      |
+
+---
+
+### **2.4 Map & Visualization**
+
+| ID    | Requirement              | Priority |
+| ----- | ------------------------ | -------- |
+| FR-17 | Show reports on map      | High     |
+| FR-18 | Filter map data          | High     |
+| FR-19 | Heatmap visualization    | Medium   |
+| FR-20 | Click marker for details | High     |
+
+---
+
+### **2.5 Analytics & Reports**
+
+| ID    | Requirement          | Priority |
+| ----- | -------------------- | -------- |
+| FR-21 | Dashboard statistics | High     |
+| FR-22 | Export to CSV/Excel  | High     |
+| FR-23 | Import data          | Medium   |
+| FR-24 | Time-based analytics | Medium   |
+
+---
+
+### **2.6 External API Integration**
+
+| ID    | Requirement                  | Priority |
+| ----- | ---------------------------- | -------- |
+| FR-25 | SendGrid email integration   | High     |
+| FR-26 | Email error handling (retry) | Medium   |
+| FR-27 | Env configuration            | High     |
+| FR-28 | HTML email templates         | Medium   |
+
+---
+
+## **3. Non-Functional Requirements**
+
+### **Performance**
+
+* Page load: < 3 seconds (up to 50 users)
+* Report processing: < 2 seconds
+
+### **Security**
+
+* Data encryption (AES/PostgreSQL)
+* Role-based access control
+* Activity logging
+
+### **Usability**
+
+* Max 3 clicks for reporting
+* Mobile & desktop support
+
+### **Scalability**
+
+* Up to 1000 reports (MVP)
+
+### **Maintainability**
+
+* Well-documented code
+* Easy backup & restore
+
+### **Integrations**
+
+* Stable API usage (SendGrid, Leaflet)
+
+---
+
+## **4. Use Cases**
+
+### **UC-01: Submit Report (Citizen)**
+
+* User logs in
+* Enters description
+* Selects GPS location
+* Uploads image (optional)
+* Submits report
+* AI classifies it
+* System stores & assigns sector
+* User receives confirmation email
+
+---
+
+### **UC-02: Process Report (Officer)**
+
+* Officer logs in
+* Views sector reports
+* Filters & selects report
+* Takes action
+* Updates status
+* User receives notification
+
+---
+
+### **UC-03: System Management (Admin)**
+
+* Manage users
+* Manage categories/sectors
+* View analytics
+* Export data
+* Monitor logs
+
+---
+
+### **UC-04: Search & Filter**
+
+* Filter by category, status, sector, date
+* View results in list or map
+
+---
+
+## **5. UI Design**
+
+The system will include:
+
+* Responsive design (mobile & desktop)
+* Consistent visual identity
+* Key screens for reporting, dashboard, map, and admin panel
+
+---
+
+## **6. Hosting**
+
+The application will be hosted on **Render**, providing:
+
+* PostgreSQL database support
+* Auto-deployment via GitHub
+* Static/media file hosting via CDN
+
+---
+
+## **7. Conclusion**
+
+Neighborhood Safety Reporter is a fully defined and technically robust solution for digitalizing urban issue reporting.
+
+Key values:
+
+* AI-powered classification
+* Transparent communication via email
+* Interactive map visualization
+* Cloud deployment with low cost
+
+---
+
+If you want, I can also:
+
+* convert this into a **PDF-ready document**
+* make a **short pitch version**
+* or adapt it for **presentation slides (PowerPoint)**

@@ -1,9 +1,10 @@
 # Use official Python image
-FROM python:3.13-slim
+FROM python:3.11-slim
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1 # don't write cache files
-ENV PYTHONUNBUFFERED=1 # more logs
+# Don't write .pyc cache files
+ENV PYTHONDONTWRITEBYTECODE=1
+# Force stdout/stderr to be unbuffered for logs
+ENV PYTHONUNBUFFERED=1
 
 # Set work directory
 WORKDIR /app

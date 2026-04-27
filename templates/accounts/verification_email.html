@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="mk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Верификација</title>
+    </head>
+<body style="margin: 0; padding: 0; background-color: #f4f7ff; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f4f7ff; padding: 40px 10px;">
+        <tr>
+            <td align="center">
+                <table role="presentation" width="100%" style="max-width: 550px; background-color: #ffffff; border-radius: 24px; overflow: hidden; box-shadow: 0 20px 40px rgba(0, 41, 133, 0.08); border: 1px solid #e2e8f0;" cellspacing="0" cellpadding="0" border="0">
+                    
+                    <tr>
+                        <td align="center" style="background: linear-gradient(135deg, #1A2238 0%, #2d3f66 100%); padding: 50px 20px;">
+                            <div style="background-color: rgba(255,255,255,0.2); width: 60px; height: 60px; border-radius: 16px; margin-bottom: 20px; display: table;">
+                                <span style="display: table-cell; vertical-align: middle; color: #ffffff; font-size: 28px; font-weight: 800; text-align: center;">S</span>
+                            </div>
+                            <h1 style="color: #ffffff; margin: 0; font-size: 22px; letter-spacing: 2px; text-transform: uppercase; font-weight: 800;">Safety Reporter</h1>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="padding: 50px 40px; text-align: center; background-color: #ffffff;">
+                            <div style="color: #0F172A; font-size: 24px; font-weight: 800; margin-bottom: 15px; font-family: 'Syne', sans-serif;">Здраво, {{ inactive_user.username }}</div>
+                            <p style="color: #64748B; font-size: 16px; line-height: 1.6; margin: 0 0 35px 0;">
+                                Ви благодариме за регистрацијата. Употребете го вашиот уникатен 6-цифрен код за да го активирате вашиот профил.
+                            </p>
+
+                            <div style="background-color: #f8fafc; border: 2px dashed #CBD5E1; border-radius: 16px; padding: 30px; margin: 20px 0;">
+                                <div style="font-family: 'Monaco', 'Courier New', monospace; font-size: 44px; font-weight: 800; color: #1A2238; letter-spacing: 10px; line-height: 1;">
+                                    {{ verification_code }}
+                                </div>
+                            </div>
+
+                            <div style="display: inline-block; background-color: #eef2f7; color: #1A2238; padding: 8px 16px; border-radius: 10px; font-size: 13px; font-weight: 700; margin-top: 25px;">
+                                <span style="margin-right: 5px;">⏱</span> Кодот важи {{ expiry_minutes }} минути
+                            </div>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="background-color: #f8fafc; padding: 40px; text-align: center; border-top: 1px solid #f1f5f9;">
+                            <p style="margin: 0 0 15px 0; font-size: 13px; color: #94A3B8; line-height: 1.5;">
+                                Доколку не ја побаравте оваа порака, некој веројатно погрешил при внесување на својот е-маил. Можете слободно да ја игнорирате.
+                            </p>
+                            <div style="height: 1px; background-color: #e2e8f0; width: 60px; margin: 25px auto;"></div>
+                            <p style="margin: 0; font-weight: 800; color: #0F172A; font-size: 14px; letter-spacing: 0.5px;">
+                                &copy; 2026 SAFETY REPORTER
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

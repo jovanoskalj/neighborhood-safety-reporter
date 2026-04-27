@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+{% block title %}Профил{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center gx-0">
+        <div class="col-12 col-md-10 col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                <h1 class="h4 mb-3">Профил</h1>
+                <p class="text-muted">Корисник: <strong>{{ request.user.username }}</strong></p>
+
+                <h2 class="h5 mt-4 mb-3">Измени основни податоци</h2>
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    {% if profile_form.non_field_errors %}
+                    <div class="alert alert-danger" role="alert">
+                        {{ profile_form.non_field_errors }}
+                    </div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label class="form-label" for="{{ profile_form.first_name.id_for_label }}">{{ profile_form.first_name.label }}</label>
+                        {{ profile_form.first_name }}
+                        {% if profile_form.first_name.errors %}
+                        <div class="text-danger small mt-1">{{ profile_form.first_name.errors|striptags }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="{{ profile_form.last_name.id_for_label }}">{{ profile_form.last_name.label }}</label>
+                        {{ profile_form.last_name }}
+                        {% if profile_form.last_name.errors %}
+                        <div class="text-danger small mt-1">{{ profile_form.last_name.errors|striptags }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="{{ profile_form.email.id_for_label }}">{{ profile_form.email.label }}</label>
+                        {{ profile_form.email }}
+                        {% if profile_form.email.errors %}
+                        <div class="text-danger small mt-1">{{ profile_form.email.errors|striptags }}</div>
+                        {% endif %}
+                    </div>
+
+                    <button class="btn btn-primary" type="submit" name="save_profile" value="1">Зачувај податоци</button>
+                </form>
+
+                <hr class="my-4">
+
+                <h2 class="h5 mb-3">Промени лозинка</h2>
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    {% if password_form.non_field_errors %}
+                    <div class="alert alert-danger" role="alert">
+                        {{ password_form.non_field_errors }}
+                    </div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label class="form-label" for="{{ password_form.old_password.id_for_label }}">{{ password_form.old_password.label }}</label>
+                        {{ password_form.old_password }}
+                        {% if password_form.old_password.errors %}
+                        <div class="text-danger small mt-1">{{ password_form.old_password.errors|striptags }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="{{ password_form.new_password1.id_for_label }}">{{ password_form.new_password1.label }}</label>
+                        {{ password_form.new_password1 }}
+                        {% if password_form.new_password1.errors %}
+                        <div class="text-danger small mt-1">{{ password_form.new_password1.errors|striptags }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="{{ password_form.new_password2.id_for_label }}">{{ password_form.new_password2.label }}</label>
+                        {{ password_form.new_password2 }}
+                        {% if password_form.new_password2.errors %}
+                        <div class="text-danger small mt-1">{{ password_form.new_password2.errors|striptags }}</div>
+                        {% endif %}
+                    </div>
+
+                    <button class="btn btn-outline-primary" type="submit" name="change_password" value="1">Зачувај лозинка</button>
+                </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

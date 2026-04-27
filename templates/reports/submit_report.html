@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+
+{% block title %}Поднеси пријава{% endblock %}
+
+{% block content %}
+
+<style>
+    .app-navbar { background: #1a2238 !important; }
+    .app-navbar .navbar-brand, .app-navbar .nav-link { color: white !important; }
+
+    #map {
+        height: 400px;
+        width: 100%;
+        border-radius: 12px;
+    }
+</style>
+
+<div class="container py-5">
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-4 p-md-5">
+
+            <h3 class="mb-2">Поднеси пријава</h3>
+            <p class="text-muted">Опишете го проблемот и означете ја локацијата</p>
+
+            <form method="POST" enctype="multipart/form-data" novalidate>
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger" role="alert">
+                    {{ form.non_field_errors }}
+                </div>
+                {% endif %}
+
+                <!-- Category -->
+                <div class="mb-3">
+                    <label class="form-label" for="id_category">Категорија</label>
+                    <select class="form-select {% if form.category.errors %}is-invalid{% endif %}"
+                            name="category" id="id_category" required>
+                        <option value="" disabled {% if not form.category.value %}selected{% endif %}>Изберете категорија</option>
+                        <option value="infrastructure" {% if form.category.value == "infrastructure" %}selected{% endif %}>Инфраструктура</option>
+                        <option value="utilities" {% if form.category.value == "utilities" %}selected{% endif %}>Комуналии</option>
+                        <option value="safety" {% if form.category.value == "safety" %}selected{% endif %}>Безбедност</option>
+                        <option value="health" {% if form.category.value == "health" %}selected{% endif %}>Здравство</option>
+                        <option value="other" {% if form.category.value == "other" %}selected{% endif %}>Друго</option>
+                    </select>
+                    {% if form.category.errors %}
+                    <div class="invalid-feedback d-block">{{ form.category.errors|first }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Priority -->
+                <div class="mb-3">
+                    <label class="form-label" for="id_priority">Приоритет</label>
+                    <select class="form-select {% if form.priority.errors %}is-invalid{% endif %}"
+                            name="priority" id="id_priority" required>
+                        <option value="" disabled {% if not form.priority.value %}selected{% endif %}>Изберете приоритет</option>
+                        <option value="urgent" {% if form.priority.value == "urgent" %}selected{% endif %}>Итно</option>
+                        <option value="normal" {% if form.priority.value == "normal" %}selected{% endif %}>Нормално</option>
+                        <option value="low" {% if form.priority.value == "low" %}selected{% endif %}>Ниско</option>
+                    </select>
+                    {% if form.priority.errors %}
+                    <div class="invalid-feedback d-block">{{ form.priority.errors|first }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Municipality -->
+                <div class="mb-3">
+                    <label class="form-label" for="id_municipality">Општина</label>
+                    <select class="form-select {% if form.municipality.errors %}is-invalid{% endif %}"
+                            name="municipality" id="id_municipality" required>
+                        <option value="" disabled {% if not form.municipality.value %}selected{% endif %}>Изберете општина</option>
+                        {% for value, label in form.fields.municipality.choices %}
+                        {% if value %}
+                        <option value="{{ value }}" {% if form.municipality.value == value %}selected{% endif %}>{{ label }}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                    {% if form.municipality.errors %}
+                    <div class="invalid-feedback d-block">{{ form.municipality.errors|first }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Description -->
+                <div class="mb-3">
+                    <label class="form-label" for="id_description">Опис</label>
+                    <textarea class="form-control {% if form.description.errors %}is-invalid{% endif %}"
+                              name="description"
+                              id="id_description"
+                              rows="4"
+                              required
+                              placeholder="Опишете го проблемот...">{{ form.description.value|default:"" }}</textarea>
+                    {% if form.description.errors %}
+                    <div class="invalid-feedback d-block">{{ form.description.errors|first }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- GPS Button -->
+                <button type="button"
+                        class="btn btn-outline-secondary mb-2"
+                        onclick="getLocation()">
+                    📍 Користи моја локација
+                </button>
+
+                <!-- Map -->
+                <div class="mb-3">
+                    <label class="form-label">Локација</label>
+                    <input type="hidden" name="latitude" id="latitude" value="{{ form.latitude.value|default:'' }}">
+                    <input type="hidden" name="longitude" id="longitude" value="{{ form.longitude.value|default:'' }}">
+                    <div id="map"></div>
+                    {% if form.latitude.errors or form.longitude.errors %}
+                    <div class="invalid-feedback d-block">
+                        Кликнете на мапата или користете ја „моја локација“ за да означите место.
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Image Upload -->
+                <div class="mb-3">
+                    <label class="form-label" for="imageInput">Прикачи слика</label>
+                    <input type="file"
+                           class="form-control {% if form.image.errors %}is-invalid{% endif %}"
+                           id="imageInput"
+                           name="image"
+                           accept="image/png, image/jpeg">
+
+                    <img id="preview" style="display:none; max-width:100%; margin-top:10px;" alt="Preview">
+                    {% if form.image.errors %}
+                    <div class="invalid-feedback d-block">{{ form.image.errors|first }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Submit -->
+                <button type="submit" class="report-btn">
+                    Поднеси пријава
+                </button>
+
+            </form>
+
+        </div>
+    </div>
+</div>
+
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+    var map = L.map('map').setView([41.9981, 21.4254], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: 'OpenStreetMap'
+    }).addTo(map);
+
+    var marker;
+
+    function setMarker(lat, lng) {
+        if (marker) map.removeLayer(marker);
+        marker = L.marker([lat, lng]).addTo(map);
+        document.getElementById("latitude").value = Number(lat).toFixed(6);
+        document.getElementById("longitude").value = Number(lng).toFixed(6);
+    }
+
+    map.on('click', function(e) {
+        setMarker(e.latlng.lat, e.latlng.lng);
+    });
+
+    (function restorePreviousMarker() {
+        var lat = document.getElementById("latitude").value;
+        var lng = document.getElementById("longitude").value;
+        if (lat && lng) {
+            setMarker(parseFloat(lat), parseFloat(lng));
+            map.setView([parseFloat(lat), parseFloat(lng)], 15);
+        }
+    })();
+
+    function getLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+                var lat = position.coords.latitude;
+                var lng = position.coords.longitude;
+                map.setView([lat, lng], 15);
+                setMarker(lat, lng);
+            }, function() {
+                alert("Не можев да ја добијам вашата локација.");
+            });
+        } else {
+            alert("Geolocation не е поддржано од овој прелистувач.");
+        }
+    }
+</script>
+
+<script>
+    document.getElementById("imageInput").addEventListener("change", function(event) {
+        const file = event.target.files[0];
+        const preview = document.getElementById("preview");
+
+        if (!file) {
+            preview.style.display = "none";
+            return;
+        }
+
+        if (!file.type.match(/^image\/(png|jpeg)$/)) {
+            alert("Молиме прикачете PNG или JPG слика.");
+            event.target.value = "";
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function() {
+            preview.src = reader.result;
+            preview.style.display = "block";
+        };
+        reader.readAsDataURL(file);
+    });
+</script>
+
+{% endblock %}
