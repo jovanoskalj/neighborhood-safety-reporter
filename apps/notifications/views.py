@@ -9,6 +9,9 @@ from django.views.decorators.http import require_http_methods
 from .models import Notification
 from .senders import retry_notification
 
+from apps.reports.models import Report, MUNICIPALITY_CHOICES
+
+
 
 def _is_admin(user) -> bool:
     if not user.is_authenticated:
@@ -75,4 +78,66 @@ def retry_all_failed(request):
         "retried": len(failed),
         "succeeded": succeeded,
         "still_failed": len(failed) - succeeded,
+    })
+
+
+
+@login_required
+@_admin_required
+def bulk_notify_preview(request):
+    """Preview page — admin избира филтри и гледа колку ќе се испратат."""
+    municipality = request.GET.get("municipality", "")
+    sector = request.GET.get("sector", "")
+
+    qs = Report.objects.filter(status="resolved").exclude(citizen__email="")
+    if municipality:
+        qs = qs.filter(municipality=municipality)
+    if sector:
+        qs = qs.filter(sector=sector)
+
+    sector_choices = Report.SECTOR_CHOICES
+    municipality_choices = MUNICIPALITY_CHOICES
+
+    return render(request, "reports/bulk_notify.html", {
+        "count": qs.count(),
+        "municipality": municipality,
+        "sector": sector,
+        "municipality_choices": municipality_choices,
+        "sector_choices": sector_choices,
+    })
+
+
+@login_required
+@_admin_required
+@require_http_methods(["POST"])
+def bulk_notify_send(request):
+    """Изврши bulk send и врати JSON со резултати."""
+    from apps.notifications.senders import send_bulk_resolved_email
+
+    municipality = request.POST.get("municipality", "")
+    sector = request.POST.get("sector", "")
+
+    qs = (
+        Report.objects
+        .filter(status="resolved")
+        .exclude(citizen__email="")
+        .select_related("citizen")
+    )
+    if municipality:
+        qs = qs.filter(municipality=municipality)
+    if sector:
+        qs = qs.filter(sector=sector)
+
+    succeeded, failed = 0, 0
+    for report in qs:
+        n = send_bulk_resolved_email(report)
+        if n and n.status == "sent":
+            succeeded += 1
+        else:
+            failed += 1
+
+    return JsonResponse({
+        "total": succeeded + failed,
+        "succeeded": succeeded,
+        "failed": failed,
     })

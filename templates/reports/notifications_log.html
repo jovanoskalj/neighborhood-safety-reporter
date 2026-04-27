@@ -19,10 +19,11 @@
           <button type="button" class="btn btn-warning btn-bulk-retry shadow-lg" data-bs-toggle="modal" data-bs-target="#bulkRetryModal">
             <i class="bi bi-arrow-repeat me-1"></i>Повтори неуспешни
           </button>
-          <button type="button" class="btn btn-primary btn-mass-notify shadow-lg" disabled
-                  title="Планирано за T-30 (management command за масовно известување)">
-            <i class="bi bi-megaphone-fill me-1"></i>Масовно известување
-          </button>
+  <a href="{% url 'notifications_bulk_notify' %}" 
+   class="btn btn-primary btn-mass-notify shadow-lg"
+   style="color:white; text-decoration:none;">
+  <i class="bi bi-megaphone-fill me-1"></i>Масовно известување
+</a>
         </div>
       </div>
     </div>
