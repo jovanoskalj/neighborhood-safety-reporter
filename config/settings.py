@@ -30,9 +30,8 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.reports",
     "apps.ai_classifier",
-    "apps.notifications",
+    "apps.notifications.apps.NotificationsConfig",
     "apps.analytics",
-    "apps.ai_classifier",
 ]
 
 MIDDLEWARE = [
@@ -45,6 +44,9 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+# Required for OpenStreetMap tile usage policy: keep origin referrer on cross-site tile requests.
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 
 ROOT_URLCONF = "config.urls"
 
@@ -127,3 +129,5 @@ LOGIN_URL = "login"
 # AI classifier settings
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
+# Set to False (e.g. in test/CI environments) to skip the post_save AI pipeline.
+AI_CLASSIFICATION_ENABLED = _env_bool("AI_CLASSIFICATION_ENABLED", "True")
