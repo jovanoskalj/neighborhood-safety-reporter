@@ -24,6 +24,7 @@ urlpatterns = [
     path('dashboard/export/', views.export_reports_csv, name='export_reports_csv'),
     path('dashboard/import/', views.import_reports_stub, name='import_reports_stub'),
     path('search/', views.search_page, name='search_page'),
-
     path("reclassify/", views.reclassify_reports, name="reclassify_reports"),
+    path('my-reports/', views.my_reports, name='my_reports'),
+    path('new-report/', views.new_report, name='new_report'),
 ]
