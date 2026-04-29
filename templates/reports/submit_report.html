@@ -67,7 +67,7 @@
                 <div class="mb-3">
                     <label class="form-label" for="id_municipality">Општина</label>
                     <select class="form-select {% if form.municipality.errors %}is-invalid{% endif %}"
-                            name="municipality" id="id_municipality" required>
+                            name="municipality" id="id_municipality">
                         <option value="" disabled {% if not form.municipality.value %}selected{% endif %}>Изберете општина</option>
                         {% for value, label in form.fields.municipality.choices %}
                         {% if value %}

@@ -4,6 +4,7 @@ from .views import (
     login_view, logout_view, profile_view, register_view, verify_email_code_view,
     admin_user_list, admin_user_toggle, admin_user_update_role,
     admin_system_log, admin_category_list,
+    notifications_list, mark_notification_read, mark_all_notifications_read, delete_notification,
 )
 
 urlpatterns = [
@@ -42,4 +43,8 @@ urlpatterns = [
         auth_views.PasswordResetCompleteView.as_view(template_name="accounts/password_reset_complete.html"),
         name="password_reset_complete",
     ),
+    path("notifications/", notifications_list, name="notifications_list"),
+    path("notifications/<int:notification_id>/read/", mark_notification_read, name="mark_notification_read"),
+    path("notifications/mark-all-read/", mark_all_notifications_read, name="mark_all_notifications_read"),
+    path("notifications/<int:notification_id>/delete/", delete_notification, name="delete_notification"),
 ]

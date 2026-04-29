@@ -548,25 +548,42 @@ def submit_report(request):
     if request.method == "POST":
         form = ReportSubmissionForm(request.POST, request.FILES)
         if form.is_valid():
-            report = form.save(commit=False)
-            report.citizen = request.user
-            duplicate = find_potential_duplicate(
-                description=report.description,
-                latitude=float(report.latitude),
-                longitude=float(report.longitude),
-            )
-            if duplicate is not None:
-                report.is_duplicate = True
-                report.duplicate_of = duplicate
-                messages.warning(
-                    request,
-                    f"Можно е оваа пријава да е дупликат на пријава #{duplicate.pk}. Ќе биде означена за проверка.",
+            try:
+                report = form.save(commit=False)
+                report.citizen = request.user
+                duplicate = find_potential_duplicate(
+                    description=report.description,
+                    latitude=float(report.latitude),
+                    longitude=float(report.longitude),
                 )
+                if duplicate is not None:
+                    report.is_duplicate = True
+                    report.duplicate_of = duplicate
+                    messages.warning(
+                        request,
+                        f"Можно е оваа пријава да е дупликат на пријава #{duplicate.pk}. Ќе биде означена за проверка.",
+                    )
 
-            report.save()
-            if duplicate is None:
-                messages.success(request, "Вашата пријава е успешно поднесена.")
-            return redirect("submit_report")
+                # Set sector based on category if AI classification might fail
+                category_to_sector = {
+                    'infrastructure': 'infrastructure',
+                    'utilities': 'utilities', 
+                    'safety': 'safety',
+                    'health': 'health',
+                    'other': 'admin'  # Default to admin for 'other' category
+                }
+                report.sector = category_to_sector.get(report.category, 'admin')
+                
+                report.save()
+                # Always show success message, regardless of AI classification
+                if duplicate is None:
+                    messages.success(request, "Вашата пријава е успешно поднесена.")
+                return redirect("submit_report")
+            except Exception as e:
+                messages.error(request, f"Грешка при зачувување: {str(e)}")
+        else:
+            # Form is invalid - add error message and show form with errors
+            messages.error(request, "Ве молиме поправете ги грешките во формата.")
     else:
         form = ReportSubmissionForm()
     return render(request, "reports/submit_report.html", {"form": form})
