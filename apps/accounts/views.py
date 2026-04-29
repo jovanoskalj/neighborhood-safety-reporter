@@ -11,14 +11,16 @@ from django.contrib.auth.models import User
 from django.contrib.auth.models import Group
 from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail
-from django.shortcuts import redirect, render
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.contrib.admin.views.decorators import staff_member_required
+from django.views.decorators.http import require_http_methods
 from apps.reports.models import Report
 
 from .forms import LocalizedPasswordChangeForm, ProfileForm, RegisterForm
-from .models import EmailVerificationCode, UserProfile
+from .models import EmailVerificationCode, UserProfile, UserNotification
 
 
 ROLE_GROUPS = {
@@ -273,3 +275,68 @@ def admin_category_list(request):
         'categories': categories,
         'sectors': sectors
     })
+
+
+# User notification views
+@login_required
+def notifications_list(request):
+    """Display all notifications for the current user."""
+    notifications = UserNotification.objects.filter(user=request.user).order_by('-created_at')
+    
+    # Filter by type if specified
+    notification_type = request.GET.get('type')
+    if notification_type:
+        notifications = notifications.filter(type=notification_type)
+    
+    # Filter by read status if specified
+    read_status = request.GET.get('read')
+    if read_status == 'read':
+        notifications = notifications.filter(is_read=True)
+    elif read_status == 'unread':
+        notifications = notifications.filter(is_read=False)
+    
+    return render(request, 'accounts/notifications_list.html', {
+        'notifications': notifications,
+        'notification_type': notification_type,
+        'read_status': read_status,
+    })
+
+
+@login_required
+@require_http_methods(["POST"])
+def mark_notification_read(request, notification_id):
+    """Mark a specific notification as read."""
+    notification = get_object_or_404(UserNotification, pk=notification_id, user=request.user)
+    notification.is_read = True
+    notification.save(update_fields=['is_read'])
+    
+    if request.headers.get('Accept', '').startswith('application/json'):
+        return JsonResponse({'success': True})
+    
+    # Always redirect back to notifications list
+    return redirect('notifications_list')
+
+
+@login_required
+@require_http_methods(["POST"])
+def mark_all_notifications_read(request):
+    """Mark all notifications for the user as read."""
+    UserNotification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+    
+    if request.headers.get('Accept', '').startswith('application/json'):
+        return JsonResponse({'success': True})
+    
+    return redirect('notifications_list')
+
+
+@login_required
+@require_http_methods(["POST"])
+def delete_notification(request, notification_id):
+    """Delete a specific notification."""
+    notification = get_object_or_404(UserNotification, pk=notification_id, user=request.user)
+    notification.delete()
+    
+    if request.headers.get('Accept', '').startswith('application/json'):
+        return JsonResponse({'success': True})
+    
+    return redirect('notifications_list')

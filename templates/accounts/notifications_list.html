@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}Известувања{% endblock %}
+
+{% block content %}
+
+<style>
+.unread-notification {
+    border-left: 4px solid var(--bs-primary) !important;
+    background-color: #f8f9fa;
+}
+</style>
+
+
+<div class="container py-5">
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-4 p-md-5">
+
+            <h3 class="mb-2"><i class="bi bi-bell me-2"></i>Мои известувања</h3>
+            <p class="text-muted mb-4">Прегледајте и управувајте со вашите известувања</p>
+
+            {% if unread_notification_count > 0 %}
+            <div class="alert alert-info d-flex align-items-center" role="alert">
+                <i class="bi bi-info-circle me-2"></i>
+                <div>
+                    Имате <strong>{{ unread_notification_count }}</strong> непрочитани известувања
+                </div>
+                <div class="ms-auto">
+                    <form method="post" action="{% url 'mark_all_notifications_read' %}" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-check-all me-1"></i>Означи ги сите како прочитани
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Filters -->
+            <div class="card mb-4 bg-light">
+                <div class="card-body">
+                    <form method="get" class="row g-3">
+                        <div class="col-md-4">
+                            <label for="type" class="form-label">Тип на известување</label>
+                            <select name="type" id="type" class="form-select">
+                                <option value="">Сите типови</option>
+                                {% if notifications %}
+                                    {% for type_value, type_label in notifications.0.TYPE_CHOICES %}
+                                    <option value="{{ type_value }}" {% if notification_type == type_value %}selected{% endif %}>
+                                        {{ type_label }}
+                                    </option>
+                                    {% endfor %}
+                                {% endif %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="read" class="form-label">Статус</label>
+                            <select name="read" id="read" class="form-select">
+                                <option value="">Сите</option>
+                                <option value="unread" {% if read_status == 'unread' %}selected{% endif %}>Непрочитани</option>
+                                <option value="read" {% if read_status == 'read' %}selected{% endif %}>Прочитани</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary me-2">
+                                <i class="bi bi-funnel me-1"></i>Филтрирај
+                            </button>
+                            <a href="{% url 'notifications_list' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle me-1"></i>Ресетирај
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Notifications List -->
+            {% if notifications %}
+                {% for notification in notifications %}
+                <div class="card mb-3 {% if not notification.is_read %}unread-notification{% endif %}">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center mb-3">
+                                    <h5 class="card-title mb-0 me-3">{{ notification.title }}</h5>
+                                    {% if not notification.is_read %}
+                                    <span class="badge bg-primary me-2">Ново</span>
+                                    {% endif %}
+                                    <span class="badge bg-secondary">{{ notification.get_type_display }}</span>
+                                </div>
+                                <p class="card-text mb-3">{{ notification.message }}</p>
+                                <div class="d-flex align-items-center text-muted small">
+                                    <i class="bi bi-clock me-1"></i>
+                                    <span>{{ notification.created_at|date:"d.m.Y H:i" }}</span>
+                                    {% if notification.report %}
+                                    <span class="ms-3">
+                                        <i class="bi bi-exclamation-triangle me-1"></i>
+                                        <a href="{% url 'my_reports' %}#report-{{ notification.report.id }}" class="text-decoration-none">
+                                            Пријава #{{ notification.report.id }}
+                                        </a>
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="notification-actions d-flex flex-column gap-2">
+                                {% if not notification.is_read %}
+                                <form method="post" action="{% url 'mark_notification_read' notification.id %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-primary" title="Означи како прочитано">
+                                        <i class="bi bi-check"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                                <form method="post" action="{% url 'delete_notification' notification.id %}" class="d-inline" 
+                                      onsubmit="return confirm('Дали сте сигурни дека сакате да го избришете ова известување?')">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Избриши">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+
+                <!-- Pagination (if needed) -->
+                {% if is_paginated %}
+                <nav aria-label="Page navigation" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}">
+                                <i class="bi bi-chevron-left"></i> Претходна
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for num in page_obj.paginator.page_range %}
+                        <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+                            <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                        </li>
+                        {% endfor %}
+                        
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}">
+                                Следна <i class="bi bi-chevron-right"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-bell-slash display-1 text-muted"></i>
+                    <h4 class="mt-3 text-muted">Нема известувања</h4>
+                    <p class="text-muted">Во моментов немате известувања за прикажување.</p>
+                </div>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+
+{% endblock %}
