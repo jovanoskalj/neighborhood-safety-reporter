@@ -157,6 +157,14 @@ class Report(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     status_changed_at = models.DateTimeField(null=True, blank=True)
     ai_processed = models.BooleanField(default=False)
+    is_duplicate = models.BooleanField(default=False)
+    duplicate_of = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="duplicates",
+    )
 
     class Meta:
         indexes = [
@@ -168,6 +176,7 @@ class Report(models.Model):
             models.Index(fields=["latitude"], name="report_latitude_idx"),
             models.Index(fields=["longitude"], name="report_longitude_idx"),
             models.Index(fields=["sector", "status"], name="report_sector_status_idx"),
+            models.Index(fields=["is_duplicate"], name="report_is_duplicate_idx"),
         ]
 
     def __str__(self) -> str:

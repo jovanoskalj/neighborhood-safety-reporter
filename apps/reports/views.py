@@ -23,6 +23,7 @@ from urllib3 import request
 from apps.accounts.models import AuditLog, UserProfile
 from apps.notifications.senders import send_status_change_email
 
+from .duplicate_detection import find_potential_duplicate
 from .forms import (
     AdminUserCreateForm,
     ReportCategoryForm,
@@ -549,8 +550,22 @@ def submit_report(request):
         if form.is_valid():
             report = form.save(commit=False)
             report.citizen = request.user
+            duplicate = find_potential_duplicate(
+                description=report.description,
+                latitude=float(report.latitude),
+                longitude=float(report.longitude),
+            )
+            if duplicate is not None:
+                report.is_duplicate = True
+                report.duplicate_of = duplicate
+                messages.warning(
+                    request,
+                    f"Можно е оваа пријава да е дупликат на пријава #{duplicate.pk}. Ќе биде означена за проверка.",
+                )
+
             report.save()
-            messages.success(request, "Вашата пријава е успешно поднесена.")
+            if duplicate is None:
+                messages.success(request, "Вашата пријава е успешно поднесена.")
             return redirect("submit_report")
     else:
         form = ReportSubmissionForm()
@@ -643,6 +658,19 @@ def create_report(request):
     if not form.is_valid():
         return JsonResponse({"errors": form.errors}, status=400)
 
+    duplicate = find_potential_duplicate(
+        description=form.cleaned_data["description"],
+        latitude=float(form.cleaned_data["latitude"]),
+        longitude=float(form.cleaned_data["longitude"]),
+    )
+    if duplicate is not None:
+        return JsonResponse(
+            {
+                "detail": "Duplicate report detected.",
+                "duplicate_of_id": duplicate.pk,
+            },
+            status=409,
+        )
     report = Report.objects.create(
         citizen=request.user,
         description=form.cleaned_data["description"],
