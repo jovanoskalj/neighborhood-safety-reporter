@@ -255,3 +255,31 @@ form textarea {
         grid-template-columns: 1fr;
     }
 }
+
+.report-card {
+    border-radius: 0.95rem;
+}
+
+.report-map {
+    height: 320px;
+    border-radius: 0.75rem;
+    border: 1px solid #dbe3ef;
+    overflow: hidden;
+}
+
+.mini-map {
+    height: 320px;
+    border-radius: 0.75rem;
+    border: 1px solid #dbe3ef;
+}
+
+.report-image-preview-wrap {
+    min-height: 120px;
+}
+
+.report-image-preview {
+    width: 100%;
+    max-width: 340px;
+    border-radius: 0.75rem;
+    border: 1px solid #dbe3ef;
+}

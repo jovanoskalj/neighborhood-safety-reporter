@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="mk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Промена на статус</title>
+</head>
+<body style="font-family: Arial, sans-serif; background:#f4f7fb; margin:0; padding:24px; color:#0f172a;">
+  <div style="max-width:620px; margin:0 auto; background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden;">
+    <div style="background:#1A2238; color:#fff; padding:16px 20px; font-weight:700;">Безбеден Град</div>
+    <div style="padding:20px;">
+      <h2 style="margin:0 0 10px; font-size:20px;">Променет статус на пријава</h2>
+      <p style="margin:0 0 14px; color:#475569;">Здраво {{ user.username }}, статусот на вашата пријава е ажуриран.</p>
+
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px; margin-bottom:14px;">
+        <div style="margin-bottom:6px;"><strong>ID:</strong> #{{ report.id }}</div>
+        <div style="margin-bottom:6px;"><strong>Од:</strong> {{ old_status_label }}</div>
+        <div style="margin-bottom:6px;"><strong>Во:</strong> {{ new_status_label }}</div>
+        <div><strong>Време:</strong> {{ report.status_changed_at|date:"d.m.Y H:i" }}</div>
+      </div>
+
+      <p style="margin:0; color:#64748b; font-size:13px;">Можете да ја проверите пријавата во вашето мени „Мои пријави“.</p>
+    </div>
+  </div>
+</body>
+</html>
