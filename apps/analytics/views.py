@@ -1,5 +1,6 @@
+from django.contrib.auth.decorators import user_passes_test
 from django.db.models import Count
-from django.db.models.functions import TruncWeek, TruncMonth, TruncYear
+from django.db.models.functions import TruncMonth, TruncWeek, TruncYear
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
@@ -13,7 +14,14 @@ _TRUNC_MAP = {
 _DEFAULT_PERIOD = "monthly"
 
 
-def _group_by_field(field: str) -> list[dict]:
+def is_analytics_user(user) -> bool:
+    """Return True if user is an officer or administrator."""
+    if not user.is_authenticated:
+        return False
+    return user.is_superuser or user.groups.filter(name__in=['admin', 'administrators', 'officer', 'officers']).exists()
+
+
+def _group_by_field(field):
     """Return [{label, count}] for a Report CharField using a single query."""
     return [
         {"label": row[field], "count": row["count"]}
@@ -21,7 +29,7 @@ def _group_by_field(field: str) -> list[dict]:
     ]
 
 
-def _time_series(period: str) -> list[dict]:
+def _time_series(period):
     """Return chronological [{period, count}] bucketed by the requested period."""
     trunc_fn = _TRUNC_MAP.get(period, _TRUNC_MAP[_DEFAULT_PERIOD])
     qs = (
@@ -37,6 +45,7 @@ def _time_series(period: str) -> list[dict]:
 
 
 @require_GET
+@user_passes_test(is_analytics_user)
 def stats(request) -> JsonResponse:
     """Provide aggregated statistics for dashboard visualization."""
     raw_period = (request.GET.get("period") or "").strip().lower()

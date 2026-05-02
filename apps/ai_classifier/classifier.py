@@ -1,18 +1,149 @@
+# import json
+# import requests
+# from functools import lru_cache
+# from django.conf import settings 
+# from apps.ai_classifier.prompts import CLASSIFICATION_PROMPT
+
+# OLLAMA_BASE_URL = settings.OLLAMA_BASE_URL
+
+# def classify_report(report):
+#     """
+#     Stub for AI classification using Ollama
+#     Returns a dict with category, priority, sector
+#     """
+    
+#      # Hardcoded description for testing
+#     description = report.get("description", "No description provided")
+
+#     prompt = CLASSIFICATION_PROMPT.format(description=description)
+
+
+#     try:
+#         response = requests.post(
+#             f"{OLLAMA_BASE_URL}/api/generate",
+#             json={"model": "llava-llama3", "prompt": prompt},
+#             timeout=10
+#         )
+#         response.raise_for_status()
+#         result_text = response.json().get("completion", "")
+
+#         classification = json.loads(result_text)
+#         # Ensure keys exist
+#         for key in ["category", "priority", "sector"]:
+#             if key not in classification:
+#                 raise ValueError(f"Missing key {key} in classification")
+#         return classification
+
+#     except Exception as e:
+#         print(f"Classification failed for: {description}. Error: {e}")
+#         return {
+#             "category": "unclassified",
+#             "priority": "unclassified",
+#             "sector": "unclassified"
+#         }
+
 import json
-from functools import lru_cache
+import logging
 
 import requests
 from django.conf import settings
 
 from apps.ai_classifier.prompts import CLASSIFICATION_PROMPT
 
-VALID_CATEGORIES = {"infrastructure", "utilities", "safety", "health", "other"}
-VALID_PRIORITIES = {"urgent", "normal", "low"}
-VALID_SECTORS = {"infrastructure", "utilities", "safety", "health", "admin"}
+logger = logging.getLogger(__name__)
+
+SAFETY_KEYWORDS = {
+    "напад",
+    "насил",
+    "тепач",
+    "краж",
+    "краде",
+    "крадци",
+    "разбој",
+    "сомнител",
+    "закана",
+    "полици",
+    "криминал",
+    "ограб",
+    "убиств",
+    "дрога",
+}
+HEALTH_KEYWORDS = {
+    "болниц",
+    "клиник",
+    "амбулант",
+    "здрав",
+    "здравје",
+    "епидем",
+    "зараза",
+    "инфек",
+    "санитар",
+    "лекар",
+    "аптека",
+}
+UTILITIES_KEYWORDS = {
+    "ѓубре",
+    "контејнер",
+    "депони",
+    "канализа",
+    "шахта",
+    "одвод",
+    "вода",
+    "истекува",
+    "поплав",
+    "смет",
+    "комунал",
+    "хигиен",
+}
+INFRASTRUCTURE_KEYWORDS = {
+    "дупка",
+    "асфалт",
+    "тротоар",
+    "улиц",
+    "пат",
+    "коловоз",
+    "семафор",
+    "осветлува",
+    "светилк",
+    "улично светло",
+    "мост",
+    "знак",
+    "инфраструкт",
+}
+
+URGENT_KEYWORDS = {
+    "итно",
+    "небезбед",
+    "опас",
+    "ризик",
+    "повред",
+    "деца",
+    "училиш",
+    "пожар",
+    "насил",
+    "краж",
+    "краде",
+    "кражби",
+    "судир",
+    "излева",
+    "поплав",
+    "поплавен",
+    "семафор",
+    "расипан",
+    "ризично",
+    "темно",
+    "светилк",
+    "нехигиен",
+    "инфекц",
+    "медицин",
+    "отпад",
+    "закани",
+    "тепач",
+}
+LOW_KEYWORDS = {"мала", "мал", "козмет", "естет", "не е итно", "кога можете"}
 
 
-def _fallback() -> dict[str, str]:
-    """Return safe fallback classification for parsing/network failures."""
+def _fallback() -> dict:
     return {
         "category": "other",
         "priority": "normal",
@@ -21,19 +152,39 @@ def _fallback() -> dict[str, str]:
     }
 
 
-def _extract_json_payload(response_json: dict) -> str:
-    """Extract model output text from Ollama API response."""
-    return response_json.get("response") or response_json.get("completion") or ""
+def _contains_any(text: str, keywords: set[str]) -> bool:
+    return any(keyword in text for keyword in keywords)
 
 
-def _validate_result(result: dict) -> dict[str, str]:
-    """Validate and normalize classifier output against accepted enums."""
-    category = str(result.get("category", "other")).strip().lower()
-    priority = str(result.get("priority", "normal")).strip().lower()
-    sector = str(result.get("sector", "admin")).strip().lower()
+def _heuristic_classify(description: str) -> dict | None:
+    """Deterministic keyword routing for MK/EN local complaints."""
+    text = (description or "").strip().lower()
+    if not text:
+        return None
 
-    if category not in VALID_CATEGORIES or priority not in VALID_PRIORITIES or sector not in VALID_SECTORS:
-        return _fallback()
+    if _contains_any(text, SAFETY_KEYWORDS):
+        category = "safety"
+        sector = "safety"
+    elif _contains_any(text, HEALTH_KEYWORDS):
+        category = "health"
+        sector = "health"
+    elif _contains_any(text, UTILITIES_KEYWORDS):
+        category = "utilities"
+        sector = "utilities"
+    elif _contains_any(text, INFRASTRUCTURE_KEYWORDS):
+        category = "infrastructure"
+        sector = "infrastructure"
+    else:
+        return None
+
+    if "не е итно" in text or "not urgent" in text:
+        priority = "low"
+    elif _contains_any(text, URGENT_KEYWORDS):
+        priority = "urgent"
+    elif _contains_any(text, LOW_KEYWORDS):
+        priority = "low"
+    else:
+        priority = "normal"
 
     return {
         "category": category,
@@ -43,29 +194,42 @@ def _validate_result(result: dict) -> dict[str, str]:
     }
 
 
-@lru_cache(maxsize=512)
-def _classify_description(description: str) -> dict[str, str]:
-    """Call Ollama with timeout and parse JSON classification output."""
-    prompt = CLASSIFICATION_PROMPT.format(description=description)
-
-    try:
-        response = requests.post(
-            f"{settings.OLLAMA_BASE_URL}/api/generate",
-            json={"model": settings.OLLAMA_MODEL, "prompt": prompt, "stream": False},
-            timeout=5,
-        )
-        response.raise_for_status()
-        result_text = _extract_json_payload(response.json())
-
-        raw_data = json.loads(result_text)
-        return _validate_result(raw_data)
-    except Exception:
-        return _fallback()
-
-
-def classify_report(description: str) -> dict[str, str]:
+def classify_report(report, timeout=10):
     """Classify a report description into category, priority, and sector."""
+    if isinstance(report, str):
+        description = report
+    elif isinstance(report, dict):
+        description = report.get("description", "")
+    else:
+        raise TypeError("classify_report expects a description string or a dict with 'description'.")
+
     normalized_description = (description or "").strip()
     if not normalized_description:
         return _fallback()
-    return _classify_description(normalized_description)
+
+    heuristic_result = _heuristic_classify(normalized_description)
+    if heuristic_result:
+        return heuristic_result
+
+    prompt = CLASSIFICATION_PROMPT.format(description=normalized_description)
+    try:
+        response = requests.post(
+            f"{settings.OLLAMA_BASE_URL}/api/generate",
+            json={
+                "model": settings.OLLAMA_MODEL,
+                "prompt": prompt,
+                "stream": False,
+            },
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        result_text = response.json().get("response") or response.json().get("completion") or "{}"
+        classification = json.loads(result_text)
+        for key in ["category", "priority", "sector"]:
+            if key not in classification:
+                raise ValueError(f"Missing key '{key}' in classification response")
+        classification.setdefault("status", "new")
+        return classification
+    except Exception:
+        logger.exception("AI classification failed; falling back to defaults.")
+        return _fallback()

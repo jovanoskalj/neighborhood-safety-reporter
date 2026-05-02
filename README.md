@@ -4,7 +4,7 @@ Modern Django platform for reporting neighborhood/community issues, with role-ba
 
 ## Features
 
-- Django 4.2 app with modular structure (`accounts`, `reports`, `analytics`, `notifications`, `ai_classifier`)
+- Django 6.0.3 app with modular structure (`accounts`, `reports`, `analytics`, `notifications`, `ai_classifier`)
 - Registration + email verification code flow (6 digits, expiring token)
 - Role-aware navigation and access (`citizen`, `officer`, `admin`, `superuser`)
 - Login-protected report submit route
@@ -14,8 +14,8 @@ Modern Django platform for reporting neighborhood/community issues, with role-ba
 
 ## Tech Stack
 
-- Python 3.11
-- Django 4.2
+- Python 3.13
+- Django 6.0.3
 - PostgreSQL 16
 - Docker / Docker Compose
 - Pytest + pytest-django
@@ -92,15 +92,15 @@ To use real SendGrid delivery, set in `.env`:
 
 ## Run Tests
 
-All tests:
+Tests run inside Docker using Django's built-in test runner.
 
-- `pytest .`
+Start the stack first:
 
-Common subsets:
+- `docker compose up -d`
 
-- `pytest tests/test_auth.py -q`
-- `pytest tests/test_navbar.py -q`
-- `pytest tests/test_submit_report_access.py -q`
+Run all tests:
+
+- `docker compose exec web python manage.py test apps.reports`
 
 ## PGAdmin Connection (Local)
 

@@ -1,23 +1,27 @@
 """Views for account registration, authentication, and profile updates."""
 
+import logging
 import random
 from datetime import timedelta
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.models import User
 from django.contrib.auth.models import Group
 from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail
-from django.shortcuts import redirect, render
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.contrib.admin.views.decorators import staff_member_required
+from django.views.decorators.http import require_http_methods
 from apps.reports.models import Report
 
-from .forms import RegisterForm
-from .models import EmailVerificationCode, UserProfile, AuditLog
+from .forms import LocalizedPasswordChangeForm, ProfileForm, RegisterForm
+from .models import AuditLog, EmailVerificationCode, UserNotification, UserProfile
 
 
 ROLE_GROUPS = {
@@ -27,13 +31,14 @@ ROLE_GROUPS = {
 }
 
 VERIFICATION_CODE_EXPIRY_MINUTES = 15
+logger = logging.getLogger(__name__)
 
 
 def _generate_verification_code() -> str:
     return f"{random.randint(0, 999999):06d}"
 
 
-def _send_verification_code_email(user: User, code: str) -> None:
+def _send_verification_code_email(user: User, code: str) -> bool:
     subject = "Email Verification Code"
     context = {
         "inactive_user": user,
@@ -47,14 +52,19 @@ def _send_verification_code_email(user: User, code: str) -> None:
         f"Кодот важи {VERIFICATION_CODE_EXPIRY_MINUTES} минути."
     )
 
-    send_mail(
-        subject=subject,
-        message=plain_message,
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[user.email],
-        html_message=html_message,
-        fail_silently=False,
-    )
+    try:
+        send_mail(
+            subject=subject,
+            message=plain_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+        return True
+    except Exception:
+        logger.exception("Verification email send failed for user_id=%s email=%s", user.id, user.email)
+        return False
 
 
 def register_view(request):
@@ -79,10 +89,7 @@ def register_view(request):
             group, _ = Group.objects.get_or_create(name=group_name)
             user.groups.add(group)
 
-        if settings.SENDGRID_ENABLED:
-            verification_code = _generate_verification_code()
-        else:
-            verification_code = str(settings.DEV_VERIFICATION_CODE)
+        verification_code = _generate_verification_code()
 
         EmailVerificationCode.objects.update_or_create(
             user=user,
@@ -92,14 +99,19 @@ def register_view(request):
             },
         )
 
-        if settings.SENDGRID_ENABLED:
-            _send_verification_code_email(user, verification_code)
+        email_sent = _send_verification_code_email(user, verification_code)
         request.session["pending_verification_user_id"] = user.id
 
-        if settings.SENDGRID_ENABLED:
+        if email_sent:
             messages.success(request, "Регистрацијата е успешна. Ви испративме 6-цифрен код на вашата е-пошта.")
         else:
-            messages.success(request, f"Регистрацијата е успешна. Тест-кодот за верификација е: {verification_code}")
+            if settings.DEBUG:
+                messages.warning(
+                    request,
+                    f"Регистрацијата е успешна, но email не е испратен. Тест-код за верификација: {verification_code}",
+                )
+            else:
+                messages.warning(request, "Регистрацијата е успешна, но има проблем со праќање email. Обидете се повторно.")
         return redirect("verify_email_code")
 
     return render(request, "accounts/register.html", {"form": form})
@@ -107,15 +119,26 @@ def register_view(request):
 
 def login_view(request):
     if request.method == "POST":
-        username = request.POST.get("username", "")
+        identifier = (request.POST.get("username") or "").strip()
         password = request.POST.get("password", "")
-        user = authenticate(request, username=username, password=password)
+        user = authenticate(request, username=identifier, password=password)
+
+        # Support email-based login in the same input field.
+        if not user and identifier:
+            email_matches = User.objects.filter(email__iexact=identifier)
+            for email_user in email_matches:
+                user = authenticate(request, username=email_user.username, password=password)
+                if user:
+                    break
+
         if user:
             login(request, user)
-            next_url = request.GET.get("next") or "dashboard"
+            next_url = request.GET.get("next") or "my_reports"
             return redirect(next_url)
         else:
-            inactive_user = User.objects.filter(username=username, is_active=False).first()
+            inactive_user = User.objects.filter(username=identifier, is_active=False).first()
+            if not inactive_user:
+                inactive_user = User.objects.filter(email__iexact=identifier, is_active=False).first()
             if inactive_user and inactive_user.check_password(password):
                 messages.error(request, "Профилот сѐ уште не е верификуван. Проверете ја вашата е-пошта.")
                 return render(request, "accounts/login.html", status=200)
@@ -142,18 +165,6 @@ def verify_email_code_view(request):
             messages.error(request, "Кодот мора да има точно 6 цифри.")
             return redirect("verify_email_code")
 
-        if not settings.SENDGRID_ENABLED:
-            if code != str(settings.DEV_VERIFICATION_CODE):
-                messages.error(request, "Кодот е невалиден или истечен.")
-                return redirect("verify_email_code")
-
-            user.is_active = True
-            user.save(update_fields=["is_active"])
-            EmailVerificationCode.objects.filter(user=user).delete()
-            request.session.pop("pending_verification_user_id", None)
-            messages.success(request, "Е-поштата е успешно верификувана. Сега можете да се најавите.")
-            return redirect("login")
-
         verification = EmailVerificationCode.objects.filter(user=user, code=code).first()
         if not verification or verification.is_expired():
             messages.error(request, "Кодот е невалиден или истечен.")
@@ -177,72 +188,219 @@ def logout_view(request):
 
 @login_required
 def profile_view(request):
+    """Allow users to update basic profile information and passwords."""
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    user_reports = Report.objects.filter(citizen=request.user)
+    total_reports = user_reports.count()
+    resolved_reports = user_reports.filter(status="resolved").count()
+    urgent_reports = user_reports.filter(priority="urgent").count()
+
+    distinct_days = {value.date() for value in user_reports.values_list("created_at", flat=True)}
+
+    achievements = [
+        {
+            "title": "Прва пријава",
+            "description": "Поднеси ја првата пријава.",
+            "unlocked": total_reports >= 1,
+            "progress": min(total_reports, 1),
+            "target": 1,
+        },
+        {
+            "title": "Активен граѓанин",
+            "description": "Поднеси 5 пријави.",
+            "unlocked": total_reports >= 5,
+            "progress": min(total_reports, 5),
+            "target": 5,
+        },
+        {
+            "title": "Чувар на маало",
+            "description": "Поднеси 20 пријави.",
+            "unlocked": total_reports >= 20,
+            "progress": min(total_reports, 20),
+            "target": 20,
+        },
+        {
+            "title": "Решени случаи",
+            "description": "Имај 3 решени пријави.",
+            "unlocked": resolved_reports >= 3,
+            "progress": min(resolved_reports, 3),
+            "target": 3,
+        },
+        {
+            "title": "Будно око",
+            "description": "Поднеси 3 итни пријави.",
+            "unlocked": urgent_reports >= 3,
+            "progress": min(urgent_reports, 3),
+            "target": 3,
+        },
+        {
+            "title": "Конзистентен корисник",
+            "description": "Поднесувај пријави во 3 различни денови.",
+            "unlocked": len(distinct_days) >= 3,
+            "progress": min(len(distinct_days), 3),
+            "target": 3,
+        },
+    ]
+
+    profile_form = ProfileForm(instance=request.user, prefix="profile")
+    password_form = LocalizedPasswordChangeForm(user=request.user, prefix="password")
 
     if request.method == "POST":
-        profile.phone = request.POST.get("phone", profile.phone)
-        role = profile.role
-        if role == "officer":
-            profile.sector = request.POST.get("sector", profile.sector)
-        profile.save()
-        messages.success(request, "Профилот е успешно ажуриран.")
-        return redirect("profile")
+        if "change_password" in request.POST:
+            password_form = LocalizedPasswordChangeForm(user=request.user, data=request.POST, prefix="password")
+            if password_form.is_valid():
+                user = password_form.save()
+                update_session_auth_hash(request, user)
+                messages.success(request, "Лозинката е успешно променета.")
+                return redirect("profile")
+        else:
+            profile_form = ProfileForm(request.POST, instance=request.user, prefix="profile")
+            if profile_form.is_valid():
+                profile_form.save()
+            profile.phone = request.POST.get("phone", profile.phone)
+            if request.FILES.get("avatar"):
+                profile.avatar = request.FILES["avatar"]
+            if profile.role == "officer":
+                profile.sector = request.POST.get("sector", profile.sector)
+            profile.save()
+            messages.success(request, "Профилот е успешно ажуриран.")
+            return redirect("profile")
 
-    return render(request, "accounts/profile.html", {"profile": profile, "sector_choices": UserProfile.SECTOR_CHOICES})
+    return render(
+        request,
+        "accounts/profile.html",
+        {
+            "profile": profile,
+            "sector_choices": UserProfile.SECTOR_CHOICES,
+            "total_reports": total_reports,
+            "resolved_reports": resolved_reports,
+            "achievements": achievements,
+            "profile_form": profile_form,
+            "password_form": password_form,
+        },
+    )
 
 
 @staff_member_required
 def admin_user_list(request):
-    users = User.objects.select_related('userprofile').all().order_by('id').distinct()
-    return render(request, 'accounts/admin_user_list.html', {'users': users})
+    users = User.objects.select_related("profile").all().order_by("id").distinct()
+    return render(request, "accounts/admin_user_list.html", {"users": users})
 
 
 @staff_member_required
 def admin_user_toggle(request, user_id):
-    if request.method == 'POST':
+    if request.method == "POST":
         target_user = User.objects.get(id=user_id)
         target_user.is_active = not target_user.is_active
         target_user.save()
         AuditLog.objects.create(
             user=request.user,
-            action='toggle_active',
-            target_model='User',
+            action="toggle_active",
+            target_model="User",
             target_id=user_id,
-            details={'is_active': target_user.is_active}
+            details={"is_active": target_user.is_active},
         )
         messages.success(request, f"User {target_user.username} updated.")
-        return redirect('admin_user_list')
-    
+        return redirect("admin_user_list")
+
 
 @staff_member_required
 def admin_user_update_role(request, user_id):
-    if request.method == 'POST':
+    if request.method == "POST":
         target_user = User.objects.get(id=user_id)
-        profile, _ = UserProfile.objects.get_or_create(user=target_user)
-        new_role = request.POST.get('role')
+        UserProfile.objects.get_or_create(user=target_user)
+        new_role = request.POST.get("role")
         if new_role in dict(UserProfile.ROLE_CHOICES):
             UserProfile.objects.filter(user=target_user).update(role=new_role)
             AuditLog.objects.create(
                 user=request.user,
-                action='update_role',
-                target_model='User',
+                action="update_role",
+                target_model="User",
                 target_id=user_id,
-                details={'new_role': new_role}
+                details={"new_role": new_role},
             )
             messages.success(request, f"Role updated to {new_role}.")
-        return redirect('admin_user_list')
-    
+        return redirect("admin_user_list")
+
 
 @staff_member_required
 def admin_system_log(request):
-    logs = AuditLog.objects.select_related('user').order_by('-timestamp')[:200]
-    return render(request, 'accounts/admin_system_log.html', {'logs': logs})
+    logs = AuditLog.objects.select_related("user").order_by("-timestamp")[:200]
+    return render(request, "accounts/admin_system_log.html", {"logs": logs})
+
 
 @staff_member_required
 def admin_category_list(request):
     categories = Report.CATEGORY_CHOICES
     sectors = Report.SECTOR_CHOICES
-    return render(request, 'accounts/admin_categories.html', {
-        'categories': categories,
-        'sectors': sectors
-    })
+    return render(
+        request,
+        "accounts/admin_categories.html",
+        {"categories": categories, "sectors": sectors},
+    )
+
+
+# User notification views
+@login_required
+def notifications_list(request):
+    """Display all notifications for the current user."""
+    notifications = UserNotification.objects.filter(user=request.user).order_by("-created_at")
+
+    notification_type = request.GET.get("type")
+    if notification_type:
+        notifications = notifications.filter(type=notification_type)
+
+    read_status = request.GET.get("read")
+    if read_status == "read":
+        notifications = notifications.filter(is_read=True)
+    elif read_status == "unread":
+        notifications = notifications.filter(is_read=False)
+
+    return render(
+        request,
+        "accounts/notifications_list.html",
+        {
+            "notifications": notifications,
+            "notification_type": notification_type,
+            "read_status": read_status,
+        },
+    )
+
+
+@login_required
+@require_http_methods(["POST"])
+def mark_notification_read(request, notification_id):
+    """Mark a specific notification as read."""
+    notification = get_object_or_404(UserNotification, pk=notification_id, user=request.user)
+    notification.is_read = True
+    notification.save(update_fields=["is_read"])
+
+    if request.headers.get("Accept", "").startswith("application/json"):
+        return JsonResponse({"success": True})
+
+    return redirect("notifications_list")
+
+
+@login_required
+@require_http_methods(["POST"])
+def mark_all_notifications_read(request):
+    """Mark all notifications for the user as read."""
+    UserNotification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+
+    if request.headers.get("Accept", "").startswith("application/json"):
+        return JsonResponse({"success": True})
+
+    return redirect("notifications_list")
+
+
+@login_required
+@require_http_methods(["POST"])
+def delete_notification(request, notification_id):
+    """Delete a specific notification."""
+    notification = get_object_or_404(UserNotification, pk=notification_id, user=request.user)
+    notification.delete()
+
+    if request.headers.get("Accept", "").startswith("application/json"):
+        return JsonResponse({"success": True})
+
+    return redirect("notifications_list")

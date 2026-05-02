@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% block title %}Резултати од пребарување{% endblock %}
+{% block content %}
+<section class="container py-4">
+    <h1 class="h3 mb-1">Резултати од пребарување</h1>
+    <p class="text-muted small mb-3">
+        Пронајдени {{ reports_page.paginator.count }} пријави
+        · страна {{ reports_page.number }} од {{ reports_page.paginator.num_pages }}
+    </p>
+
+    {% if reports_page.object_list %}
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>ИД</th>
+                    <th>Категорија</th>
+                    <th>Статус</th>
+                    <th>Приоритет</th>
+                    <th>Сектор</th>
+                    <th>Опис</th>
+                    <th>Датум</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for report in reports_page.object_list %}
+                <tr>
+                    <td class="fw-semibold">ПРЈ-{{ report.pk|stringformat:'03d' }}</td>
+                    <td>{{ report.get_category_display }}</td>
+                    <td>{{ report.get_status_display }}</td>
+                    <td>{{ report.get_priority_display }}</td>
+                    <td>{{ report.get_sector_display }}</td>
+                    <td class="text-truncate" style="max-width:340px">{{ report.description }}</td>
+                    <td class="text-muted small">{{ report.created_at|date:'Y-m-d' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if reports_page.paginator.num_pages > 1 %}
+    <nav aria-label="pagination">
+        <ul class="pagination">
+            {% if reports_page.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?{% for key, value in query.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ reports_page.previous_page_number }}">‹ Претходна</a>
+            </li>
+            {% endif %}
+            <li class="page-item active"><span class="page-link">{{ reports_page.number }}</span></li>
+            {% if reports_page.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?{% for key, value in query.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ reports_page.next_page_number }}">Следна ›</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+    {% else %}
+    <div class="alert alert-info">Нема пријави што одговараат на пребарувањето.</div>
+    {% endif %}
+</section>
+{% endblock %}

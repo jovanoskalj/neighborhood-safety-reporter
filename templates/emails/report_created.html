@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="mk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Потврда за пријава</title>
+</head>
+<body style="font-family: Arial, sans-serif; background:#f4f7fb; margin:0; padding:24px; color:#0f172a;">
+  <div style="max-width:620px; margin:0 auto; background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden;">
+    <div style="background:#1A2238; color:#fff; padding:16px 20px; font-weight:700;">Безбеден Град</div>
+    <div style="padding:20px;">
+      <h2 style="margin:0 0 10px; font-size:20px;">Пријавата е успешно креирана</h2>
+      <p style="margin:0 0 14px; color:#475569;">Здраво {{ user.username }}, вашата пријава е успешно примена.</p>
+
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px; margin-bottom:14px;">
+        <div style="margin-bottom:6px;"><strong>ID:</strong> #{{ report.id }}</div>
+        <div style="margin-bottom:6px;"><strong>Статус:</strong> {{ report.get_status_display }}</div>
+        <div style="margin-bottom:6px;"><strong>Категорија:</strong> {{ report.get_category_display }}</div>
+        <div style="margin-bottom:6px;"><strong>Приоритет:</strong> {{ report.get_priority_display }}</div>
+        <div style="margin-bottom:6px;"><strong>Опис:</strong> {{ report.description|truncatechars:140 }}</div>
+        <div><strong>Датум:</strong> {{ report.created_at|date:"d.m.Y H:i" }}</div>
+      </div>
+
+      {% if report.status == 'unclassified' %}
+      <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:10px; padding:12px; margin-bottom:14px; color:#9a3412;">
+        Пријавата е означена како не-класифицирана и ќе биде прегледана рачно од нашиот тим.
+      </div>
+      {% endif %}
+
+      <p style="margin:0; color:#64748b; font-size:13px;">Ќе добиете нов email кога статусот на пријавата ќе се промени.</p>
+    </div>
+  </div>
+</body>
+</html>

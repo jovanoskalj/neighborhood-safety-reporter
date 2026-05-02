@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block title %}Админ панел{% endblock %}
+
+{% block content %}
+<section class="container py-4 admin-dashboard-wrap">
+  <h1 class="h3 mb-3">Админ панел</h1>
+
+  <nav class="nav nav-pills admin-tabs mb-4">
+    <a class="nav-link {% if active_tab == 'analytics' %}active{% endif %}" href="?tab=analytics">Аналитика</a>
+    <a class="nav-link {% if active_tab == 'users' %}active{% endif %}" href="?tab=users">Корисници</a>
+    <a class="nav-link {% if active_tab == 'settings' %}active{% endif %}" href="?tab=settings">Подесувања</a>
+    <a class="nav-link {% if active_tab == 'log' %}active{% endif %}" href="?tab=log">Системски лог</a>
+  </nav>
+
+  {% if active_tab == 'analytics' %}
+  <div class="row g-3">
+    <div class="col-12">
+      <label for="periodSelect" class="form-label">Период</label>
+      <select id="periodSelect" class="form-select" style="max-width: 240px;">
+        <option value="weekly">weekly</option>
+        <option value="monthly" selected>monthly</option>
+        <option value="yearly">yearly</option>
+      </select>
+    </div>
+    <div class="col-12 col-lg-6">
+      <div class="card border-0 shadow-sm p-3">
+        <canvas id="timeSeriesChart"></canvas>
+      </div>
+    </div>
+    <div class="col-12 col-lg-3">
+      <div class="card border-0 shadow-sm p-3">
+        <canvas id="categoryChart"></canvas>
+      </div>
+    </div>
+    <div class="col-12 col-lg-3">
+      <div class="card border-0 shadow-sm p-3">
+        <canvas id="statusChart"></canvas>
+      </div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script>
+    (function () {
+      const endpoint = "/api/analytics/stats/";
+      async function load(period) {
+        try {
+          const resp = await fetch(`${endpoint}?period=${period}`);
+          if (!resp.ok) throw new Error('bad response');
+          await resp.json();
+        } catch (err) {
+          console.error('Analytics fetch failed:', err);
+        }
+      }
+      const select = document.getElementById('periodSelect');
+      if (select) {
+        select.addEventListener('change', (e) => load(e.target.value));
+        load(select.value);
+      }
+    })();
+  </script>
+  {% endif %}
+</section>
+{% endblock %}
