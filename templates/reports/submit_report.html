@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 
 {% block title %}Поднеси пријава{% endblock %}
 
@@ -284,6 +284,12 @@
         <div class="field" style="margin-top:14px">
           <label for="{{ form.municipality.id_for_label }}">{{ form.municipality.label }}</label>
           {{ form.municipality }}
+          {% if form.municipality.errors %}
+          <div class="field-error">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+            {{ form.municipality.errors|join:', ' }}
+          </div>
+          {% endif %}
         </div>
       </div>
 

@@ -11,6 +11,10 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
+
+def _env_bool(name: str, default: str = "False") -> bool:
+    return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
+
 SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-fallback-key")
 DEBUG = os.getenv("DEBUG", "False") == "True"
 ALLOWED_HOSTS = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "localhost").split(",") if host.strip()]
@@ -26,7 +30,7 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.reports",
     "apps.ai_classifier",
-    "apps.notifications",
+    "apps.notifications.apps.NotificationsConfig",
     "apps.analytics",
 ]
 
@@ -41,6 +45,9 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
+# Required for OpenStreetMap tile usage policy: keep origin referrer on cross-site tile requests.
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+
 ROOT_URLCONF = "config.urls"
 
 TEMPLATES = [
@@ -53,6 +60,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "apps.accounts.context_processors.notification_context",
             ],
         },
     },
@@ -111,7 +119,8 @@ EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.sendgrid.net")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True") == "True"
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "apikey")
-EMAIL_HOST_PASSWORD = os.getenv("SENDGRID_API_KEY", "")
+# Prefer the standard Django SMTP variable and fallback to SENDGRID_API_KEY for backward compatibility.
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD") or os.getenv("SENDGRID_API_KEY", "")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "safetyreport.mk@gmail.com")
 
 # django-verify-email
@@ -125,3 +134,16 @@ LOGIN_URL = "login"
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
 OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "25"))
+# Set to False (e.g. in test/CI environments) to skip the post_save AI pipeline.
+AI_CLASSIFICATION_ENABLED = _env_bool("AI_CLASSIFICATION_ENABLED", "True")
+
+
+# Django Debug Toolbar
+if DEBUG:
+    try:
+        import debug_toolbar
+        INSTALLED_APPS += ["debug_toolbar"]
+        MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")
+        INTERNAL_IPS = ["127.0.0.1"]
+    except ImportError:
+        pass

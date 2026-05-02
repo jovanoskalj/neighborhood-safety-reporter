@@ -5,6 +5,7 @@
 {% block content %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -137,14 +138,22 @@
   }
 
   /* coords */
-  .coord-pair { display: flex; gap: 12px; flex-wrap: wrap; }
-  .coord-chip {
-    font-family: var(--font-mono); font-size: 12.5px;
-    background: var(--gray-bg); border: 1px solid var(--gray-bd);
-    border-radius: 4px; padding: 4px 10px; color: var(--text-2);
-    display: inline-flex; align-items: center; gap: 5px;
+  .location-block {
+    display: grid; grid-template-columns: 1fr; gap: 10px;
   }
-  .coord-chip span { color: var(--text-3); font-size: 11px; }
+  .location-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--gray-bg); border: 1px solid var(--gray-bd);
+    border-radius: 999px; padding: 4px 10px; color: var(--text-2);
+    font-size: 12.5px;
+  }
+  .location-pill svg { width: 12px; height: 12px; }
+  .report-map {
+    width: 100%; height: 260px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
 
   /* image */
   .img-wrap { margin-top: 10px; }
@@ -275,9 +284,12 @@
       <div class="detail-row">
         <div class="detail-key">Локација</div>
         <div class="detail-val">
-          <div class="coord-pair">
-            <span class="coord-chip"><span>LAT</span> {{ report.latitude }}</span>
-            <span class="coord-chip"><span>LNG</span> {{ report.longitude }}</span>
+          <div class="location-block">
+            <span class="location-pill">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+              {{ report.get_municipality_display|default:"Непозната општина" }}
+            </span>
+            <div id="report-map" class="report-map"></div>
           </div>
         </div>
       </div>
@@ -330,4 +342,28 @@
   </div><!-- /.card -->
 
 </div><!-- /.rd-page -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+  (function () {
+    const lat = Number("{{ report.latitude|default_if_none:'' }}");
+    const lng = Number("{{ report.longitude|default_if_none:'' }}");
+    const mapEl = document.getElementById("report-map");
+    if (!mapEl || Number.isNaN(lat) || Number.isNaN(lng)) return;
+
+    const map = L.map("report-map", { zoomControl: true, attributionControl: false })
+      .setView([lat, lng], 16);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19
+    }).addTo(map);
+
+    L.circleMarker([lat, lng], {
+      radius: 7,
+      color: "#1a2238",
+      weight: 2,
+      fillColor: "#2563eb",
+      fillOpacity: 0.9,
+    }).addTo(map);
+  })();
+</script>
 {% endblock %}

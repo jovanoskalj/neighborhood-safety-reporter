@@ -17,8 +17,15 @@
         <div style="margin-bottom:6px;"><strong>Статус:</strong> {{ report.get_status_display }}</div>
         <div style="margin-bottom:6px;"><strong>Категорија:</strong> {{ report.get_category_display }}</div>
         <div style="margin-bottom:6px;"><strong>Приоритет:</strong> {{ report.get_priority_display }}</div>
+        <div style="margin-bottom:6px;"><strong>Опис:</strong> {{ report.description|truncatechars:140 }}</div>
         <div><strong>Датум:</strong> {{ report.created_at|date:"d.m.Y H:i" }}</div>
       </div>
+
+      {% if report.status == 'unclassified' %}
+      <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:10px; padding:12px; margin-bottom:14px; color:#9a3412;">
+        Пријавата е означена како не-класифицирана и ќе биде прегледана рачно од нашиот тим.
+      </div>
+      {% endif %}
 
       <p style="margin:0; color:#64748b; font-size:13px;">Ќе добиете нов email кога статусот на пријавата ќе се промени.</p>
     </div>
