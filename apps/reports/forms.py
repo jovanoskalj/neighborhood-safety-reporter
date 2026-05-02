@@ -75,13 +75,27 @@ class ReportSubmissionForm(forms.ModelForm):
         self.fields["municipality"].required = False
 
     def clean_image(self):
-        """Reject uploads outside the allowed JPG/PNG MIME types (FR-08)."""
         image = self.cleaned_data.get("image")
         if not image:
             return image
+
+        if image.size > 5 * 1024 * 1024:
+            raise forms.ValidationError("Сликата не смее да биде поголема од 5MB.")
+
         content_type = getattr(image, "content_type", "") or ""
         if content_type not in {"image/jpeg", "image/png"}:
             raise forms.ValidationError("Дозволени се само JPG или PNG слики.")
+
+        try:
+            from PIL import Image
+            img = Image.open(image)
+            img.verify()
+            if img.format not in {"JPEG", "PNG"}:
+                raise forms.ValidationError("Датотеката не е валидна JPG или PNG слика.")
+            image.seek(0)
+        except Exception:
+            raise forms.ValidationError("Датотеката не е валидна слика.")
+
         return image
 
 
