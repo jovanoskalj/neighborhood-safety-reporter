@@ -1142,11 +1142,7 @@ def officer_panel(request):
 
 @login_required
 def export_reports(request):
-    try:
-        profile = request.user.userprofile
-        if profile.role != 'admin':
-             return redirect('dashboard')
-    except:
+    if not request.user.is_staff:
         return redirect('dashboard')
     fmt = request.GET.get('format', 'csv')
     date_from = request.GET.get('from')
