@@ -4,7 +4,7 @@ from django.contrib.auth.models import Group, User
 from django.urls import reverse
 
 from apps.accounts.models import AuditLog
-from apps.reports.models import ReportCategory, Sector
+from apps.reports.models import Report, ReportCategory, Sector
 
 
 @pytest.fixture
@@ -165,6 +165,116 @@ def test_admin_create_user_rejects_weak_password(client, admin_with_profile):
     # Weak password → form invalid → no user created, redirect back to users tab
     assert response.status_code == 302
     assert not User.objects.filter(username="weak_user").exists()
+
+
+@pytest.mark.django_db
+def test_admin_creates_worker_with_assignment_and_forced_password_change(client, admin_with_profile):
+    client.login(username="admin_user", password="AdminStrongPass9!")
+    response = client.post(
+        reverse("create_user"),
+        {
+            "email": "worker@test.com",
+            "password": "WorkerStrongPass9!",
+            "role": "officer",
+            "sector": "health",
+            "municipality": "centar",
+        },
+    )
+
+    assert response.status_code == 302
+    worker = User.objects.get(email="worker@test.com")
+    assert worker.username == "worker"
+    assert worker.profile.role == "officer"
+    assert worker.profile.sector == "health"
+    assert worker.profile.municipality == "centar"
+    assert worker.profile.must_change_password is True
+    assert worker.groups.filter(name="officer").exists()
+
+
+@pytest.mark.django_db
+def test_admin_updates_worker_assignment_immediately(client, admin_with_profile, citizen_user):
+    client.login(username="admin_user", password="AdminStrongPass9!")
+    response = client.post(
+        reverse("update_user", args=[citizen_user.id]),
+        {
+            "role": "officer",
+            "sector": "utilities",
+            "municipality": "karposh",
+        },
+    )
+
+    assert response.status_code == 302
+    citizen_user.refresh_from_db()
+    assert citizen_user.profile.role == "officer"
+    assert citizen_user.profile.sector == "utilities"
+    assert citizen_user.profile.municipality == "karposh"
+    assert citizen_user.groups.filter(name="officer").exists()
+
+
+@pytest.mark.django_db
+def test_worker_only_sees_assigned_municipality(client, admin_with_profile, citizen_user):
+    worker = User.objects.create_user(
+        username="worker_user",
+        email="worker2@test.com",
+        password="WorkerStrongPass9!",
+    )
+    profile = worker.profile
+    profile.role = "officer"
+    profile.sector = "health"
+    profile.municipality = "centar"
+    profile.save()
+
+    visible_report = Report.objects.create(
+        citizen=citizen_user,
+        description="Clinic sidewalk issue",
+        latitude=41.99,
+        longitude=21.43,
+        category="health",
+        priority="normal",
+        status="new",
+        sector="health",
+        municipality="centar",
+        ai_processed=True,
+    )
+    hidden_report = Report.objects.create(
+        citizen=citizen_user,
+        description="Clinic issue in another municipality",
+        latitude=41.98,
+        longitude=21.41,
+        category="health",
+        priority="normal",
+        status="new",
+        sector="health",
+        municipality="karposh",
+        ai_processed=True,
+    )
+
+    client.login(username="worker_user", password="WorkerStrongPass9!")
+    response = client.get(reverse("reports_api"))
+
+    assert response.status_code == 200
+    ids = {item["id"] for item in response.json()["results"]}
+    assert visible_report.id in ids
+    assert hidden_report.id not in ids
+
+
+@pytest.mark.django_db
+def test_users_tab_filters_users_by_role(client, admin_with_profile, citizen_user, officer_user):
+    officer_profile = officer_user.profile
+    officer_profile.role = "officer"
+    officer_profile.sector = "health"
+    officer_profile.municipality = "centar"
+    officer_profile.save()
+
+    client.login(username="admin_user", password="AdminStrongPass9!")
+    response = client.get(reverse("dashboard") + "?tab=users&role=officer")
+    content = response.content.decode()
+
+    assert response.status_code == 200
+    assert "@officer" in content
+    assert "@citizen" not in content
+    assert "@admin_user" not in content
+    assert "Работници" in content
 
 
 # ---------------------------------------------------------------------------

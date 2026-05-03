@@ -10,6 +10,18 @@ class RoleRequiredMiddleware:
     def __call__(self, request):
         user = request.user
 
+        if user.is_authenticated:
+            profile = getattr(user, "profile", None)
+            if profile and profile.must_change_password:
+                allowed_paths = (
+                    "/accounts/profile/",
+                    "/accounts/logout/",
+                    "/static/",
+                    "/media/",
+                )
+                if not request.path.startswith(allowed_paths):
+                    return redirect("profile")
+
         if request.path.startswith('/officer/'):
             if not user.is_authenticated or not user.groups.filter(name__in=['officer', 'officers']).exists():
                 return redirect('login')

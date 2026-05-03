@@ -24,6 +24,7 @@ from apps.notifications.services import send_report_created_email, send_report_s
 
 from .duplicate_detection import find_potential_duplicate
 from .forms import (
+    AdminUserUpdateForm,
     AdminUserCreateForm,
     ReportCategoryForm,
     ReportCreateForm,
@@ -268,7 +269,10 @@ def _visible_reports_for_user(request):
     if _is_officer(request.user):
         profile = UserProfile.objects.filter(user=request.user).first()
         if profile and profile.sector:
-            return queryset.filter(sector=profile.sector)
+            queryset = queryset.filter(sector=profile.sector)
+            if profile.municipality:
+                queryset = queryset.filter(municipality=profile.municipality)
+            return queryset
         return queryset.none()
 
     return queryset.filter(citizen=request.user)
@@ -281,7 +285,9 @@ def _can_view_report(user, report: Report) -> bool:
         return True
     if _is_officer(user):
         profile = UserProfile.objects.filter(user=user).first()
-        return bool(profile and profile.sector and profile.sector == report.sector)
+        if not profile or not profile.sector or profile.sector != report.sector:
+            return False
+        return not profile.municipality or profile.municipality == report.municipality
     return False
 
 
@@ -382,13 +388,36 @@ def dashboard(request):
     for listed_user in missing_profile_users:
         UserProfile.objects.get_or_create(user=listed_user)
 
-    users = User.objects.select_related("profile").order_by("username")
+    users_queryset = User.objects.select_related("profile").order_by("username")
+    role_filter = request.GET.get("role", "")
+    valid_roles = {value for value, _ in UserProfile.ROLE_CHOICES}
+    if role_filter not in valid_roles:
+        role_filter = ""
+    users = users_queryset.filter(profile__role=role_filter) if role_filter else users_queryset
+    role_filter_cards = [
+        {"value": "", "label": "Сите", "count": users_queryset.count()},
+        {
+            "value": "citizen",
+            "label": "Граѓани",
+            "count": users_queryset.filter(profile__role="citizen").count(),
+        },
+        {
+            "value": "officer",
+            "label": "Работници",
+            "count": users_queryset.filter(profile__role="officer").count(),
+        },
+        {
+            "value": "admin",
+            "label": "Админи",
+            "count": users_queryset.filter(profile__role="admin").count(),
+        },
+    ]
     categories = ReportCategory.objects.order_by("name")
     sectors = Sector.objects.order_by("name")
     logs = AuditLog.objects.select_related("user").order_by("-timestamp")[:20]
 
     context = {
-        "active_tab": request.GET.get("tab", "analytics"),
+        "active_tab": request.GET.get("tab", "users"),
         "stats": {
             "total_reports": total_reports,
             "active_users": active_users,
@@ -398,12 +427,17 @@ def dashboard(request):
         "category_counts": category_counts,
         "status_counts": status_counts,
         "users": users,
+        "selected_user_role": role_filter,
+        "role_filter_cards": role_filter_cards,
         "categories": categories,
         "sectors": sectors,
         "logs": logs,
         "category_form": ReportCategoryForm(),
         "sector_form": SectorForm(),
         "user_form": AdminUserCreateForm(),
+        "role_choices": AdminUserCreateForm.ROLE_CHOICES,
+        "sector_choices": Report.SECTOR_CHOICES,
+        "municipality_choices": MUNICIPALITY_CHOICES,
     }
     return render(request, "reports/admin_dashboard.html", context)
 
@@ -450,7 +484,10 @@ def create_user(request: HttpRequest) -> HttpResponse:
             role = form.cleaned_data["role"]
             profile, _ = UserProfile.objects.get_or_create(user=user)
             profile.role = role
-            profile.save(update_fields=["role"])
+            profile.sector = form.cleaned_data.get("sector") if role == "officer" else ""
+            profile.municipality = form.cleaned_data.get("municipality") if role == "officer" else ""
+            profile.must_change_password = True
+            profile.save(update_fields=["role", "sector", "municipality", "must_change_password"])
 
             if role == "admin":
                 user.is_staff = True
@@ -461,7 +498,13 @@ def create_user(request: HttpRequest) -> HttpResponse:
                 action="create_user",
                 target_model="User",
                 target_id=user.id,
-                details={"username": user.username, "role": role},
+                details={
+                    "username": user.username,
+                    "role": role,
+                    "sector": profile.sector,
+                    "municipality": profile.municipality,
+                    "must_change_password": True,
+                },
             )
             messages.success(request, f"Корисникот {user.username} е успешно додаден.")
         else:
@@ -475,6 +518,47 @@ def create_user(request: HttpRequest) -> HttpResponse:
 
             error_message = error_list[0] if error_list else "Неуспешно додавање корисник. Проверете ги полињата."
             messages.error(request, error_message)
+    return redirect(f"{reverse('dashboard')}?tab=users")
+
+
+@login_required
+@_admin_only()
+def update_user(request: HttpRequest, user_id: int) -> HttpResponse:
+    """Update a user's role and worker assignment from the users tab."""
+    if request.method != "POST":
+        return redirect(f"{reverse('dashboard')}?tab=users")
+
+    user = get_object_or_404(User, id=user_id)
+    profile, _ = UserProfile.objects.get_or_create(user=user)
+    form = AdminUserUpdateForm(request.POST)
+
+    if form.is_valid():
+        role = form.cleaned_data["role"]
+        profile.role = role
+        profile.sector = form.cleaned_data.get("sector") if role == "officer" else ""
+        profile.municipality = form.cleaned_data.get("municipality") if role == "officer" else ""
+        profile.save(update_fields=["role", "sector", "municipality"])
+
+        user.is_staff = role == "admin" or user.is_superuser
+        user.save(update_fields=["is_staff"])
+
+        _write_audit_log(
+            request,
+            action="update_user_assignment",
+            target_model="User",
+            target_id=user.id,
+            details={
+                "username": user.username,
+                "role": role,
+                "sector": profile.sector,
+                "municipality": profile.municipality,
+            },
+        )
+        messages.success(request, f"Корисникот {user.username} е ажуриран.")
+    else:
+        first_error = next(iter(form.errors.values()))[0] if form.errors else "Неуспешно ажурирање."
+        messages.error(request, first_error)
+
     return redirect(f"{reverse('dashboard')}?tab=users")
 
 
@@ -762,8 +846,6 @@ def submit_report(request):
 @require_http_methods(["GET", "POST"])
 def reports_api(request):
     """GET filtered reports, POST create new report with AI classification."""
-    if request.method == "GET" and not _is_json_request(request):
-        return redirect("home")
     if request.method == "POST":
         payload = _parse_json_body(request)
         if payload is None:
@@ -1001,6 +1083,8 @@ def update_report_status(request, report_id: int):
     profile = UserProfile.objects.filter(user=request.user).first()
     if not profile or not profile.sector or profile.sector != report.sector:
         return JsonResponse({"detail": "You can only edit reports from your own sector."}, status=403)
+    if profile.municipality and profile.municipality != report.municipality:
+        return JsonResponse({"detail": "You can only edit reports from your assigned municipality."}, status=403)
 
     payload = _parse_json_body(request) if request.method == "PATCH" else request.POST
     if payload is None:
@@ -1069,7 +1153,7 @@ def map_view(request):
 @login_required
 def reports_json(request):
     """Return reports as JSON for AJAX-based Leaflet map rendering."""
-    queryset = Report.objects.all().order_by("-created_at")
+    queryset = _visible_reports_for_user(request).order_by("-created_at")
 
     category = request.GET.get("category", "").strip()
     status = request.GET.get("status", "").strip()
@@ -1126,7 +1210,10 @@ def officer_panel(request):
         return redirect("dashboard")
 
     sector = get_user_sector(request.user)
+    profile = UserProfile.objects.filter(user=request.user).first()
     reports = Report.objects.filter(sector=sector).order_by("-created_at")
+    if profile and profile.municipality:
+        reports = reports.filter(municipality=profile.municipality)
 
     status_filter = request.GET.get("status")
     if status_filter:
@@ -1142,6 +1229,7 @@ def officer_panel(request):
         {
             "reports": reports,
             "sector": sector,
+            "municipality": profile.municipality if profile else "",
             "status_choices": Report.STATUS_CHOICES,
             "priority_choices": Report.PRIORITY_CHOICES,
         },
@@ -1156,7 +1244,7 @@ def search_page(request):
     if opshtina:
         filters &= Q(municipality=opshtina)
 
-    queryset = Report.objects.filter(filters).order_by("-created_at")
+    queryset = _visible_reports_for_user(request).filter(filters).order_by("-created_at")
     paginator = Paginator(queryset, 20)
     page_number = request.GET.get("page", 1)
     try:

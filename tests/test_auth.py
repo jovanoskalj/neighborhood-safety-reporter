@@ -152,6 +152,45 @@ def test_profile_page_loads_for_authenticated_user(client, citizen_user):
 
 
 @pytest.mark.django_db
+def test_admin_profile_hides_citizen_gamification(client, admin_user):
+    profile = admin_user.profile
+    profile.role = "admin"
+    profile.save()
+
+    client.login(username="admin", password="admin123")
+    response = client.get(reverse("profile"))
+    content = response.content.decode()
+
+    assert response.status_code == 200
+    assert "Администраторски профил" in content
+    assert "Постигнувања" not in content
+    assert "Пријави</div>" not in content
+    assert "Администратор" in content
+
+
+@pytest.mark.django_db
+def test_superuser_profile_hides_citizen_gamification_even_with_citizen_profile(client):
+    superuser = User.objects.create_superuser(
+        username="superadmin",
+        email="superadmin@test.com",
+        password="SuperAdmin123!",
+    )
+    profile = superuser.profile
+    profile.role = "citizen"
+    profile.save()
+
+    client.login(username="superadmin", password="SuperAdmin123!")
+    response = client.get(reverse("profile"))
+    content = response.content.decode()
+
+    assert response.status_code == 200
+    assert "Администраторски профил" in content
+    assert "Постигнувања" not in content
+    assert "Пријави</div>" not in content
+    assert "Администратор" in content
+
+
+@pytest.mark.django_db
 def test_profile_form_saves_basic_info(client, citizen_user):
     client.login(username="citizen", password="citizen123")
     response = client.post(

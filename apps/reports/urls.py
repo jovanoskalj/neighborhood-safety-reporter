@@ -16,6 +16,7 @@ urlpatterns = [
     path("api/reports/json/", views.reports_json, name="reports_json"),
     path("officer/", views.officer_panel, name="officer_panel"),
     path("dashboard/users/create/", views.create_user, name="create_user"),
+    path("dashboard/users/<int:user_id>/update/", views.update_user, name="update_user"),
     path("dashboard/users/<int:user_id>/toggle/", views.toggle_user_active, name="toggle_user_active"),
     path("dashboard/users/<int:user_id>/delete/", views.delete_user, name="delete_user"),
     path("dashboard/categories/create/", views.create_category, name="create_category"),

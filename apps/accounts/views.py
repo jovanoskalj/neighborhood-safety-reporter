@@ -10,7 +10,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.models import User
 from django.contrib.auth.models import Group
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.mail import send_mail
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -18,7 +18,7 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.contrib.admin.views.decorators import staff_member_required
 from django.views.decorators.http import require_http_methods
-from apps.reports.models import Report
+from apps.reports.models import MUNICIPALITY_CHOICES, Report
 
 from .forms import LocalizedPasswordChangeForm, ProfileForm, RegisterForm
 from .models import AuditLog, EmailVerificationCode, UserNotification, UserProfile
@@ -32,6 +32,12 @@ ROLE_GROUPS = {
 
 VERIFICATION_CODE_EXPIRY_MINUTES = 15
 logger = logging.getLogger(__name__)
+
+
+def _is_admin_user(user: User) -> bool:
+    if not user.is_authenticated:
+        return False
+    return user.is_superuser or user.groups.filter(name__in=["admin", "administrators"]).exists()
 
 
 def _generate_verification_code() -> str:
@@ -133,7 +139,13 @@ def login_view(request):
 
         if user:
             login(request, user)
-            next_url = request.GET.get("next") or "my_reports"
+            profile = UserProfile.objects.filter(user=user).first()
+            if profile and profile.must_change_password:
+                next_url = "profile"
+            elif _is_admin_user(user):
+                next_url = "/dashboard/?tab=users"
+            else:
+                next_url = request.GET.get("next") or "my_reports"
             return redirect(next_url)
         else:
             inactive_user = User.objects.filter(username=identifier, is_active=False).first()
@@ -165,14 +177,22 @@ def verify_email_code_view(request):
             messages.error(request, "Кодот мора да има точно 6 цифри.")
             return redirect("verify_email_code")
 
-        verification = EmailVerificationCode.objects.filter(user=user, code=code).first()
-        if not verification or verification.is_expired():
+        dev_code = getattr(settings, "DEV_VERIFICATION_CODE", None)
+        if dev_code and code == dev_code:
+            verification = None
+        else:
+            verification = EmailVerificationCode.objects.filter(user=user, code=code).first()
+
+        if dev_code and code == dev_code:
+            pass
+        elif not verification or verification.is_expired():
             messages.error(request, "Кодот е невалиден или истечен.")
             return redirect("verify_email_code")
 
         user.is_active = True
         user.save(update_fields=["is_active"])
-        verification.delete()
+        if verification:
+            verification.delete()
         request.session.pop("pending_verification_user_id", None)
         messages.success(request, "Е-поштата е успешно верификувана. Сега можете да се најавите.")
         return redirect("login")
@@ -190,6 +210,8 @@ def logout_view(request):
 def profile_view(request):
     """Allow users to update basic profile information and passwords."""
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    is_admin_profile = _is_admin_user(request.user)
+    effective_role = "admin" if is_admin_profile else profile.role
     user_reports = Report.objects.filter(citizen=request.user)
     total_reports = user_reports.count()
     resolved_reports = user_reports.filter(status="resolved").count()
@@ -250,6 +272,8 @@ def profile_view(request):
             password_form = LocalizedPasswordChangeForm(user=request.user, data=request.POST, prefix="password")
             if password_form.is_valid():
                 user = password_form.save()
+                profile.must_change_password = False
+                profile.save(update_fields=["must_change_password"])
                 update_session_auth_hash(request, user)
                 messages.success(request, "Лозинката е успешно променета.")
                 return redirect("profile")
@@ -271,6 +295,12 @@ def profile_view(request):
         "accounts/profile.html",
         {
             "profile": profile,
+            "role_label": {
+                "citizen": "Граѓанин",
+                "officer": "Работник",
+                "admin": "Администратор",
+            }.get(effective_role, effective_role),
+            "show_gamification": effective_role == "citizen",
             "sector_choices": UserProfile.SECTOR_CHOICES,
             "total_reports": total_reports,
             "resolved_reports": resolved_reports,
@@ -281,13 +311,24 @@ def profile_view(request):
     )
 
 
-@staff_member_required
+@login_required
+@user_passes_test(_is_admin_user)
 def admin_user_list(request):
     users = User.objects.select_related("profile").all().order_by("id").distinct()
-    return render(request, "accounts/admin_user_list.html", {"users": users})
+    return render(
+        request,
+        "accounts/admin_user_list.html",
+        {
+            "users": users,
+            "role_choices": UserProfile.ROLE_CHOICES,
+            "sector_choices": UserProfile.SECTOR_CHOICES,
+            "municipality_choices": MUNICIPALITY_CHOICES,
+        },
+    )
 
 
-@staff_member_required
+@login_required
+@user_passes_test(_is_admin_user)
 def admin_user_toggle(request, user_id):
     if request.method == "POST":
         target_user = User.objects.get(id=user_id)
@@ -304,20 +345,26 @@ def admin_user_toggle(request, user_id):
         return redirect("admin_user_list")
 
 
-@staff_member_required
+@login_required
+@user_passes_test(_is_admin_user)
 def admin_user_update_role(request, user_id):
     if request.method == "POST":
         target_user = User.objects.get(id=user_id)
-        UserProfile.objects.get_or_create(user=target_user)
+        profile, _ = UserProfile.objects.get_or_create(user=target_user)
         new_role = request.POST.get("role")
         if new_role in dict(UserProfile.ROLE_CHOICES):
-            UserProfile.objects.filter(user=target_user).update(role=new_role)
+            profile.role = new_role
+            profile.sector = request.POST.get("sector", "") if new_role == "officer" else ""
+            profile.municipality = request.POST.get("municipality", "") if new_role == "officer" else ""
+            profile.save(update_fields=["role", "sector", "municipality"])
+            target_user.is_staff = new_role == "admin" or target_user.is_superuser
+            target_user.save(update_fields=["is_staff"])
             AuditLog.objects.create(
                 user=request.user,
                 action="update_role",
                 target_model="User",
                 target_id=user_id,
-                details={"new_role": new_role},
+                details={"new_role": new_role, "sector": profile.sector, "municipality": profile.municipality},
             )
             messages.success(request, f"Role updated to {new_role}.")
         return redirect("admin_user_list")

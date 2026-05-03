@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as CoreValidationError
 
-from .models import Report, ReportCategory, Sector
+from .models import MUNICIPALITY_CHOICES, Report, ReportCategory, Sector
 
 
 _COORD_QUANTUM = Decimal("0.000001")
@@ -115,16 +115,24 @@ class AdminUserCreateForm(forms.Form):
         ("admin", "Админ"),
     ]
 
-    username = forms.CharField(max_length=150)
-    email = forms.EmailField(required=False)
+    username = forms.CharField(max_length=150, required=False)
+    email = forms.EmailField()
     password = forms.CharField(max_length=128, widget=forms.PasswordInput)
     role = forms.ChoiceField(choices=ROLE_CHOICES)
+    sector = forms.ChoiceField(choices=[("", "---------")] + list(Report.SECTOR_CHOICES), required=False)
+    municipality = forms.ChoiceField(choices=[("", "---------")] + list(MUNICIPALITY_CHOICES), required=False)
 
     def clean_username(self) -> str:
-        username = self.cleaned_data["username"].strip()
-        if User.objects.filter(username=username).exists():
+        username = (self.cleaned_data.get("username") or "").strip()
+        if username and User.objects.filter(username=username).exists():
             raise forms.ValidationError("Корисничкото име веќе постои.")
         return username
+
+    def clean_email(self) -> str:
+        email = (self.cleaned_data.get("email") or "").strip().lower()
+        if User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError("Е-поштата веќе постои.")
+        return email
 
     def clean_password(self) -> str:
         """Enforce Django's configured password validators (min length, etc.)."""
@@ -134,3 +142,44 @@ class AdminUserCreateForm(forms.Form):
         except CoreValidationError as error:
             raise forms.ValidationError(list(error.messages))
         return password
+
+    def clean(self):
+        cleaned_data = super().clean()
+        username = cleaned_data.get("username")
+        email = cleaned_data.get("email")
+        if not username and email:
+            base_username = email.split("@", 1)[0] or "user"
+            username = base_username
+            counter = 2
+            while User.objects.filter(username=username).exists():
+                username = f"{base_username}{counter}"
+                counter += 1
+            cleaned_data["username"] = username
+        elif not username:
+            self.add_error("username", "Внесете корисничко име или е-пошта.")
+
+        if cleaned_data.get("role") == "officer":
+            if not cleaned_data.get("sector"):
+                self.add_error("sector", "Изберете сектор за работникот.")
+            if not cleaned_data.get("municipality"):
+                self.add_error("municipality", "Изберете општина за работникот.")
+        return cleaned_data
+
+
+class AdminUserUpdateForm(forms.Form):
+    """Form for immediate admin updates to role and worker assignment."""
+
+    ROLE_CHOICES = AdminUserCreateForm.ROLE_CHOICES
+
+    role = forms.ChoiceField(choices=ROLE_CHOICES)
+    sector = forms.ChoiceField(choices=[("", "---------")] + list(Report.SECTOR_CHOICES), required=False)
+    municipality = forms.ChoiceField(choices=[("", "---------")] + list(MUNICIPALITY_CHOICES), required=False)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get("role") == "officer":
+            if not cleaned_data.get("sector"):
+                self.add_error("sector", "Изберете сектор за работникот.")
+            if not cleaned_data.get("municipality"):
+                self.add_error("municipality", "Изберете општина за работникот.")
+        return cleaned_data

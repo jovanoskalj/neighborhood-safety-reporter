@@ -119,7 +119,7 @@
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
                             <li class="dropdown-header">Мој профил</li>
                             <li><a class="dropdown-item" href="{% url 'profile' %}"><i class="bi bi-person me-2"></i>Профил</a></li>
-                            {% if user|has_group:'citizen' or user|has_group:'citizens' %}
+                            {% if request.user.profile.role == 'citizen' and not user.is_superuser and not user|has_group:'admin' and not user|has_group:'administrators' and not user|has_group:'officer' and not user|has_group:'officers' %}
                             <li><a class="dropdown-item" href="{% url 'my_reports' %}"><i class="bi bi-clipboard-check me-2"></i>Мои пријави</a></li>
                             <li><a class="dropdown-item" href="{% url 'submit_report' %}"><i class="bi bi-plus-circle me-2"></i>Нова пријава</a></li>
                             {% endif %}

@@ -3,10 +3,82 @@
 {% block title %}Админ панел{% endblock %}
 
 {% block content %}
-<section class="container py-4 admin-dashboard-wrap">
-  <h1 class="h3 mb-3">Админ панел</h1>
+<style>
+  .admin-dashboard-wrap {
+    max-width: 1280px;
+    padding-top: 2rem !important;
+  }
+  body:has(.admin-dashboard-wrap) .app-navbar .navbar-nav.me-auto {
+    display: none !important;
+  }
+  .admin-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 14px;
+  }
+  .admin-page-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1a1916;
+    margin: 0;
+    letter-spacing: 0;
+  }
+  .admin-page-subtitle {
+    color: #6b6760;
+    font-size: 13px;
+    margin-top: 4px;
+  }
+  .admin-tabs {
+    display: inline-flex;
+    width: auto;
+    gap: 4px;
+    padding: 4px;
+    margin-bottom: 16px !important;
+    background: #ffffff;
+    border: 1px solid #e8e5df;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  }
+  .admin-tabs .nav-link {
+    border-radius: 7px;
+    color: #6b6760;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 13px;
+  }
+  .admin-tabs .nav-link:hover {
+    color: #1a1916;
+    background: #f6f5f2;
+  }
+  .admin-tabs .nav-link.active {
+    background: #1a1916;
+    color: #ffffff;
+    font-weight: 700;
+  }
+  @media (max-width: 640px) {
+    .admin-tabs {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      width: 100%;
+    }
+    .admin-tabs .nav-link {
+      text-align: center;
+    }
+  }
+</style>
 
-  <nav class="nav nav-pills admin-tabs mb-4">
+<section class="container py-4 admin-dashboard-wrap">
+  <div class="admin-page-header">
+    <div>
+      <h1 class="admin-page-title">Админ панел</h1>
+      <div class="admin-page-subtitle">Корисници, аналитика и системски поставки на едно место.</div>
+    </div>
+  </div>
+
+  <nav class="nav admin-tabs mb-4">
     <a class="nav-link {% if active_tab == 'analytics' %}active{% endif %}" href="?tab=analytics">Аналитика</a>
     <a class="nav-link {% if active_tab == 'users' %}active{% endif %}" href="?tab=users">Корисници</a>
     <a class="nav-link {% if active_tab == 'settings' %}active{% endif %}" href="?tab=settings">Подесувања</a>
@@ -60,5 +132,370 @@
     })();
   </script>
   {% endif %}
+
+  {% if active_tab == 'users' %}
+  <style>
+    .admin-users-page {
+      --au-bg: #f6f5f2;
+      --au-surface: #ffffff;
+      --au-border: #e8e5df;
+      --au-border-2: #d4cfc5;
+      --au-text: #1a1916;
+      --au-muted: #6b6760;
+      --au-faint: #9e9a93;
+      --au-blue: #2563eb;
+      --au-blue-bg: #eff5ff;
+      --au-green: #15803d;
+      --au-red: #dc2626;
+      --au-radius: 10px;
+      --au-shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+      background: var(--au-bg);
+      border: 1px solid var(--au-border);
+      border-radius: 14px;
+      padding: 20px;
+    }
+    .admin-users-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+    .admin-users-head h2 { font-size: 22px; font-weight: 600; color: var(--au-text); margin: 0; }
+    .admin-users-head p { font-size: 13px; color: var(--au-muted); margin: 3px 0 0; }
+    .role-filter-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .role-filter-card {
+      display: flex; justify-content: space-between; align-items: center; gap: 10px;
+      background: var(--au-surface); border: 1px solid var(--au-border); border-radius: var(--au-radius);
+      padding: 12px 14px; color: var(--au-muted); text-decoration: none; box-shadow: var(--au-shadow);
+      transition: border-color .15s, transform .15s;
+    }
+    .role-filter-card:hover { border-color: var(--au-border-2); color: var(--au-text); transform: translateY(-1px); }
+    .role-filter-card.active { border-color: #bfdbfe; background: var(--au-blue-bg); color: var(--au-blue); }
+    .role-filter-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+    .role-filter-count { font-size: 22px; font-weight: 600; color: var(--au-text); }
+    .admin-users-layout { display: grid; grid-template-columns: 330px 1fr; gap: 14px; align-items: start; }
+    .admin-user-panel, .admin-user-list {
+      background: var(--au-surface); border: 1px solid var(--au-border); border-radius: 14px;
+      box-shadow: var(--au-shadow); overflow: hidden;
+    }
+    .admin-user-panel-body { padding: 18px; }
+    .admin-user-panel h3, .admin-user-list h3 { font-size: 16px; font-weight: 600; color: var(--au-text); margin: 0; }
+    .admin-user-panel-sub, .admin-user-list-sub { font-size: 12.5px; color: var(--au-muted); margin-top: 3px; }
+    .admin-user-panel label { font-size: 12px; font-weight: 600; color: var(--au-muted); margin-bottom: 5px; }
+    .admin-user-panel .form-control, .admin-user-panel .form-select,
+    .admin-users-table .form-select {
+      border-color: var(--au-border-2); border-radius: 6px; font-size: 13px;
+    }
+    .admin-user-panel .form-control:focus, .admin-user-panel .form-select:focus,
+    .admin-users-table .form-select:focus { border-color: var(--au-text); box-shadow: none; }
+    .admin-user-list-header {
+      display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+      padding: 16px 18px; border-bottom: 1px solid var(--au-border);
+    }
+    .admin-users-table-wrap { overflow-x: auto; }
+    .admin-users-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .admin-users-table th {
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em;
+      color: var(--au-faint); background: #fbfaf8; border-bottom: 1px solid var(--au-border);
+      padding: 10px 12px; white-space: nowrap;
+    }
+    .admin-users-table td { padding: 12px; border-bottom: 1px solid var(--au-border); vertical-align: middle; color: var(--au-text); }
+    .admin-users-table tbody tr:hover td { background: #fbfaf8; }
+    .admin-users-table tbody tr:last-child td { border-bottom: 0; }
+    .user-name-cell { min-width: 170px; }
+    .user-name-cell .name { font-weight: 600; }
+    .user-name-cell .handle, .user-assignment-empty { color: var(--au-faint); font-size: 12px; }
+    .role-badge, .status-badge {
+      display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 9px;
+      font-size: 12px; font-weight: 600; border: 1px solid transparent;
+    }
+    .status-badge.active { color: var(--au-green); background: #f0fdf4; border-color: #bbf7d0; }
+    .status-badge.inactive { color: var(--au-muted); background: #f3f2ee; border-color: #e4e1d9; }
+    .password-badge { color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 999px; padding: 3px 8px; font-size: 11px; font-weight: 600; }
+    .assignment-grid { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(130px, 1fr); gap: 8px; min-width: 280px; }
+    .worker-only-fields[hidden] { display: none !important; }
+    .admin-action-stack { display: inline-flex; gap: 6px; align-items: center; justify-content: flex-end; }
+    .admin-icon-action {
+      width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 999px; border: 1px solid var(--au-border-2); background: #fff; color: var(--au-muted);
+    }
+    .admin-icon-action:hover { color: var(--au-text); border-color: var(--au-muted); }
+    .admin-icon-action.danger { color: var(--au-red); border-color: #fecdd3; }
+    .admin-icon-action.success { color: var(--au-green); border-color: #bbf7d0; }
+    .admin-create-btn {
+      border: 0; border-radius: 6px; background: var(--au-text); color: #fff;
+      min-height: 38px; font-size: 13px; font-weight: 600;
+    }
+    .admin-create-btn:hover { opacity: .86; color: #fff; }
+    .admin-empty-row td { text-align: center; color: var(--au-faint); padding: 36px 12px; }
+    @media (max-width: 1100px) {
+      .admin-users-layout { grid-template-columns: 1fr; }
+      .role-filter-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 620px) {
+      .admin-users-page { padding: 14px; }
+      .role-filter-strip { grid-template-columns: 1fr; }
+      .assignment-grid { grid-template-columns: 1fr; min-width: 220px; }
+    }
+  </style>
+
+  <div class="admin-users-page">
+    <div class="admin-users-head">
+      <div>
+        <h2>Управување со корисници</h2>
+        <p>Филтрирај по улога, додај работници и ажурирај пристап без напуштање на страницата.</p>
+      </div>
+      <a class="btn btn-outline-dark btn-sm" href="{% url 'export_reports_csv' %}">
+        <i class="bi bi-download me-1"></i>Извоз
+      </a>
+    </div>
+
+    <div class="role-filter-strip" aria-label="Филтер по улога">
+      {% for role_card in role_filter_cards %}
+      <a class="role-filter-card {% if selected_user_role == role_card.value %}active{% endif %}" href="?tab=users{% if role_card.value %}&role={{ role_card.value }}{% endif %}">
+        <span class="role-filter-label">{{ role_card.label }}</span>
+        <span class="role-filter-count">{{ role_card.count }}</span>
+      </a>
+      {% endfor %}
+    </div>
+
+    <div class="admin-users-layout">
+      <div class="admin-user-panel">
+        <div class="admin-user-panel-body">
+          <h3>Нов корисник</h3>
+          <div class="admin-user-panel-sub mb-3">Почетната лозинка се менува при првата најава.</div>
+          <form method="post" action="{% url 'create_user' %}" class="vstack gap-3">
+            {% csrf_token %}
+            <div>
+              <label class="form-label" for="id_username">Корисничко име</label>
+              <input class="form-control" id="id_username" type="text" name="username" autocomplete="off">
+            </div>
+            <div>
+              <label class="form-label" for="id_email">Е-пошта</label>
+              <input class="form-control" id="id_email" type="email" name="email" required>
+            </div>
+            <div>
+              <label class="form-label" for="id_password">Почетна лозинка</label>
+              <input class="form-control" id="id_password" type="password" name="password" required>
+              <div class="form-text">Корисникот ќе мора да ја промени при првата најава.</div>
+            </div>
+            <div>
+              <label class="form-label" for="id_role">Улога</label>
+              <select class="form-select js-role-select" id="id_role" name="role" data-worker-target="create-worker-fields">
+                {% for value,label in role_choices %}
+                <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div id="create-worker-fields" class="vstack gap-3 worker-only-fields" hidden>
+              <div>
+                <label class="form-label" for="id_sector">Сектор</label>
+                <select class="form-select" id="id_sector" name="sector">
+                  <option value="">---------</option>
+                  {% for value,label in sector_choices %}
+                  <option value="{{ value }}">{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div>
+                <label class="form-label" for="id_municipality">Општина</label>
+                <select class="form-select" id="id_municipality" name="municipality">
+                  <option value="">---------</option>
+                  {% for value,label in municipality_choices %}
+                  <option value="{{ value }}">{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <button class="btn admin-create-btn" type="submit">
+              <i class="bi bi-person-plus me-1"></i>Креирај профил
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="admin-user-list">
+        <div class="admin-user-list-header">
+          <div>
+            <h3>Листа на корисници</h3>
+            <div class="admin-user-list-sub">
+              {% if selected_user_role %}Прикажани се само избраните улоги.{% else %}Прикажани се сите улоги.{% endif %}
+            </div>
+          </div>
+          {% if selected_user_role %}
+          <a class="btn btn-sm btn-outline-secondary" href="?tab=users">Сите улоги</a>
+          {% endif %}
+        </div>
+        <div class="admin-users-table-wrap">
+          <table class="admin-users-table">
+            <thead>
+            <tr>
+              <th>Име</th>
+              <th>Е-пошта</th>
+              <th>Улога</th>
+              <th>Статус</th>
+              <th>Доделување</th>
+              <th class="text-end">Акција</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for listed_user in users %}
+            <tr>
+              <td class="user-name-cell">
+                <div class="name">{{ listed_user.get_full_name|default:listed_user.username }}</div>
+                <div class="handle">@{{ listed_user.username }}</div>
+              </td>
+              <td>{{ listed_user.email|default:"—" }}</td>
+              <td style="min-width: 150px;">
+                <form id="update-user-{{ listed_user.id }}" method="post" action="{% url 'update_user' listed_user.id %}">
+                  {% csrf_token %}
+                  <select class="form-select form-select-sm js-role-select" name="role" data-worker-target="worker-fields-{{ listed_user.id }}">
+                    {% for value,label in role_choices %}
+                    <option value="{{ value }}" {% if listed_user.profile.role == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                </form>
+              </td>
+              <td>
+                <span class="status-badge {% if listed_user.is_active %}active{% else %}inactive{% endif %}">
+                  {% if listed_user.is_active %}Активен{% else %}Неактивен{% endif %}
+                </span>
+                {% if listed_user.profile.must_change_password %}
+                <span class="password-badge ms-1">Нова лозинка</span>
+                {% endif %}
+              </td>
+              <td style="min-width: 280px;">
+                <div id="worker-fields-{{ listed_user.id }}" class="assignment-grid worker-only-fields" {% if listed_user.profile.role != 'officer' %}hidden{% endif %}>
+                  <div>
+                    <select class="form-select form-select-sm" name="sector" form="update-user-{{ listed_user.id }}">
+                      <option value="">Сектор</option>
+                      {% for value,label in sector_choices %}
+                      <option value="{{ value }}" {% if listed_user.profile.sector == value %}selected{% endif %}>{{ label }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div>
+                    <select class="form-select form-select-sm" name="municipality" form="update-user-{{ listed_user.id }}">
+                      <option value="">Општина</option>
+                      {% for value,label in municipality_choices %}
+                      <option value="{{ value }}" {% if listed_user.profile.municipality == value %}selected{% endif %}>{{ label }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                </div>
+                {% if listed_user.profile.role != 'officer' %}
+                <span id="worker-empty-{{ listed_user.id }}" class="user-assignment-empty">Не е потребно</span>
+                {% else %}
+                <span id="worker-empty-{{ listed_user.id }}" class="user-assignment-empty" hidden>Не е потребно</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                <div class="admin-action-stack">
+                  <button class="admin-icon-action" type="submit" form="update-user-{{ listed_user.id }}" title="Зачувај" aria-label="Зачувај корисник">
+                    <i class="bi bi-check2"></i>
+                  </button>
+                  <form method="post" action="{% url 'toggle_user_active' listed_user.id %}">
+                    {% csrf_token %}
+                    <button class="admin-icon-action {% if listed_user.is_active %}danger{% else %}success{% endif %}" type="submit" {% if listed_user.id == request.user.id %}disabled{% endif %} title="{% if listed_user.is_active %}Деактивирај{% else %}Активирај{% endif %}" aria-label="{% if listed_user.is_active %}Деактивирај{% else %}Активирај{% endif %}">
+                      {% if listed_user.is_active %}<i class="bi bi-pause-circle"></i>{% else %}<i class="bi bi-play-circle"></i>{% endif %}
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr class="admin-empty-row"><td colspan="6">Нема корисници за избраниот филтер.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if active_tab == 'settings' %}
+  <div class="row g-4">
+    <div class="col-12 col-lg-6">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <h2 class="h5">Категории</h2>
+          <form method="post" action="{% url 'create_category' %}" class="row g-2 mb-3">
+            {% csrf_token %}
+            <div class="col"><input class="form-control" name="name" placeholder="Име"></div>
+            <div class="col-auto"><button class="btn btn-primary" type="submit">Додај</button></div>
+          </form>
+          {% for category in categories %}
+          <div class="d-flex justify-content-between border-top py-2 small">
+            <span>{{ category.name }}</span>
+            <span class="text-muted">{{ category.key }}</span>
+          </div>
+          {% empty %}
+          <p class="text-muted mb-0">Нема категории.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-lg-6">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <h2 class="h5">Сектори</h2>
+          <form method="post" action="{% url 'create_sector' %}" class="row g-2 mb-3">
+            {% csrf_token %}
+            <div class="col"><input class="form-control" name="name" placeholder="Име"></div>
+            <div class="col-auto"><button class="btn btn-primary" type="submit">Додај</button></div>
+          </form>
+          {% for sector in sectors %}
+          <div class="d-flex justify-content-between border-top py-2 small">
+            <span>{{ sector.name }}</span>
+            <span class="text-muted">{{ sector.key }}</span>
+          </div>
+          {% empty %}
+          <p class="text-muted mb-0">Нема сектори.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if active_tab == 'log' %}
+  <div class="table-responsive bg-white border rounded shadow-sm">
+    <table class="table align-middle mb-0">
+      <thead class="table-light"><tr><th>Време</th><th>Корисник</th><th>Акција</th><th>Детали</th></tr></thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td>{{ log.timestamp|date:"Y-m-d H:i" }}</td>
+          <td>{{ log.user.username|default:"—" }}</td>
+          <td>{{ log.action }}</td>
+          <td><code>{{ log.details }}</code></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="text-center text-muted py-4">Нема записи.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
 </section>
+<script>
+  document.querySelectorAll('.js-role-select').forEach((select) => {
+    const sync = () => {
+      const target = document.getElementById(select.dataset.workerTarget);
+      const empty = target && target.id.startsWith('worker-fields-')
+        ? document.getElementById(target.id.replace('worker-fields-', 'worker-empty-'))
+        : null;
+      if (!target) return;
+      const isWorker = select.value === 'officer';
+      target.hidden = !isWorker;
+      target.classList.toggle('d-none', !isWorker);
+      target.querySelectorAll('select').forEach((field) => {
+        field.disabled = !isWorker;
+        field.required = isWorker;
+      });
+      if (empty) {
+        empty.hidden = isWorker;
+        empty.classList.toggle('d-none', isWorker);
+      }
+    };
+    select.addEventListener('change', sync);
+    sync();
+  });
+</script>
 {% endblock %}

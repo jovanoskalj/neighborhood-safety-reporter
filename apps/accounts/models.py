@@ -1,3 +1,4 @@
+from apps.reports.models import MUNICIPALITY_CHOICES
 from django.contrib.auth.models import User
 from django.db import models
 from django.utils import timezone
@@ -22,7 +23,9 @@ class UserProfile(models.Model):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='citizen')
-    sector = models.CharField(max_length=50, choices=SECTOR_CHOICES, blank=True)  # only for officers
+    sector = models.CharField(max_length=50, choices=SECTOR_CHOICES, blank=True)  # only for workers/officers
+    municipality = models.CharField(max_length=100, choices=MUNICIPALITY_CHOICES, blank=True)
+    must_change_password = models.BooleanField(default=False)
     phone = models.CharField(max_length=20, blank=True)
     avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
 
