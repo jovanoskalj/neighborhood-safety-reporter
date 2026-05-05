@@ -1,30 +1,52 @@
 from django.urls import path
-
 from . import views
 
 urlpatterns = [
     path("", views.home, name="home"),
     path("dashboard/", views.dashboard, name="dashboard"),
     path("reports/", views.reports_api, name="reports_api"),
-    path("submit/", views.submit_report, name="submit_report"),
-    path("my-reports/", views.my_reports, name="my_reports"),
+
+    # reports
+    path("reports/submit/", views.submit_report, name="submit_report"),
     path("reports/<int:report_id>/", views.report_detail, name="report_detail"),
     path("reports/<int:report_id>/withdraw/", views.withdraw_report, name="withdraw_report"),
     path("reports/<int:report_id>/status/", views.update_report_status, name="update_report_status"),
+    path("reports/<int:report_id>/reassign/", views.reassign_report, name="reassign_report"),
+
+    # user reports
+    path("my-reports/", views.my_reports, name="my_reports"),
+
+    # map & heatmap
     path("reports/map/", views.map_view, name="map_view"),
     path("reports/heatmap/", views.heatmap_data, name="reports_heatmap"),
+
+    # APIs
     path("api/reports/json/", views.reports_json, name="reports_json"),
+    path("api/sectors/json/", views.get_sectors_json, name="get_sectors_json"),
+
+    # officer
     path("officer/", views.officer_panel, name="officer_panel"),
+
+    # dashboard users
     path("dashboard/users/create/", views.create_user, name="create_user"),
     path("dashboard/users/<int:user_id>/toggle/", views.toggle_user_active, name="toggle_user_active"),
     path("dashboard/users/<int:user_id>/delete/", views.delete_user, name="delete_user"),
+
+    # categories
     path("dashboard/categories/create/", views.create_category, name="create_category"),
     path("dashboard/categories/<int:category_id>/update/", views.update_category, name="update_category"),
     path("dashboard/categories/<int:category_id>/delete/", views.delete_category, name="delete_category"),
+
+    # sectors
     path("dashboard/sectors/create/", views.create_sector, name="create_sector"),
     path("dashboard/sectors/<int:sector_id>/update/", views.update_sector, name="update_sector"),
     path("dashboard/sectors/<int:sector_id>/delete/", views.delete_sector, name="delete_sector"),
+
+    # export/import
     path("dashboard/export/", views.export_reports_csv, name="export_reports_csv"),
     path("dashboard/import/", views.import_reports_stub, name="import_reports_stub"),
+
+    # search & extras
     path("search/", views.search_page, name="search_page"),
+    path("reclassify/", views.reclassify_reports, name="reclassify_reports"),
 ]
