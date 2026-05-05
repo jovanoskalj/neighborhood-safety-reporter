@@ -34,10 +34,8 @@ from .forms import (
 )
 from .models import MUNICIPALITY_CHOICES, Report, ReportCategory, ReportStatusHistory, Sector
 
-
 MAX_REPORTS_PER_24H = 10
 REPORT_WINDOW_HOURS = 24
-
 
 SEARCH_PARAMS = (
     "category", "status", "sector", "priority",
@@ -70,10 +68,10 @@ def _build_report_filters(request):
     filters = Q()
 
     for param, field in (
-        ("category", "category"),
-        ("status", "status"),
-        ("sector", "sector"),
-        ("priority", "priority"),
+            ("category", "category"),
+            ("status", "status"),
+            ("sector", "sector"),
+            ("priority", "priority"),
     ):
         value = request.GET.get(param)
         if value:
@@ -87,7 +85,6 @@ def _build_report_filters(request):
     if to_date:
         filters &= Q(created_at__date__lte=to_date)
 
-   
     keyword = request.GET.get("keyword")
     if keyword:
         clean_keyword = keyword.strip()
@@ -98,16 +95,16 @@ def _build_report_filters(request):
             if keyword.lower() in label.lower()
         ]
         filters &= (
-            Q(description__icontains=keyword) |
-            Q(id__icontains=clean_keyword) |
-            Q(municipality__in=matching_slugs) |
-            Q(category__icontains=keyword)
+                Q(description__icontains=keyword) |
+                Q(id__icontains=clean_keyword) |
+                Q(municipality__in=matching_slugs) |
+                Q(category__icontains=keyword)
         )
     for param, lookup in (
-        ("lat_min", "latitude__gte"),
-        ("lat_max", "latitude__lte"),
-        ("lng_min", "longitude__gte"),
-        ("lng_max", "longitude__lte"),
+            ("lat_min", "latitude__gte"),
+            ("lat_max", "latitude__lte"),
+            ("lng_min", "longitude__gte"),
+            ("lng_max", "longitude__lte"),
     ):
         value = _parse_decimal(request.GET.get(param))
         if value is not None:
@@ -130,13 +127,15 @@ def _serialize_reports_page(page):
         "results": [_serialize_report(report) for report in page.object_list],
     }
 
+
 try:
     import openpyxl
+
     OPENPYXL_AVAILABLE = True
 except ImportError:
     OPENPYXL_AVAILABLE = False
 
-    
+
 def home(request):
     """Landing page (no params) or paginated search endpoint (with params)."""
     should_filter = _is_json_request(request) or any(
@@ -169,6 +168,7 @@ def home(request):
         "reports/search_results.html",
         {"reports_page": page_obj, "query": request.GET},
     )
+
 
 def _as_float(value):
     try:
@@ -298,7 +298,8 @@ def _remaining_reports_quota(user) -> int:
     return max(0, MAX_REPORTS_PER_24H - recent_reports_count)
 
 
-def _log_status_transition(report: Report, from_status: str | None, to_status: str, changed_by=None, note: str = "") -> None:
+def _log_status_transition(report: Report, from_status: str | None, to_status: str, changed_by=None,
+                           note: str = "") -> None:
     ReportStatusHistory.objects.create(
         report=report,
         from_status=from_status or "",
@@ -306,6 +307,7 @@ def _log_status_transition(report: Report, from_status: str | None, to_status: s
         changed_by=changed_by,
         note=note,
     )
+
 
 def _is_admin_user(user: User) -> bool:
     """Allow dashboard access to superusers and admin group users."""
@@ -672,7 +674,8 @@ def export_reports_csv(request: HttpRequest) -> HttpResponse:
 @_admin_only()
 def import_reports_stub(request: HttpRequest) -> HttpResponse:
     """Temporary import action endpoint for dashboard UI button."""
-    messages.info(request, "Import функцијата е подготвена во UI и ќе биде поврзана со обработка на датотеки во следен task.")
+    messages.info(request,
+                  "Import функцијата е подготвена во UI и ќе биде поврзана со обработка на датотеки во следен task.")
     return redirect(f"{reverse('dashboard')}?tab=analytics")
 
 
@@ -967,7 +970,6 @@ def update_report_status(request, report_id):
     })
 
 
- 
 @login_required
 @require_http_methods(["POST"])
 def withdraw_report(request, report_id: int):
@@ -1140,14 +1142,14 @@ def officer_panel(request):
         reports = reports.filter(priority=priority_filter)
     return render(request, "reports/submit_report.html")
 
+
 @login_required
 def export_reports(request):
-    if not request.user.is_staff:
-
     try:
         profile = request.user.profile
         if profile.role != 'admin' and not request.user.is_staff:
-             return redirect('dashboard')
+            return redirect('dashboard')
+
     except:
         return redirect('dashboard')
     fmt = request.GET.get('format', 'csv')
@@ -1170,7 +1172,8 @@ def export_reports(request):
     headers = ['ID', 'Description', 'Category', 'Priority', 'Status', 'Sector', 'Latitude', 'Longitude', 'Created At']
 
     def get_row(r):
-        return [r.id, r.description, r.category, r.priority, r.status, r.sector, r.latitude, r.longitude, r.created_at.strftime('%Y-%m-%d %H:%M')]
+        return [r.id, r.description, r.category, r.priority, r.status, r.sector, r.latitude, r.longitude,
+                r.created_at.strftime('%Y-%m-%d %H:%M')]
 
     if fmt == 'excel' and OPENPYXL_AVAILABLE:
         wb = openpyxl.Workbook()
@@ -1182,7 +1185,8 @@ def export_reports(request):
         output = io.BytesIO()
         wb.save(output)
         output.seek(0)
-        response = HttpResponse(output.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response = HttpResponse(output.read(),
+                                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         response['Content-Disposition'] = 'attachment; filename="reports.xlsx"'
         return response
 
@@ -1193,6 +1197,7 @@ def export_reports(request):
     for r in reports:
         writer.writerow(get_row(r))
     return response
+
     return render(
         request,
         "reports/officer_panel.html",
