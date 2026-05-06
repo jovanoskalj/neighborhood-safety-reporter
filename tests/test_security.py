@@ -20,7 +20,6 @@ def make_user(username, role, is_staff=False):
 
 @pytest.mark.django_db
 def test_csrf_protection_on_login():
-    """Login form should require CSRF token."""
     client = Client(enforce_csrf_checks=True)
     response = client.post(reverse('login'), {
         'username': 'test',
@@ -31,7 +30,6 @@ def test_csrf_protection_on_login():
 
 @pytest.mark.django_db
 def test_admin_endpoints_blocked_for_guests(client):
-    """Unauthenticated users cannot access admin endpoints."""
     urls = [
         reverse('admin_user_list'),
         reverse('admin_system_log'),
@@ -45,7 +43,6 @@ def test_admin_endpoints_blocked_for_guests(client):
 
 @pytest.mark.django_db
 def test_admin_endpoints_blocked_for_citizens(client):
-    """Citizens cannot access admin endpoints."""
     make_user('citizen1', 'citizen')
     client.login(username='citizen1', password='test123')
     urls = [
@@ -60,7 +57,6 @@ def test_admin_endpoints_blocked_for_citizens(client):
 
 @pytest.mark.django_db
 def test_admin_endpoints_blocked_for_officers(client):
-    """Officers cannot access admin endpoints."""
     make_user('officer1', 'officer')
     client.login(username='officer1', password='test123')
     urls = [
@@ -75,7 +71,6 @@ def test_admin_endpoints_blocked_for_officers(client):
 
 @pytest.mark.django_db
 def test_xss_in_report_description_is_escaped(client):
-    """XSS payload in report description should be escaped in HTML responses."""
     make_user('admin1', 'admin', is_staff=True)
     client.login(username='admin1', password='test123')
     from apps.reports.models import Report
@@ -95,7 +90,6 @@ def test_xss_in_report_description_is_escaped(client):
 
 @pytest.mark.django_db
 def test_passwords_not_in_response(client):
-    """Password hashes should never appear in any response."""
     make_user('admin2', 'admin', is_staff=True)
     client.login(username='admin2', password='test123')
     response = client.get(reverse('admin_user_list'))
@@ -106,7 +100,6 @@ def test_passwords_not_in_response(client):
 
 @pytest.mark.django_db
 def test_export_handles_large_dataset(client):
-    """Export should handle 100 reports without errors."""
     from apps.reports.models import Report
     u = make_user('admin3', 'admin', is_staff=True)
     reports = [
@@ -130,7 +123,6 @@ def test_export_handles_large_dataset(client):
 
 @pytest.mark.django_db
 def test_admin_user_list_handles_many_users(client):
-    """Admin user list should handle 50 users without errors."""
     for i in range(50):
         User.objects.create_user(username=f'user{i}', password='test123', is_active=True)
     make_user('admin4', 'admin', is_staff=True)

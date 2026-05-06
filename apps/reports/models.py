@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
 from django.db import models
+from .validators import validate_image_content
 
 
 class ReportCategory(models.Model):
@@ -143,7 +144,7 @@ class Report(models.Model):
 
     citizen = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reports')
     description = models.TextField()
-    image = models.ImageField(upload_to='reports/', blank=True, null=True)
+    image = models.ImageField(upload_to='reports/', blank=True, null=True, validators=[validate_image_content])
     latitude = models.DecimalField(max_digits=9, decimal_places=6)
     longitude = models.DecimalField(max_digits=9, decimal_places=6)
     category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default='other')

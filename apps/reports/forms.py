@@ -7,6 +7,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as CoreValidationError
 
 from .models import Report, ReportCategory, Sector
+from .validators import validate_image_content
 
 
 _COORD_QUANTUM = Decimal("0.000001")
@@ -38,7 +39,7 @@ class ReportCreateForm(forms.Form):
     description = forms.CharField(required=True)
     latitude = _CoordinateField(max_digits=9, decimal_places=6, min_value=-90, max_value=90)
     longitude = _CoordinateField(max_digits=9, decimal_places=6, min_value=-180, max_value=180)
-    image = forms.ImageField(required=False)
+    image = forms.ImageField(required=False, validators=[validate_image_content])
 
     def clean_description(self):
         description = self.cleaned_data["description"].strip()
@@ -73,16 +74,6 @@ class ReportSubmissionForm(forms.ModelForm):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.fields["municipality"].required = True
-
-    def clean_image(self):
-        """Reject uploads outside the allowed JPG/PNG MIME types (FR-08)."""
-        image = self.cleaned_data.get("image")
-        if not image:
-            return image
-        content_type = getattr(image, "content_type", "") or ""
-        if content_type not in {"image/jpeg", "image/png"}:
-            raise forms.ValidationError("Дозволени се само JPG или PNG слики.")
-        return image
 
 
 class ReportCategoryForm(forms.ModelForm):
