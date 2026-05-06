@@ -18,9 +18,9 @@
           <form method="post" action="{% url 'admin_user_update_role' u.id %}">
             {% csrf_token %}
             <select name="role" onchange="this.form.submit()">
-              <option value="citizen" {% if u.userprofile.role == 'citizen' %}selected{% endif %}>Citizen</option>
-              <option value="officer" {% if u.userprofile.role == 'officer' %}selected{% endif %}>Officer</option>
-              <option value="admin" {% if u.userprofile.role == 'admin' %}selected{% endif %}>Admin</option>
+              <option value="citizen" {% if u.profile.role == 'citizen' %}selected{% endif %}>Citizen</option>
+              <option value="officer" {% if u.profile.role == 'officer' %}selected{% endif %}>Officer</option>
+              <option value="admin" {% if u.profile.role == 'admin' %}selected{% endif %}>Admin</option>
             </select>
           </form>
         </td>

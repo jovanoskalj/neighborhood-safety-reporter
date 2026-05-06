@@ -167,6 +167,11 @@ data-has-image="{% if report.image and report.image.url %}1{% else %}0{% endif %
             </select>
           </div>
           <div>
+            <div class="op-label">Преасигнирај на сектор</div>
+            <select class="op-select" id="d-reassign-sector"></select>
+            <button onclick="reassignReport()" style="width:100%;margin-top:8px;padding:8px;font-size:13px;font-weight:500;background:#667085;color:#fff;border:none;border-radius:8px;cursor:pointer;">Преасигнирај</button>
+          </div>
+          <div>
             <div class="op-label">Интерни белешки</div>
             <textarea class="op-textarea" id="d-note" placeholder="Додај белешка..."></textarea>
           </div>
@@ -274,6 +279,60 @@ function openLightbox() {
 function closeLightbox() {
   document.getElementById('lightbox').style.display = 'none';
 }
+
+// Load sectors on page load
+let allSectors = [];
+function loadSectors() {
+  fetch('/reports/api/sectors/json/')
+    .then(r => r.json())
+    .then(data => {
+      allSectors = data.sectors || [];
+      populateSectorDropdown();
+    })
+    .catch(err => console.error('Failed to load sectors:', err));
+}
+
+function populateSectorDropdown() {
+  const dropdown = document.getElementById('d-reassign-sector');
+  dropdown.innerHTML = '<option value="">-- Избери сектор --</option>';
+  allSectors.forEach(sector => {
+    const option = document.createElement('option');
+    option.value = sector.id;
+    option.textContent = sector.name;
+    dropdown.appendChild(option);
+  });
+}
+
+function reassignReport() {
+  if (!currentId) return;
+  const sectorId = document.getElementById('d-reassign-sector').value;
+  if (!sectorId) {
+    alert('Молиме изберете сектор');
+    return;
+  }
+
+  fetch(`/reports/${currentId}/reassign/`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+    body: JSON.stringify({ sector_id: parseInt(sectorId) })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.id) {
+      const row = document.querySelector(`[data-id="${currentId}"]`);
+      if (row) {
+        row.dataset.sector = data.sector;
+      }
+      document.getElementById('d-meta').textContent = row.dataset.date + ' · ' + data.sector_name;
+      document.getElementById('d-reassign-sector').value = '';
+      alert('Пријавата е успешно преасигнирана');
+    }
+  })
+  .catch(err => console.error('Reassignment failed:', err));
+}
+
+// Load sectors when page loads
+window.addEventListener('load', loadSectors);
 </script>
 
 {% endblock %}
