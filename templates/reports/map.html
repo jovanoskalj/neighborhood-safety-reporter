@@ -17,7 +17,7 @@
         <div class="card-body p-4">
             <form id="map-filters" class="row g-2 mb-3">
                 <div class="col-12 col-md-3">
-                    <select name="category" class="form-select">
+                    <select id="filter-category" name="category" class="form-select">
                         <option value="">Категорија</option>
                         {% for value, label in category_choices %}
                             <option value="{{ value }}">{{ label }}</option>
@@ -25,7 +25,7 @@
                     </select>
                 </div>
                 <div class="col-12 col-md-3">
-                    <select name="status" class="form-select">
+                    <select id="filter-status" name="status" class="form-select">
                         <option value="">Статус</option>
                         {% for value, label in status_choices %}
                             <option value="{{ value }}">{{ label }}</option>
@@ -33,9 +33,17 @@
                     </select>
                 </div>
                 <div class="col-12 col-md-3">
-                    <select name="sector" class="form-select">
+                    <select id="filter-sector" name="sector" class="form-select">
                         <option value="">Сектор</option>
                         {% for value, label in sector_choices %}
+                            <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12 col-md-3">
+                    <select id="filter-municipality" name="municipality" class="form-select">
+                        <option value="">Општина</option>
+                        {% for value, label in municipality_choices %}
                             <option value="{{ value }}">{{ label }}</option>
                         {% endfor %}
                     </select>
