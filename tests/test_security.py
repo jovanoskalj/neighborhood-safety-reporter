@@ -129,3 +129,29 @@ def test_admin_user_list_handles_many_users(client):
     client.login(username='admin4', password='test123')
     response = client.get(reverse('admin_user_list'))
     assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_report_submission_requires_csrf():
+    """Report submission should require CSRF token."""
+    client = Client(enforce_csrf_checks=True)
+    user = User.objects.create_user(username='csrf_test', password='test123', is_active=True)
+    client.login(username='csrf_test', password='test123')
+    response = client.post(reverse('submit_report'), {
+        'description': 'CSRF test',
+        'latitude': 41.9,
+        'longitude': 21.4,
+        'category': 'other',
+        'priority': 'normal',
+        'municipality': 'centar'
+    })
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_passwords_are_hashed():
+    """Verify that user passwords are not stored in plain text."""
+    user = User.objects.create_user(username='hash_test', password='secret_password', is_active=True)
+    # Django's password hash starts with the algorithm name (e.g., 'pbkdf2_sha256$')
+    assert user.password.startswith('pbkdf2_sha256$')
+    assert 'secret_password' not in user.password

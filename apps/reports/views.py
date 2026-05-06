@@ -641,6 +641,56 @@ def update_report_status(request, report_id):
     })
 
 
+@login_required
+@require_http_methods(["PATCH"])
+def reassign_report(request, report_id):
+    """Officer-only endpoint that reassigns a report to a different sector."""
+    if not user_is_officer(request.user):
+        return JsonResponse({"error": "Only officers may reassign reports."}, status=403)
+
+    report = get_object_or_404(Report, pk=report_id)
+    if report.sector != get_user_sector(request.user):
+        return JsonResponse({"error": "Officers may only reassign reports in their own sector."}, status=403)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON payload."}, status=400)
+
+    sector_id = payload.get("sector_id")
+    if not sector_id:
+        return JsonResponse({"error": "Missing sector_id."}, status=400)
+
+    try:
+        sector = Sector.objects.get(pk=sector_id)
+    except Sector.DoesNotExist:
+        return JsonResponse({"error": "Invalid sector_id."}, status=400)
+
+    old_sector = report.sector
+    report.sector = sector.key
+    report.save(update_fields=["sector", "updated_at"])
+
+    # Log the reassignment action
+    AuditLog.objects.create(
+        user=request.user,
+        action="REASSIGN",
+        target_model="Report",
+        target_id=report.pk,
+        details={
+            "old_sector": old_sector,
+            "new_sector": sector.key,
+            "sector_name": sector.name,
+        }
+    )
+
+    return JsonResponse({
+        "id": report.pk,
+        "sector": report.sector,
+        "sector_name": sector.name,
+        "updated_at": report.updated_at.isoformat(),
+    })
+
+
 def _serialize_report(report):
     return {
         "id": report.id,
@@ -655,6 +705,18 @@ def _serialize_report(report):
         "ai_processed": report.ai_processed,
         "created_at": report.created_at.isoformat(),
     }
+
+
+@login_required
+def get_sectors_json(request):
+    """Return list of active sectors as JSON for frontend dropdowns."""
+    if not user_is_officer(request.user):
+        return JsonResponse({"error": "Only officers can access this."}, status=403)
+    
+    sectors = Sector.objects.filter(is_active=True).values('id', 'key', 'name')
+    return JsonResponse({
+        "sectors": list(sectors)
+    })
 
 
 @csrf_exempt

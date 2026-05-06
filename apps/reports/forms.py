@@ -72,7 +72,7 @@ class ReportSubmissionForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.fields["municipality"].required = False
+        self.fields["municipality"].required = True
 
     def clean_image(self):
         image = self.cleaned_data.get("image")
