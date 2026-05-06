@@ -978,8 +978,8 @@ def new_report(request):
 @login_required
 def export_reports(request):
     try:
-        profile = request.user.userprofile
-        if profile.role != 'admin':
+        profile = request.user.profile
+        if profile.role != 'admin' and not request.user.is_staff:
              return redirect('dashboard')
     except:
         return redirect('dashboard')
