@@ -624,6 +624,20 @@ def dashboard(request):
     active_categories_for_classification = list(
         ReportCategory.objects.filter(is_active=True).exclude(key="other").values_list('key', 'name')
     )
+    bulk_municipality = request.GET.get("bulk_municipality", "")
+    bulk_sector = request.GET.get("bulk_sector", "")
+    bulk_queryset = Report.objects.filter(status="resolved").exclude(citizen__email="")
+    if bulk_municipality:
+        bulk_queryset = bulk_queryset.filter(municipality=bulk_municipality)
+    if bulk_sector:
+        bulk_queryset = bulk_queryset.filter(sector=bulk_sector)
+    default_bulk_subject = "Известување од Безбеден Град"
+    default_bulk_message = (
+        "Почитувани,\n\n"
+        "Ве информираме дека пријавите што одговараат на избраните филтри се обработени. "
+        "Ви благодариме што придонесувате за побезбедна заедница.\n\n"
+        "Со почит,\nТимот на Безбеден Град"
+    )
 
     context = {
         "active_tab": request.GET.get("tab", "users"),
@@ -658,6 +672,11 @@ def dashboard(request):
         "priority_choices": Report.PRIORITY_CHOICES,
         "municipality_choices": MUNICIPALITY_CHOICES,
         "export_columns": REPORT_EXPORT_COLUMNS,
+        "bulk_count": bulk_queryset.count(),
+        "bulk_municipality": bulk_municipality,
+        "bulk_sector": bulk_sector,
+        "default_bulk_subject": default_bulk_subject,
+        "default_bulk_message": default_bulk_message,
     }
     return render(request, "reports/admin_dashboard.html", context)
 
@@ -1406,11 +1425,21 @@ def update_report_status(request, report_id: int):
             changed_by=request.user,
             note="Промена од службеник",
         )
-        send_report_status_changed_email(report, old_status, report.status)
-        send_status_change_email(report)
+        html_email_sent = send_report_status_changed_email(report, old_status, report.status)
+        notification = send_status_change_email(report)
+        email_sent = bool(html_email_sent or (notification and notification.status == "sent"))
 
     payload = _serialize_report(report)
     payload["internal_note"] = report.internal_note
+    if requested_status and old_status != report.status:
+        payload["status_changed"] = True
+        payload["old_status"] = old_status
+        payload["old_status_label"] = dict(Report.STATUS_CHOICES).get(old_status, old_status)
+        payload["email_sent"] = email_sent
+        payload["email_recipient"] = getattr(report.citizen, "email", "") or ""
+    else:
+        payload["status_changed"] = False
+        payload["email_sent"] = False
     return JsonResponse(payload)
 
 
@@ -1647,13 +1676,20 @@ def officer_panel(request):
 
 @login_required
 def search_page(request):
-    """Simple search page aligned with current branch UI."""
+    """Search visible reports, with keyword matching report descriptions."""
     filters = _build_report_filters(request)
     opshtina = request.GET.get("opshtina", "").strip()
     if opshtina:
         filters &= Q(municipality=opshtina)
 
     queryset = _visible_reports_for_user(request).filter(filters).order_by("-created_at")
+    sort = request.GET.get("sort", "date")
+    sort_map = {
+        "date": "-created_at",
+        "priority": "priority",
+        "status": "status",
+    }
+    queryset = queryset.order_by(sort_map.get(sort, "-created_at"))
     paginator = Paginator(queryset, 20)
     page_number = request.GET.get("page", 1)
     try:

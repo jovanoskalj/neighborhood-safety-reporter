@@ -110,9 +110,12 @@ def test_officer_panel_includes_sector_map_controls(client, safety_officer, sect
 
     assert 'id="sector-map"' in content
     assert 'id="heatmap-toggle"' in content
-    assert 'id="map-filter-category"' in content
     assert 'id="map-filter-status"' in content
     assert 'id="map-filter-priority"' in content
+    assert 'id="map-filter-municipality"' in content
+    assert 'id="map-filter-category"' not in content
+    assert 'Категорија:</span>' in content
+    assert 'Општина:</span>' in content
 
 
 # ---------------------------------------------------------------------------

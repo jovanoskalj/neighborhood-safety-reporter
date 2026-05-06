@@ -91,7 +91,7 @@
       {% if unclassified_count %}<span class="badge bg-danger ms-1">{{ unclassified_count }}</span>{% endif %}
     </a>
     <a class="nav-link {% if active_tab == 'settings' %}active{% endif %}" href="?tab=settings">Подесувања</a>
-    <a class="nav-link" href="{% url 'notifications_bulk_notify' %}">Масовно известување</a>
+    <a class="nav-link {% if active_tab == 'bulk_notify' %}active{% endif %}" href="?tab=bulk_notify">Масовно известување</a>
     <a class="nav-link {% if active_tab == 'log' %}active{% endif %}" href="?tab=log">Системски лог</a>
   </nav>
 
@@ -1115,6 +1115,175 @@
     </div>
     {% endif %}
   </div>
+  {% endif %}
+
+  {% if active_tab == 'bulk_notify' %}
+  <style>
+    .bulk-tab-page {
+      --bt-bg: #f6f5f2;
+      --bt-surface: #ffffff;
+      --bt-border: #e8e5df;
+      --bt-border-2: #d4cfc5;
+      --bt-text: #1a1916;
+      --bt-muted: #6b6760;
+      --bt-faint: #9e9a93;
+      background: var(--bt-bg);
+      border: 1px solid var(--bt-border);
+      border-radius: 14px;
+      padding: 20px;
+    }
+    .bulk-tab-head {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 14px; flex-wrap: wrap; margin-bottom: 16px;
+    }
+    .bulk-tab-head h2 { font-size: 22px; font-weight: 600; color: var(--bt-text); margin: 0; }
+    .bulk-tab-head p { font-size: 13px; color: var(--bt-muted); margin: 3px 0 0; }
+    .bulk-tab-count {
+      min-width: 138px; background: var(--bt-surface); border: 1px solid var(--bt-border);
+      border-radius: 10px; padding: 10px 14px;
+    }
+    .bulk-tab-count-label {
+      font-size: 11px; color: var(--bt-faint); font-weight: 700;
+      text-transform: uppercase; letter-spacing: .04em;
+    }
+    .bulk-tab-count strong {
+      display: block; font-size: 26px; line-height: 1.1; color: var(--bt-text); margin-top: 4px;
+    }
+    .bulk-tab-grid {
+      display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 14px; align-items: start;
+    }
+    .bulk-tab-panel {
+      background: var(--bt-surface); border: 1px solid var(--bt-border);
+      border-radius: 12px; padding: 16px;
+    }
+    .bulk-tab-panel h3 { font-size: 16px; font-weight: 600; color: var(--bt-text); margin: 0 0 12px; }
+    .bulk-tab-panel label { font-size: 12px; font-weight: 700; color: var(--bt-muted); }
+    .bulk-tab-panel .form-control, .bulk-tab-panel .form-select {
+      border-color: var(--bt-border-2); border-radius: 7px; font-size: 13px;
+    }
+    .bulk-tab-panel .form-control:focus, .bulk-tab-panel .form-select:focus {
+      border-color: var(--bt-text); box-shadow: none;
+    }
+    .bulk-tab-message textarea { min-height: 190px; resize: vertical; }
+    .bulk-tab-note {
+      background: #fbfaf8; border: 1px solid var(--bt-border); border-radius: 10px;
+      padding: 12px; color: var(--bt-muted); font-size: 12.5px; line-height: 1.5; margin-top: 12px;
+    }
+    .bulk-tab-actions {
+      display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px;
+    }
+    .bulk-tab-send {
+      border: 0; border-radius: 7px; background: var(--bt-text); color: #fff;
+      min-height: 40px; padding: 9px 14px; font-size: 13px; font-weight: 700;
+    }
+    .bulk-tab-send:hover { opacity: .88; color: #fff; }
+    .bulk-tab-send:disabled { opacity: .45; }
+    @media (max-width: 900px) {
+      .bulk-tab-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+
+  <div class="bulk-tab-page">
+    <div class="bulk-tab-head">
+      <div>
+        <h2>Масовно известување</h2>
+        <p>Изберете примачи и напишете ја пораката што ќе се испрати по email.</p>
+      </div>
+      <div class="bulk-tab-count">
+        <div class="bulk-tab-count-label">Примачи</div>
+        <strong>{{ bulk_count }}</strong>
+      </div>
+    </div>
+
+    <div class="bulk-tab-grid">
+      <div class="bulk-tab-panel">
+        <h3>Филтри</h3>
+        <form method="get">
+          <input type="hidden" name="tab" value="bulk_notify">
+          <div class="mb-3">
+            <label class="form-label" for="bulkMunicipality">Општина</label>
+            <select id="bulkMunicipality" name="bulk_municipality" class="form-select">
+              <option value="">Сите општини</option>
+              {% for key, label in municipality_choices %}
+              <option value="{{ key }}" {% if bulk_municipality == key %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="bulkSector">Сектор</label>
+            <select id="bulkSector" name="bulk_sector" class="form-select">
+              <option value="">Сите сектори</option>
+              {% for key, label in sector_choices %}
+              <option value="{{ key }}" {% if bulk_sector == key %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="btn btn-outline-dark w-100">
+            <i class="bi bi-funnel me-1"></i>Освежи примачи
+          </button>
+        </form>
+      </div>
+
+      <div class="bulk-tab-panel bulk-tab-message">
+        <h3>Порака</h3>
+        <form id="dashboardBulkSendForm" method="post" action="{% url 'notifications_bulk_notify_send' %}">
+          {% csrf_token %}
+          <input type="hidden" name="municipality" value="{{ bulk_municipality }}">
+          <input type="hidden" name="sector" value="{{ bulk_sector }}">
+          <div class="mb-3">
+            <label class="form-label" for="dashboardBulkSubject">Наслов на email</label>
+            <input id="dashboardBulkSubject" class="form-control" type="text" name="subject" value="{{ default_bulk_subject }}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="dashboardBulkMessage">Broadcast порака</label>
+            <textarea id="dashboardBulkMessage" class="form-control" name="message" required>{{ default_bulk_message }}</textarea>
+          </div>
+          <div class="bulk-tab-note">
+            До секој email автоматски се додаваат името на корисникот и кратки податоци за неговата решена пријава.
+          </div>
+          <div class="bulk-tab-actions">
+            <span class="text-muted small">Ќе се испрати до {{ bulk_count }} примачи.</span>
+            <button type="submit" class="bulk-tab-send" {% if bulk_count == 0 %}disabled{% endif %}>
+              <i class="bi bi-megaphone me-1"></i>Испрати
+            </button>
+          </div>
+        </form>
+        <div id="dashboardBulkResult" class="mt-3"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('dashboardBulkSendForm')?.addEventListener('submit', async function(event) {
+      event.preventDefault();
+      const result = document.getElementById('dashboardBulkResult');
+      const button = this.querySelector('button[type=submit]');
+      button.disabled = true;
+      button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Испраќање...';
+
+      const response = await fetch(this.action, {
+        method: 'POST',
+        body: new FormData(this),
+        headers: {'X-CSRFToken': '{{ csrf_token }}'}
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        result.innerHTML = `<div class="alert alert-danger border-0">${data.error || 'Неуспешно испраќање.'}</div>`;
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-megaphone me-1"></i>Испрати';
+        return;
+      }
+
+      result.innerHTML = `
+        <div class="alert alert-success border-0">
+          <i class="bi bi-check-circle me-2"></i>
+          Успешно испратени: <strong>${data.succeeded}</strong> / ${data.total}
+          ${data.failed ? `<br><span class="text-danger"><i class="bi bi-x-circle me-1"></i>Неуспешни: ${data.failed}</span>` : ''}
+        </div>`;
+      button.innerHTML = '<i class="bi bi-check-lg me-1"></i>Завршено';
+    });
+  </script>
   {% endif %}
 
   {% if active_tab == 'settings' %}
