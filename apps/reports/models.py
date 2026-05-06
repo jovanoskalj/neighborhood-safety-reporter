@@ -147,6 +147,12 @@ class Report(models.Model):
         ("health", "Здравство"),
         ("admin", "Администрација"),
     ]
+    DUPLICATE_VERDICT_CHOICES = [
+        ("none", "Нема"),
+        ("pending", "Чека одлука на админ"),
+        ("confirmed", "Потврден дупликат"),
+        ("rejected", "Не е дупликат"),
+    ]
 
     citizen = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reports')
     description = models.TextField()
@@ -172,6 +178,11 @@ class Report(models.Model):
         blank=True,
         related_name="duplicates",
     )
+    duplicate_verdict = models.CharField(
+        max_length=20,
+        choices=DUPLICATE_VERDICT_CHOICES,
+        default="none",
+    )
 
     class Meta:
         indexes = [
@@ -184,6 +195,7 @@ class Report(models.Model):
             models.Index(fields=["longitude"], name="report_longitude_idx"),
             models.Index(fields=["sector", "status"], name="report_sector_status_idx"),
             models.Index(fields=["is_duplicate"], name="report_is_duplicate_idx"),
+            models.Index(fields=["duplicate_verdict"], name="report_dup_verdict_idx"),
         ]
 
     def __str__(self) -> str:

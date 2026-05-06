@@ -619,6 +619,14 @@ def dashboard(request):
     unclassified_reports = Report.objects.filter(
         Q(category="other") | Q(status="unclassified")
     ).select_related("citizen").order_by("-created_at")[:50]
+
+    pending_duplicate_reports = (
+        Report.objects.filter(duplicate_verdict="pending")
+        .exclude(duplicate_of__isnull=True)
+        .select_related("citizen", "duplicate_of")
+        .order_by("-created_at")[:100]
+    )
+    pending_duplicate_count = Report.objects.filter(duplicate_verdict="pending").exclude(duplicate_of__isnull=True).count()
     
     # For classification form: exclude "Друго" (other) from categories - it's the unclassified marker
     active_categories_for_classification = list(
@@ -662,6 +670,8 @@ def dashboard(request):
         "logs": logs,
         "unclassified_reports": unclassified_reports,
         "unclassified_count": Report.objects.filter(Q(category="other") | Q(status="unclassified")).count(),
+        "pending_duplicate_reports": pending_duplicate_reports,
+        "pending_duplicate_count": pending_duplicate_count,
         "category_form": ReportCategoryForm(),
         "sector_form": SectorForm(),
         "user_form": AdminUserCreateForm(),
@@ -1096,9 +1106,10 @@ def submit_report(request):
             if duplicate is not None:
                 report.is_duplicate = True
                 report.duplicate_of = duplicate
+                report.duplicate_verdict = "pending"
                 messages.warning(
                     request,
-                    f"Можно е оваа пријава да е дупликат на пријава #{duplicate.pk}. Ќе биде означена за проверка.",
+                    f"Можно е оваа пријава да е дупликат на пријава #{duplicate.pk}. Администратор ќе одлучи дали навистина е дупликат.",
                 )
 
             if getattr(settings, "AI_CLASSIFICATION_ENABLED", False):
@@ -1215,8 +1226,9 @@ def my_reports(request):
     new_count = base_qs.filter(status="new").count()
     in_progress_count = base_qs.filter(status="in_progress").count()
     done_count = base_qs.filter(status="resolved").count()
+    duplicate_count = base_qs.filter(duplicate_verdict__in=["pending", "confirmed"]).count()
 
-    qs = base_qs
+    qs = base_qs.select_related("duplicate_of", "duplicate_of__citizen")
 
     category = request.GET.get("category", "")
     priority = request.GET.get("priority", "")
@@ -1251,6 +1263,7 @@ def my_reports(request):
             "new_count": new_count,
             "in_progress_count": in_progress_count,
             "done_count": done_count,
+            "duplicate_count": duplicate_count,
             "category_choices": Report.CATEGORY_CHOICES,
             "priority_choices": Report.PRIORITY_CHOICES,
             "status_choices": Report.STATUS_CHOICES,
@@ -1265,9 +1278,15 @@ def my_reports(request):
 @require_GET
 def report_detail(request, report_id: int):
     """Show full details for one report (owner/officer same sector/admin)."""
-    report = get_object_or_404(Report, pk=report_id)
+    report = get_object_or_404(
+        Report.objects.select_related("citizen", "duplicate_of", "duplicate_of__citizen"),
+        pk=report_id,
+    )
     if not _can_view_report(request.user, report):
         return JsonResponse({"detail": "Not allowed."}, status=403)
+    can_view_duplicate_original = bool(
+        report.duplicate_of_id and _can_view_report(request.user, report.duplicate_of)
+    )
     status_labels = dict(Report.STATUS_CHOICES)
     timeline = []
     for event in report.status_history.select_related("changed_by").all():
@@ -1295,7 +1314,15 @@ def report_detail(request, report_id: int):
                 "note": "Креирана пријава",
             }
         ]
-    return render(request, "reports/report_detail.html", {"report": report, "timeline": timeline})
+    return render(
+        request,
+        "reports/report_detail.html",
+        {
+            "report": report,
+            "timeline": timeline,
+            "can_view_duplicate_original": can_view_duplicate_original,
+        },
+    )
 
 
 def user_is_officer(user):
@@ -1560,6 +1587,57 @@ def classify_report(request, report_id: int):
     return redirect(f"{reverse('dashboard')}?tab=unclassified")
 
 
+@login_required
+@_admin_only()
+@require_http_methods(["POST"])
+def review_duplicate_report(request, report_id: int):
+    """Admin confirms or rejects automatic duplicate suggestion."""
+    report = get_object_or_404(Report, pk=report_id)
+    if report.duplicate_verdict != "pending":
+        messages.error(request, "Оваа пријава не е во редица за преглед на дупликат.")
+        return redirect(f"{reverse('dashboard')}?tab=duplicates")
+
+    action = (request.POST.get("action") or "").strip()
+    if action == "confirm":
+        report.duplicate_verdict = "confirmed"
+        report.is_duplicate = True
+        report.save(update_fields=["duplicate_verdict", "is_duplicate", "updated_at"])
+        _write_audit_log(
+            request,
+            action="duplicate_verdict_confirm",
+            target_model="Report",
+            target_id=report.id,
+            details={
+                "duplicate_of_id": report.duplicate_of_id,
+            },
+        )
+        messages.success(
+            request,
+            f"ПРЈ-{report.id} е означена како дупликат на ПРЈ-{report.duplicate_of_id}.",
+        )
+    elif action == "reject":
+        old_dup_id = report.duplicate_of_id
+        report.duplicate_verdict = "rejected"
+        report.is_duplicate = False
+        report.duplicate_of = None
+        report.save(update_fields=["duplicate_verdict", "is_duplicate", "duplicate_of", "updated_at"])
+        _write_audit_log(
+            request,
+            action="duplicate_verdict_reject",
+            target_model="Report",
+            target_id=report.id,
+            details={"previous_duplicate_of_id": old_dup_id},
+        )
+        messages.success(
+            request,
+            f"ПРЈ-{report.id} е задржана како посебна пријава (не е дупликат).",
+        )
+    else:
+        messages.error(request, "Непозната акција.")
+
+    return redirect(f"{reverse('dashboard')}?tab=duplicates")
+
+
 def user_is_officer(user):
     return _is_officer(user)
 
@@ -1640,7 +1718,7 @@ def officer_panel(request):
 
     sector = get_user_sector(request.user)
     profile = UserProfile.objects.filter(user=request.user).first()
-    reports = Report.objects.filter(sector=sector).order_by("-created_at")
+    reports = Report.objects.filter(sector=sector).select_related("duplicate_of").order_by("-created_at")
     if profile and profile.municipality:
         reports = reports.filter(municipality=profile.municipality)
 

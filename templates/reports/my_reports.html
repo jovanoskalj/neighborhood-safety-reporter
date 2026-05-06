@@ -65,7 +65,10 @@
     .btn-new:hover { opacity: .82; }
 
     /* ─── Stats strip ─── */
-    .mr-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 1.25rem; }
+    .mr-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 1.25rem; }
+    @media (max-width: 900px) {
+        .mr-stats { grid-template-columns: repeat(2, 1fr); }
+    }
     .stat-card {
         background: var(--surface); border: 1px solid var(--border);
         border-radius: var(--radius); padding: 14px 16px;
@@ -76,6 +79,23 @@
     .stat-val.blue   { color: var(--blue); }
     .stat-val.amber  { color: var(--amber); }
     .stat-val.green  { color: var(--green); }
+    .stat-val.dup    { color: var(--amber); }
+
+    /* Possible duplicate (linked report) */
+    .dup-chip {
+        display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px;
+        margin-top: 6px;
+        font-size: 11.5px; font-weight: 500;
+        color: var(--amber);
+        background: var(--amber-bg);
+        border: 1px solid var(--amber-bd);
+        border-radius: 6px;
+        padding: 4px 8px;
+        max-width: 100%;
+    }
+    .dup-chip a { color: var(--amber); text-decoration: underline; text-underline-offset: 2px; }
+    .dup-chip a:hover { opacity: .85; }
+    .dup-note { font-weight: 400; color: var(--text-3); font-size: 11px; }
 
     /* ─── Layout ─── */
     .mr-layout { display: grid; grid-template-columns: 1fr 290px; gap: 14px; align-items: start; }
@@ -316,6 +336,10 @@
             <div class="stat-label">Завршени</div>
             <div class="stat-val green">{{ done_count|default:"0" }}</div>
         </div>
+        <div class="stat-card">
+            <div class="stat-label">Можни дупликати</div>
+            <div class="stat-val dup">{{ duplicate_count|default:"0" }}</div>
+        </div>
     </div>
 
     <!-- Main layout -->
@@ -368,6 +392,19 @@
                             <tr>
                                 <td class="report-main-cell">
                                     <span class="cat-pill">{{ report.get_category_display }}</span>
+                                    {% if report.duplicate_verdict == 'pending' or report.duplicate_verdict == 'confirmed' %}
+                                    {% if report.duplicate_of_id %}
+                                    <div class="dup-chip">
+                                        {% if report.duplicate_verdict == 'pending' %}Можен дупликат · чека админ ·{% else %}Потврден дупликат ·{% endif %}
+                                        {% if report.duplicate_of.citizen_id == user.id %}
+                                        <a href="{% url 'report_detail' report.duplicate_of_id %}">ПРЈ-{{ report.duplicate_of_id }}</a>
+                                        {% else %}
+                                        <span>ПРЈ-{{ report.duplicate_of_id }}</span>
+                                        <span class="dup-note">оригинал од друг корисник</span>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                    {% endif %}
                                     <div class="row-hover-card">
                                         <div class="hover-title">Брз преглед</div>
                                         <div class="hover-desc">{{ report.description|truncatechars:160 }}</div>

@@ -191,7 +191,16 @@
 data-has-image="{% if report.image and report.image.url %}1{% else %}0{% endif %}"
                 onclick="selectReport(this)">
               <td><span class="id-link">ПРЈ-{{ report.pk|stringformat:'03d' }}</span></td>
-             <td>{{ report.get_category_display }}</td>
+             <td>{{ report.get_category_display }}
+                {% if report.duplicate_of_id %}
+                {% if report.duplicate_verdict == 'pending' or report.duplicate_verdict == 'confirmed' %}
+                <div class="text-muted small mt-1">
+                  {% if report.duplicate_verdict == 'pending' %}Можен дупликат{% else %}Потврден дупликат{% endif %}
+                  · <a href="{% url 'report_detail' report.duplicate_of_id %}">ПРЈ-{{ report.duplicate_of_id }}</a>
+                </div>
+                {% endif %}
+                {% endif %}
+             </td>
               <td><span class="p-pill p-{{ report.priority }}">{{ report.get_priority_display }}</span></td>
             </tr>
             {% empty %}

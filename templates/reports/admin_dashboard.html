@@ -90,6 +90,10 @@
       <span>Некласифицирано</span>
       {% if unclassified_count %}<span class="badge bg-danger ms-1">{{ unclassified_count }}</span>{% endif %}
     </a>
+    <a class="nav-link {% if active_tab == 'duplicates' %}active{% endif %}" href="?tab=duplicates">
+      <span>Дупликати</span>
+      {% if pending_duplicate_count %}<span class="badge bg-warning text-dark ms-1">{{ pending_duplicate_count }}</span>{% endif %}
+    </a>
     <a class="nav-link {% if active_tab == 'settings' %}active{% endif %}" href="?tab=settings">Подесувања</a>
     <a class="nav-link {% if active_tab == 'bulk_notify' %}active{% endif %}" href="?tab=bulk_notify">Масовно известување</a>
     <a class="nav-link {% if active_tab == 'log' %}active{% endif %}" href="?tab=log">Системски лог</a>
@@ -1113,6 +1117,121 @@
       <p>Нема некласифицирани извештаи</p>
       <small>Сите извештаи се класифицирани.</small>
     </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if active_tab == 'duplicates' %}
+  <style>
+    .dup-queue-page {
+      --dq-bg: #f6f5f2;
+      --dq-surface: #ffffff;
+      --dq-border: #e8e5df;
+      --dq-text: #1a1916;
+      --dq-muted: #6b6760;
+      background: var(--dq-bg);
+      border: 1px solid var(--dq-border);
+      border-radius: 14px;
+      padding: 18px;
+    }
+    .dup-queue-head {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 14px; flex-wrap: wrap; margin-bottom: 16px;
+    }
+    .dup-queue-head h2 { font-size: 20px; font-weight: 700; color: var(--dq-text); margin: 0; }
+    .dup-queue-head p { color: var(--dq-muted); font-size: 13px; margin: 4px 0 0; }
+    .dup-queue-count {
+      min-width: 120px; background: var(--dq-surface); border: 1px solid var(--dq-border);
+      border-radius: 10px; padding: 10px 14px; text-align: center;
+    }
+    .dup-queue-count-label { font-size: 11px; color: var(--dq-muted); font-weight: 700; text-transform: uppercase; }
+    .dup-queue-count-num { font-size: 28px; font-weight: 700; color: #b45309; }
+    .dup-queue-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 14px;
+      align-items: start;
+      background: var(--dq-surface);
+      border: 1px solid var(--dq-border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.05);
+    }
+    .dup-queue-meta { font-size: 12px; color: var(--dq-muted); margin-bottom: 8px; }
+    .dup-queue-desc { font-size: 13px; color: var(--dq-text); line-height: 1.45; margin: 0 0 10px; }
+    .dup-queue-ref {
+      font-size: 13px;
+      font-weight: 600;
+      color: #92400e;
+      margin-bottom: 10px;
+    }
+    .dup-queue-ref a { color: #2563eb; font-weight: 600; }
+    .dup-queue-actions { display: flex; flex-direction: column; gap: 8px; min-width: 160px; }
+    .dup-queue-actions button {
+      border: 0; border-radius: 8px; padding: 10px 14px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .dup-btn-confirm { background: #1a1916; color: #fff; }
+    .dup-btn-confirm:hover { opacity: .9; }
+    .dup-btn-reject { background: #fff; color: #1a1916; border: 1px solid var(--dq-border) !important; }
+    .dup-btn-reject:hover { background: #f6f5f2; }
+    .dup-queue-empty {
+      text-align: center; padding: 40px 20px; color: var(--dq-muted);
+      background: var(--dq-surface); border: 1px dashed var(--dq-border); border-radius: 12px;
+    }
+    @media (max-width: 720px) {
+      .dup-queue-item { grid-template-columns: 1fr; }
+      .dup-queue-actions { flex-direction: row; flex-wrap: wrap; }
+    }
+  </style>
+  <div class="dup-queue-page">
+    <div class="dup-queue-head">
+      <div>
+        <h2>Преглед на можни дупликати</h2>
+        <p>Системот предложува врска со постара пријава. Потврдете или одбијте за секоја нова пријава.</p>
+      </div>
+      <div class="dup-queue-count">
+        <div class="dup-queue-count-label">Чекаат</div>
+        <div class="dup-queue-count-num">{{ pending_duplicate_count }}</div>
+      </div>
+    </div>
+
+    {% if pending_duplicate_reports %}
+      {% for report in pending_duplicate_reports %}
+      <div class="dup-queue-item">
+        <div>
+          <div class="dup-queue-meta">
+            <strong>ПРЈ-{{ report.id }}</strong> · {{ report.citizen.username }} · {{ report.created_at|date:"d.m.Y H:i" }}
+          </div>
+          <p class="dup-queue-desc">{{ report.description|truncatewords:40 }}</p>
+          <div class="dup-queue-ref">
+            Предложен оригинал:
+            {% if report.duplicate_of_id %}
+            <a href="{% url 'report_detail' report.duplicate_of_id %}" target="_blank" rel="noopener">ПРЈ-{{ report.duplicate_of_id }}</a>
+            {% else %}
+            —
+            {% endif %}
+          </div>
+        </div>
+        <div class="dup-queue-actions">
+          <form method="post" action="{% url 'review_duplicate_report' report.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="confirm" />
+            <button type="submit" class="dup-btn-confirm w-100">Потврди дупликат</button>
+          </form>
+          <form method="post" action="{% url 'review_duplicate_report' report.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reject" />
+            <button type="submit" class="dup-btn-reject w-100">Не е дупликат</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="dup-queue-empty">
+        <p class="mb-0 fw-semibold text-dark">Нема пријави што чекаат одлука за дупликат.</p>
+      </div>
     {% endif %}
   </div>
   {% endif %}

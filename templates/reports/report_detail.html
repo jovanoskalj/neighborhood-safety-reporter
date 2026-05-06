@@ -202,6 +202,20 @@
   .timeline-main { font-size: 13.5px; color: var(--text-1); }
   .timeline-meta { font-size: 12px; color: var(--text-3); margin-top: 2px; }
 
+  /* Possible duplicate notice */
+  .dup-banner {
+    margin-bottom: 1rem;
+    padding: 12px 16px;
+    background: var(--amber-bg);
+    border: 1px solid var(--amber-bd);
+    border-radius: var(--radius);
+    font-size: 13.5px;
+    color: var(--amber);
+    line-height: 1.45;
+  }
+  .dup-banner a { color: #92400e; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+  .dup-banner-muted { font-size: 12.5px; color: var(--text-2); font-weight: 400; }
+
   @media (max-width: 640px) {
     .meta-strip { grid-template-columns: 1fr; }
     .meta-cell  { border-right: none; border-bottom: 1px solid var(--border); }
@@ -241,6 +255,24 @@
       </a>
     </div>
   </div>
+
+  {% if report.duplicate_verdict == 'pending' or report.duplicate_verdict == 'confirmed' %}
+  {% if report.duplicate_of_id %}
+  <div class="dup-banner" role="status">
+    {% if report.duplicate_verdict == 'pending' %}
+    <strong>Можен дупликат</strong> — администратор уште не потврдил. Предложена поврзана пријава:
+    {% else %}
+    <strong>Потврден дупликат</strong> од администратор. Поврзана пријава:
+    {% endif %}
+    {% if can_view_duplicate_original %}
+    <a href="{% url 'report_detail' report.duplicate_of_id %}">ПРЈ-{{ report.duplicate_of_id }}</a>.
+    {% else %}
+    <strong>#{{ report.duplicate_of_id }}</strong>
+    <span class="dup-banner-muted">(немате пристап до целосниот преглед на таа пријава)</span>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% endif %}
 
   <!-- Card -->
   <div class="card">
