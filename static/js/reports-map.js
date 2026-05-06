@@ -12,6 +12,7 @@
     const filterCategory = document.getElementById("filter-category");
     const filterStatus = document.getElementById("filter-status");
     const filterMunicipality = document.getElementById("filter-municipality");
+    const heatmapToggle = document.getElementById("heatmap-toggle");
 
     const map = L.map(mapElement).setView([41.9981, 21.4254], 12);
 
@@ -21,6 +22,43 @@
     }).addTo(map);
 
     const markersLayer = L.layerGroup().addTo(map);
+    let heatmapLayer = null;
+
+    const heatmapUrl = window.reportsMapConfig && window.reportsMapConfig.heatmapUrl;
+
+    async function toggleHeatmap() {
+        if (!heatmapToggle || !heatmapUrl) return;
+
+        if (heatmapToggle.checked) {
+            if (!heatmapLayer) {
+                try {
+                    const response = await fetch(heatmapUrl);
+                    if (!response.ok) throw new Error("Failed to fetch heatmap data");
+                    
+                    const data = await response.json();
+                    heatmapLayer = L.heatLayer(data, {
+                        radius: 20,
+                        blur: 15,
+                        maxZoom: 17,
+                        max: 1.0,
+                    });
+                } catch (error) {
+                    console.error("Error loading heatmap:", error);
+                    heatmapToggle.checked = false;
+                    return;
+                }
+            }
+            heatmapLayer.addTo(map);
+        } else {
+            if (heatmapLayer) {
+                map.removeLayer(heatmapLayer);
+            }
+        }
+    }
+
+    if (heatmapToggle) {
+        heatmapToggle.addEventListener("change", toggleHeatmap);
+    }
 
     function markerClassByStatus(status) {
         if (status === "new") {
