@@ -93,6 +93,13 @@
             params.set("municipality", filterMunicipality.value);
         }
 
+        // Add bounding box parameters from visible map area
+        const bounds = map.getBounds();
+        params.set("minLat", bounds.getSouth().toFixed(6));
+        params.set("maxLat", bounds.getNorth().toFixed(6));
+        params.set("minLng", bounds.getWest().toFixed(6));
+        params.set("maxLng", bounds.getEast().toFixed(6));
+
         return params.toString();
     }
 
@@ -100,35 +107,32 @@
         const query = buildQueryString();
         const url = query ? endpointUrl + "?" + query : endpointUrl;
 
-        const response = await fetch(url, {
-            headers: {
-                "X-Requested-With": "XMLHttpRequest",
-            },
-        });
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+            });
 
-        if (!response.ok) {
-            return;
-        }
+            if (!response.ok) {
+                return;
+            }
 
-        const payload = await response.json();
-        const results = payload.results || [];
+            const payload = await response.json();
+            const results = payload.results || [];
 
-        markersLayer.clearLayers();
+            markersLayer.clearLayers();
 
-        const bounds = [];
-        results.forEach(function (report) {
-            const marker = createMarker(report);
-            marker.addTo(markersLayer);
-            bounds.push([report.lat, report.lng]);
-        });
-
-        if (bounds.length > 0) {
-            map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
-        } else {
-            map.setView([41.9981, 21.4254], 12);
+            results.forEach(function (report) {
+                const marker = createMarker(report);
+                marker.addTo(markersLayer);
+            });
+        } catch (error) {
+            console.error("Error loading reports:", error);
         }
     }
 
+    // Load reports on filter changes
     [filterCategory, filterStatus, filterMunicipality].forEach(function (element) {
         if (!element) {
             return;
@@ -136,5 +140,17 @@
         element.addEventListener("change", loadReports);
     });
 
+    // Load reports on map move events (pan and zoom)
+    // Debounce the load to prevent too many requests during rapid panning/zooming
+    let loadReportsTimeout;
+    function debouncedLoadReports() {
+        clearTimeout(loadReportsTimeout);
+        loadReportsTimeout = setTimeout(loadReports, 300);
+    }
+
+    map.on("moveend", debouncedLoadReports);
+    map.on("zoomend", debouncedLoadReports);
+
+    // Initial load
     loadReports();
 })();

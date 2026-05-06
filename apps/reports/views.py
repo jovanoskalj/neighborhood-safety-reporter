@@ -833,9 +833,10 @@ def map_view(request):
 
 @login_required
 def reports_json(request):
-    """Return reports as JSON for AJAX-based Leaflet map rendering."""
+    """Return reports as JSON for AJAX-based Leaflet map rendering with bounding box filtering."""
     queryset = Report.objects.all().order_by("-created_at")
 
+    # Filter by category, status, municipality
     category = request.GET.get("category", "").strip()
     status = request.GET.get("status", "").strip()
     municipality = request.GET.get("municipality", "").strip()
@@ -846,6 +847,17 @@ def reports_json(request):
         queryset = queryset.filter(status=status)
     if municipality:
         queryset = queryset.filter(municipality=municipality)
+
+    # Filter by bounding box (map bounds)
+    min_lat = _parse_decimal(request.GET.get("minLat"))
+    max_lat = _parse_decimal(request.GET.get("maxLat"))
+    min_lng = _parse_decimal(request.GET.get("minLng"))
+    max_lng = _parse_decimal(request.GET.get("maxLng"))
+
+    if min_lat is not None and max_lat is not None:
+        queryset = queryset.filter(latitude__gte=min_lat, latitude__lte=max_lat)
+    if min_lng is not None and max_lng is not None:
+        queryset = queryset.filter(longitude__gte=min_lng, longitude__lte=max_lng)
 
     status_labels = dict(Report.STATUS_CHOICES)
     category_labels = dict(Report.CATEGORY_CHOICES)
