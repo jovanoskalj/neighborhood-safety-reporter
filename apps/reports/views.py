@@ -1,7 +1,9 @@
 import csv
 import json
+import os
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
+from io import TextIOWrapper
 
 from django.conf import settings
 from django.contrib import messages
@@ -13,11 +15,13 @@ from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed, JsonR
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.utils.text import slugify
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods
 
 from apps.accounts.models import AuditLog, UserProfile
+from apps.accounts.utils import notify_report_classified, notify_report_reassigned
 from apps.ai_classifier.classifier import classify_report
 from apps.notifications.senders import send_status_change_email
 from apps.notifications.services import send_report_created_email, send_report_status_changed_email
@@ -46,6 +50,23 @@ SEARCH_PARAMS = (
     "page",
 )
 
+REPORT_EXPORT_COLUMNS = [
+    "id",
+    "description",
+    "category",
+    "priority",
+    "status",
+    "sector",
+    "location",
+    "latitude",
+    "longitude",
+    "municipality",
+    "citizen",
+    "created_at",
+    "updated_at",
+    "status_changed_at",
+]
+
 
 def _parse_iso_date(value):
     """Return a ``date`` parsed from ISO-8601 input, or ``None`` on failure."""
@@ -61,7 +82,7 @@ def _parse_decimal(value):
         return None
     try:
         return Decimal(value)
-    except InvalidOperation:
+    except (InvalidOperation, TypeError, ValueError):
         return None
 
 
@@ -144,6 +165,8 @@ def home(request):
     )
 
     if not should_filter:
+        if request.user.is_authenticated and request.user.is_superuser:
+            return redirect("/dashboard/")
         return render(request, "reports/home.html")
 
     if not request.user.is_authenticated:
@@ -226,6 +249,7 @@ def _filter_queryset(request, queryset):
     status = (request.GET.get("status") or "").strip().lower()
     sector = (request.GET.get("sector") or "").strip().lower()
     priority = (request.GET.get("priority") or "").strip().lower()
+    municipality = (request.GET.get("municipality") or "").strip().lower()
     keyword = (request.GET.get("keyword") or "").strip()
     location = (request.GET.get("location") or "").strip()
     date_from = (request.GET.get("from") or "").strip()
@@ -239,6 +263,8 @@ def _filter_queryset(request, queryset):
         queryset = queryset.filter(sector=sector)
     if priority:
         queryset = queryset.filter(priority=priority)
+    if municipality:
+        queryset = queryset.filter(municipality=municipality)
     if keyword:
         queryset = queryset.filter(description__icontains=keyword)
     if location:
@@ -261,9 +287,176 @@ def _filter_queryset(request, queryset):
     return queryset
 
 
+def _filtered_admin_reports(request):
+    return _filter_queryset(request, Report.objects.select_related("citizen").order_by("-created_at"))
+
+
+def _format_report_row(report):
+    latitude = str(report.latitude)
+    longitude = str(report.longitude)
+    return [
+        report.id,
+        report.description,
+        report.category,
+        report.priority,
+        report.status,
+        report.sector,
+        f"{latitude},{longitude}",
+        latitude,
+        longitude,
+        report.municipality,
+        report.citizen.username,
+        report.created_at.isoformat(),
+        report.updated_at.isoformat(),
+        report.status_changed_at.isoformat() if report.status_changed_at else "",
+    ]
+
+
+def _clean_import_header(value):
+    return str(value or "").strip().lower().replace(" ", "_")
+
+
+def _parse_import_datetime(value):
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return timezone.make_aware(value) if timezone.is_naive(value) else value
+    if isinstance(value, date):
+        return timezone.make_aware(datetime.combine(value, datetime.min.time()))
+
+    parsed = parse_datetime(str(value).strip())
+    if parsed:
+        return timezone.make_aware(parsed) if timezone.is_naive(parsed) else parsed
+    parsed_date = _parse_iso_date(str(value).strip())
+    if parsed_date:
+        return timezone.make_aware(datetime.combine(parsed_date, datetime.min.time()))
+    return None
+
+
+def _parse_import_location(row):
+    latitude = row.get("latitude") or row.get("lat")
+    longitude = row.get("longitude") or row.get("lng") or row.get("lon")
+    if (not latitude or not longitude) and row.get("location"):
+        pieces = [piece.strip() for piece in str(row["location"]).split(",")]
+        if len(pieces) >= 2:
+            latitude, longitude = pieces[0], pieces[1]
+    return _parse_decimal(latitude), _parse_decimal(longitude)
+
+
+def _read_import_rows(uploaded_file):
+    extension = os.path.splitext(uploaded_file.name)[1].lower()
+    if extension == ".csv":
+        text_file = TextIOWrapper(uploaded_file.file, encoding="utf-8-sig", newline="")
+        return list(csv.DictReader(text_file))
+
+    if extension in {".xlsx", ".xlsm"} and OPENPYXL_AVAILABLE:
+        workbook = openpyxl.load_workbook(uploaded_file, read_only=True, data_only=True)
+        sheet = workbook.active
+        rows = list(sheet.iter_rows(values_only=True))
+        if not rows:
+            return []
+        headers = [_clean_import_header(value) for value in rows[0]]
+        return [
+            {headers[index]: value for index, value in enumerate(row) if index < len(headers)}
+            for row in rows[1:]
+            if any(value not in (None, "") for value in row)
+        ]
+
+    raise ValueError("Поддржани формати се CSV и XLSX.")
+
+
+def _import_reports_from_rows(rows, user):
+    valid_categories = {choice[0] for choice in Report.CATEGORY_CHOICES} | set(
+        ReportCategory.objects.values_list("key", flat=True)
+    )
+    valid_priorities = {choice[0] for choice in Report.PRIORITY_CHOICES}
+    valid_statuses = {choice[0] for choice in Report.STATUS_CHOICES}
+    active_sector_keys = set(Sector.objects.values_list("key", flat=True)) | {choice[0] for choice in Report.SECTOR_CHOICES}
+    valid_municipalities = {choice[0] for choice in MUNICIPALITY_CHOICES}
+
+    inserted = 0
+    skipped_duplicates = []
+    invalid_rows = []
+
+    for index, raw_row in enumerate(rows, start=2):
+        row = {_clean_import_header(key): value for key, value in raw_row.items()}
+        errors = []
+        report_id = str(row.get("id") or "").strip()
+        description = str(row.get("description") or "").strip()
+        category = str(row.get("category") or "").strip().lower()
+        priority = str(row.get("priority") or "").strip().lower()
+        status = str(row.get("status") or "").strip().lower()
+        sector = str(row.get("sector") or "").strip().lower()
+        municipality = str(row.get("municipality") or "").strip().lower()
+        latitude, longitude = _parse_import_location(row)
+
+        report_pk = None
+        if report_id:
+            try:
+                report_pk = int(report_id)
+            except ValueError:
+                errors.append("invalid id")
+
+        if report_pk and Report.objects.filter(pk=report_pk).exists():
+            skipped_duplicates.append(report_id)
+            continue
+        if not description:
+            errors.append("missing description")
+        if category not in valid_categories:
+            errors.append("invalid category")
+        if priority not in valid_priorities:
+            errors.append("invalid priority")
+        if status not in valid_statuses:
+            errors.append("invalid status")
+        if sector not in active_sector_keys:
+            errors.append("invalid sector")
+        if municipality and municipality not in valid_municipalities:
+            errors.append("invalid municipality")
+        if latitude is None or longitude is None:
+            errors.append("invalid location")
+
+        created_at = _parse_import_datetime(row.get("created_at"))
+        updated_at = _parse_import_datetime(row.get("updated_at"))
+        status_changed_at = _parse_import_datetime(row.get("status_changed_at"))
+
+        if errors:
+            invalid_rows.append({"row": index, "reason": ", ".join(errors)})
+            continue
+
+        report = Report(
+            citizen=user,
+            description=description,
+            latitude=latitude,
+            longitude=longitude,
+            category=category,
+            priority=priority,
+            status=status,
+            sector=sector,
+            municipality=municipality,
+            status_changed_at=status_changed_at,
+            ai_processed=True,
+        )
+        if report_pk:
+            report.id = report_pk
+        report.save()
+
+        update_fields = []
+        if created_at:
+            report.created_at = created_at
+            update_fields.append("created_at")
+        if updated_at:
+            report.updated_at = updated_at
+            update_fields.append("updated_at")
+        if update_fields:
+            Report.objects.filter(pk=report.pk).update(**{field: getattr(report, field) for field in update_fields})
+        inserted += 1
+
+    return inserted, skipped_duplicates, invalid_rows
+
+
 def _visible_reports_for_user(request):
     queryset = Report.objects.select_related("citizen").order_by("-created_at")
-    if request.user.is_superuser:
+    if _is_admin_user(request.user):
         return queryset
 
     if _is_officer(request.user):
@@ -383,6 +576,12 @@ def dashboard(request):
     status_counts = list(
         Report.objects.values("status").annotate(total=Count("id")).order_by("status")
     )
+    priority_counts = list(
+        Report.objects.values("priority").annotate(total=Count("id")).order_by("priority")
+    )
+    sector_counts = list(
+        Report.objects.values("sector").annotate(total=Count("id")).order_by("sector")
+    )
 
     missing_profile_users = User.objects.filter(profile__isnull=True)
     for listed_user in missing_profile_users:
@@ -415,6 +614,16 @@ def dashboard(request):
     categories = ReportCategory.objects.order_by("name")
     sectors = Sector.objects.order_by("name")
     logs = AuditLog.objects.select_related("user").order_by("-timestamp")[:20]
+    
+    # Unclassified reports - those with "other" category or "unclassified" status
+    unclassified_reports = Report.objects.filter(
+        Q(category="other") | Q(status="unclassified")
+    ).select_related("citizen").order_by("-created_at")[:50]
+    
+    # For classification form: exclude "Друго" (other) from categories - it's the unclassified marker
+    active_categories_for_classification = list(
+        ReportCategory.objects.filter(is_active=True).exclude(key="other").values_list('key', 'name')
+    )
 
     context = {
         "active_tab": request.GET.get("tab", "users"),
@@ -423,21 +632,32 @@ def dashboard(request):
             "active_users": active_users,
             "resolve_rate": resolve_rate,
             "avg_days": avg_days,
+            "open_reports": Report.objects.exclude(status__in=["resolved", "rejected", "withdrawn"]).count(),
+            "high_priority_reports": Report.objects.filter(priority="high").count(),
+            "unclassified_reports": Report.objects.filter(Q(category="other") | Q(status="unclassified")).count(),
         },
         "category_counts": category_counts,
         "status_counts": status_counts,
+        "priority_counts": priority_counts,
+        "sector_counts": sector_counts,
         "users": users,
         "selected_user_role": role_filter,
         "role_filter_cards": role_filter_cards,
         "categories": categories,
         "sectors": sectors,
         "logs": logs,
+        "unclassified_reports": unclassified_reports,
+        "unclassified_count": Report.objects.filter(Q(category="other") | Q(status="unclassified")).count(),
         "category_form": ReportCategoryForm(),
         "sector_form": SectorForm(),
         "user_form": AdminUserCreateForm(),
         "role_choices": AdminUserCreateForm.ROLE_CHOICES,
-        "sector_choices": Report.SECTOR_CHOICES,
+        "sector_choices": list(Sector.objects.filter(is_active=True).values_list('key', 'name')),
+        "category_choices": active_categories_for_classification,
+        "status_choices": Report.STATUS_CHOICES,
+        "priority_choices": Report.PRIORITY_CHOICES,
         "municipality_choices": MUNICIPALITY_CHOICES,
+        "export_columns": REPORT_EXPORT_COLUMNS,
     }
     return render(request, "reports/admin_dashboard.html", context)
 
@@ -661,6 +881,8 @@ def create_sector(request: HttpRequest) -> HttpResponse:
         name = (payload.get("name") or "").strip()
         if name and not payload.get("key"):
             payload["key"] = _build_unique_key(Sector, name)
+        if "is_active" not in payload:
+            payload["is_active"] = "true"
 
         form = SectorForm(payload)
         if form.is_valid():
@@ -694,7 +916,8 @@ def update_sector(request: HttpRequest, sector_id: int) -> HttpResponse:
                 target_id=sector.id,
                 details={"key": sector.key, "name": sector.name, "is_active": sector.is_active},
             )
-            messages.success(request, "Секторот е успешно ажуриран.")
+            state_label = "видлив" if sector.is_active else "скриен"
+            messages.success(request, f"Секторот „{sector.name}“ сега е {state_label}.")
         else:
             messages.error(request, "Неуспешно ажурирање на секторот.")
     return redirect(f"{reverse('dashboard')}?tab=settings")
@@ -722,40 +945,102 @@ def delete_sector(request: HttpRequest, sector_id: int) -> HttpResponse:
 @login_required
 @_admin_only()
 def export_reports_csv(request: HttpRequest) -> HttpResponse:
-    """Export current reports to CSV from dashboard."""
+    """Export filtered reports to CSV from dashboard."""
+    queryset = _filtered_admin_reports(request)
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = 'attachment; filename="reports_export.csv"'
 
     writer = csv.writer(response)
-    writer.writerow(["id", "citizen", "category", "sector", "status", "priority", "created_at"])
-    for report in Report.objects.select_related("citizen").order_by("-created_at"):
-        writer.writerow(
-            [
-                report.id,
-                report.citizen.username,
-                report.category,
-                report.sector,
-                report.status,
-                report.priority,
-                report.created_at.isoformat(),
-            ]
-        )
+    writer.writerow(REPORT_EXPORT_COLUMNS)
+    for report in queryset:
+        writer.writerow(_format_report_row(report))
 
     _write_audit_log(
         request,
         action="export_reports_csv",
         target_model="Report",
         target_id=None,
-        details={"count": Report.objects.count()},
+        details={"count": queryset.count(), "filters": request.GET.dict()},
     )
     return response
 
 
 @login_required
 @_admin_only()
-def import_reports_stub(request: HttpRequest) -> HttpResponse:
-    """Temporary import action endpoint for dashboard UI button."""
-    messages.info(request, "Import функцијата е подготвена во UI и ќе биде поврзана со обработка на датотеки во следен task.")
+def export_reports_excel(request: HttpRequest) -> HttpResponse:
+    """Export filtered reports to XLSX from dashboard."""
+    if not OPENPYXL_AVAILABLE:
+        messages.error(request, "Excel извозот бара openpyxl. Користете CSV извоз.")
+        return redirect(f"{reverse('dashboard')}?tab=analytics")
+
+    queryset = _filtered_admin_reports(request)
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "Reports"
+    sheet.append(REPORT_EXPORT_COLUMNS)
+    for report in queryset:
+        sheet.append(_format_report_row(report))
+
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = 'attachment; filename="reports_export.xlsx"'
+    workbook.save(response)
+
+    _write_audit_log(
+        request,
+        action="export_reports_excel",
+        target_model="Report",
+        target_id=None,
+        details={"count": queryset.count(), "filters": request.GET.dict()},
+    )
+    return response
+
+
+@login_required
+@_admin_only()
+def import_reports(request: HttpRequest) -> HttpResponse:
+    """Validate and import CSV/XLSX rows from dashboard."""
+    if request.method != "POST":
+        return redirect(f"{reverse('dashboard')}?tab=analytics")
+
+    uploaded_file = request.FILES.get("file")
+    if not uploaded_file:
+        messages.error(request, "Изберете CSV или XLSX датотека за импорт.")
+        return redirect(f"{reverse('dashboard')}?tab=analytics")
+
+    try:
+        rows = _read_import_rows(uploaded_file)
+        inserted, skipped_duplicates, invalid_rows = _import_reports_from_rows(rows, request.user)
+    except ValueError as exc:
+        messages.error(request, str(exc))
+        return redirect(f"{reverse('dashboard')}?tab=analytics")
+
+    if inserted:
+        messages.success(request, f"Импортирани се {inserted} валидни пријави.")
+    if skipped_duplicates:
+        preview = ", ".join(skipped_duplicates[:8])
+        extra = "..." if len(skipped_duplicates) > 8 else ""
+        messages.warning(request, f"Прескокнати дупликат ID: {preview}{extra}")
+    if invalid_rows:
+        preview = "; ".join(f"ред {item['row']}: {item['reason']}" for item in invalid_rows[:8])
+        extra = " ..." if len(invalid_rows) > 8 else ""
+        messages.error(request, f"Невалидни редови: {preview}{extra}")
+    if not inserted and not skipped_duplicates and not invalid_rows:
+        messages.info(request, "Датотеката не содржи редови за импорт.")
+
+    _write_audit_log(
+        request,
+        action="import_reports",
+        target_model="Report",
+        target_id=None,
+        details={
+            "inserted": inserted,
+            "duplicates": len(skipped_duplicates),
+            "invalid": len(invalid_rows),
+            "filename": uploaded_file.name,
+        },
+    )
     return redirect(f"{reverse('dashboard')}?tab=analytics")
 
 
@@ -1129,6 +1414,123 @@ def update_report_status(request, report_id: int):
     return JsonResponse(payload)
 
 
+@login_required
+@require_http_methods(["POST"])
+def reassign_report_sector(request, report_id: int):
+    """Allow an officer to send a wrongly assigned report to another sector."""
+    if not _is_officer(request.user):
+        return JsonResponse({"detail": "Only officers can reassign reports."}, status=403)
+
+    report = get_object_or_404(Report, pk=report_id)
+    profile = UserProfile.objects.filter(user=request.user).first()
+    if not profile or not profile.sector or profile.sector != report.sector:
+        return JsonResponse({"detail": "You can only reassign reports from your own sector."}, status=403)
+    if profile.municipality and profile.municipality != report.municipality:
+        return JsonResponse({"detail": "You can only reassign reports from your assigned municipality."}, status=403)
+
+    new_sector = (request.POST.get("sector") or "").strip()
+    valid_sectors = set(Sector.objects.filter(is_active=True).values_list("key", flat=True)) | {
+        value for value, _ in Report.SECTOR_CHOICES
+    }
+    if not new_sector or new_sector not in valid_sectors:
+        return JsonResponse({"errors": {"sector": ["Invalid sector."]}}, status=400)
+    if new_sector == report.sector:
+        return JsonResponse({"errors": {"sector": ["Choose a different sector."]}}, status=400)
+
+    old_sector = report.sector
+    report.sector = new_sector
+    report.assigned_officer = None
+    report.save(update_fields=["sector", "assigned_officer", "updated_at"])
+
+    _write_audit_log(
+        request,
+        action="reassign_report_sector",
+        target_model="Report",
+        target_id=report.id,
+        details={"old_sector": old_sector, "new_sector": new_sector},
+    )
+    notify_report_reassigned(report, old_sector, reassigned_by=request.user)
+
+    return JsonResponse(
+        {
+            "id": report.id,
+            "old_sector": old_sector,
+            "new_sector": report.sector,
+            "detail": "Report reassigned.",
+        }
+    )
+
+
+@login_required
+@_admin_only()
+@require_http_methods(["POST"])
+def classify_report(request, report_id: int):
+    """Admin endpoint to classify unclassified reports."""
+    report = get_object_or_404(Report, pk=report_id)
+    
+    category = (request.POST.get("category") or "").strip()
+    priority = (request.POST.get("priority") or "").strip()
+    sector = (request.POST.get("sector") or "").strip()
+    
+    valid_categories = {value for value, _ in Report.CATEGORY_CHOICES}
+    valid_priorities = {value for value, _ in Report.PRIORITY_CHOICES}
+    valid_sectors = {value for value, _ in Report.SECTOR_CHOICES}
+    
+    errors = {}
+    if category and category not in valid_categories:
+        errors["category"] = "Invalid category"
+    if priority and priority not in valid_priorities:
+        errors["priority"] = "Invalid priority"
+    if sector and sector not in valid_sectors:
+        errors["sector"] = "Invalid sector"
+    
+    if errors:
+        return JsonResponse({"errors": errors}, status=400)
+    
+    update_fields = []
+    old_category = report.category
+    old_priority = report.priority
+    old_sector = report.sector
+    
+    if category and category != "other":
+        report.category = category
+        update_fields.append("category")
+    
+    if priority:
+        report.priority = priority
+        update_fields.append("priority")
+    
+    if sector:
+        report.sector = sector
+        update_fields.append("sector")
+    
+    # If classified (no longer "other"), update status if needed
+    if category and category != "other" and report.status == "unclassified":
+        report.status = "new"
+        update_fields.append("status")
+    
+    if update_fields:
+        report.save(update_fields=update_fields)
+        _write_audit_log(
+            request,
+            action="classify_report",
+            target_model="Report",
+            target_id=report.id,
+            details={
+                "old_category": old_category,
+                "new_category": report.category,
+                "old_priority": old_priority,
+                "new_priority": report.priority,
+                "old_sector": old_sector,
+                "new_sector": report.sector,
+            },
+        )
+        notify_report_classified(report, classified_by=request.user)
+        messages.success(request, "Извештајот е успешно класифициран.")
+    
+    return redirect(f"{reverse('dashboard')}?tab=unclassified")
+
+
 def user_is_officer(user):
     return _is_officer(user)
 
@@ -1141,10 +1543,11 @@ def get_user_sector(user):
 @login_required
 def map_view(request):
     """Render interactive map page with report filters."""
+    active_sector_choices = list(Sector.objects.filter(is_active=True).values_list('key', 'name'))
     context = {
         "category_choices": Report.CATEGORY_CHOICES,
         "status_choices": Report.STATUS_CHOICES,
-        "sector_choices": Report.SECTOR_CHOICES,
+        "sector_choices": active_sector_choices,
         "priority_choices": Report.PRIORITY_CHOICES,
     }
     return render(request, "reports/map.html", context)
@@ -1153,21 +1556,12 @@ def map_view(request):
 @login_required
 def reports_json(request):
     """Return reports as JSON for AJAX-based Leaflet map rendering."""
-    queryset = _visible_reports_for_user(request).order_by("-created_at")
-
-    category = request.GET.get("category", "").strip()
-    status = request.GET.get("status", "").strip()
-    municipality = request.GET.get("municipality", "").strip()
-
-    if category:
-        queryset = queryset.filter(category=category)
-    if status:
-        queryset = queryset.filter(status=status)
-    if municipality:
-        queryset = queryset.filter(municipality=municipality)
+    queryset = _filter_queryset(request, _visible_reports_for_user(request).order_by("-created_at"))
 
     status_labels = dict(Report.STATUS_CHOICES)
     category_labels = dict(Report.CATEGORY_CHOICES)
+    priority_labels = dict(Report.PRIORITY_CHOICES)
+    sector_labels = dict(Report.SECTOR_CHOICES)
 
     data = [
         {
@@ -1177,9 +1571,15 @@ def reports_json(request):
             "status_label": status_labels.get(report.status, report.status),
             "category": report.category,
             "category_label": category_labels.get(report.category, report.category),
+            "priority": report.priority,
+            "priority_label": priority_labels.get(report.priority, report.priority),
+            "sector": report.sector,
+            "sector_label": sector_labels.get(report.sector, report.sector),
             "municipality": report.municipality or "",
             "lat": float(report.latitude),
             "lng": float(report.longitude),
+            "created_at": report.created_at.isoformat(),
+            "detail_url": reverse("report_detail", args=[report.id]),
         }
         for report in queryset
     ]
@@ -1223,6 +1623,11 @@ def officer_panel(request):
     if priority_filter:
         reports = reports.filter(priority=priority_filter)
 
+    active_sector_choices = list(Sector.objects.filter(is_active=True).values_list("key", "name"))
+    destination_sector_choices = [
+        (key, name) for key, name in active_sector_choices if key != sector
+    ]
+
     return render(
         request,
         "reports/officer_panel.html",
@@ -1232,6 +1637,10 @@ def officer_panel(request):
             "municipality": profile.municipality if profile else "",
             "status_choices": Report.STATUS_CHOICES,
             "priority_choices": Report.PRIORITY_CHOICES,
+            "category_choices": Report.CATEGORY_CHOICES,
+            "sector_choices": active_sector_choices,
+            "destination_sector_choices": destination_sector_choices,
+            "municipality_choices": MUNICIPALITY_CHOICES,
         },
     )
 
@@ -1252,8 +1661,19 @@ def search_page(request):
     except (PageNotAnInteger, EmptyPage):
         page_obj = paginator.page(1)
 
+    active_sector_choices = list(Sector.objects.filter(is_active=True).values_list('key', 'name'))
+    active_category_choices = list(ReportCategory.objects.filter(is_active=True).values_list('key', 'name'))
+    
     return render(
         request,
         "reports/search_results.html",
-        {"reports_page": page_obj, "query": request.GET},
+        {
+            "reports_page": page_obj,
+            "query": request.GET,
+            "status_choices": Report.STATUS_CHOICES,
+            "priority_choices": Report.PRIORITY_CHOICES,
+            "sector_choices": active_sector_choices,
+            "category_choices": active_category_choices,
+            "municipalities": MUNICIPALITY_CHOICES,
+        },
     )

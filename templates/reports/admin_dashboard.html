@@ -5,11 +5,16 @@
 {% block content %}
 <style>
   .admin-dashboard-wrap {
+    font-family: "Poppins", "Inter", "Segoe UI", Arial, sans-serif;
     max-width: 1280px;
     padding-top: 2rem !important;
   }
-  body:has(.admin-dashboard-wrap) .app-navbar .navbar-nav.me-auto {
-    display: none !important;
+  .admin-dashboard-wrap input,
+  .admin-dashboard-wrap select,
+  .admin-dashboard-wrap textarea,
+  .admin-dashboard-wrap button,
+  .admin-dashboard-wrap table {
+    font-family: inherit;
   }
   .admin-page-header {
     display: flex;
@@ -81,53 +86,597 @@
   <nav class="nav admin-tabs mb-4">
     <a class="nav-link {% if active_tab == 'analytics' %}active{% endif %}" href="?tab=analytics">Аналитика</a>
     <a class="nav-link {% if active_tab == 'users' %}active{% endif %}" href="?tab=users">Корисници</a>
+    <a class="nav-link {% if active_tab == 'unclassified' %}active{% endif %}" href="?tab=unclassified">
+      <span>Некласифицирано</span>
+      {% if unclassified_count %}<span class="badge bg-danger ms-1">{{ unclassified_count }}</span>{% endif %}
+    </a>
     <a class="nav-link {% if active_tab == 'settings' %}active{% endif %}" href="?tab=settings">Подесувања</a>
+    <a class="nav-link" href="{% url 'notifications_bulk_notify' %}">Масовно известување</a>
     <a class="nav-link {% if active_tab == 'log' %}active{% endif %}" href="?tab=log">Системски лог</a>
   </nav>
 
   {% if active_tab == 'analytics' %}
-  <div class="row g-3">
-    <div class="col-12">
-      <label for="periodSelect" class="form-label">Период</label>
-      <select id="periodSelect" class="form-select" style="max-width: 240px;">
-        <option value="weekly">weekly</option>
-        <option value="monthly" selected>monthly</option>
-        <option value="yearly">yearly</option>
-      </select>
-    </div>
-    <div class="col-12 col-lg-6">
-      <div class="card border-0 shadow-sm p-3">
-        <canvas id="timeSeriesChart"></canvas>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <style>
+    .analytics-page {
+      --an-bg: #f6f7f8;
+      --an-surface: #ffffff;
+      --an-border: #e2e5e9;
+      --an-text: #171a1f;
+      --an-muted: #68707c;
+      --an-blue: #2563eb;
+      --an-green: #16803c;
+      --an-amber: #b7791f;
+      --an-red: #c2410c;
+      background: var(--an-bg);
+      border: 1px solid var(--an-border);
+      border-radius: 14px;
+      padding: 18px;
+    }
+    .analytics-head { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 14px; }
+    .analytics-head h2 { font-size: 20px; font-weight: 700; color: var(--an-text); margin: 0; }
+    .analytics-head p { color: var(--an-muted); font-size: 13px; margin: 3px 0 0; }
+    .analytics-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .analytics-actions .btn { border-radius: 8px; font-size: 13px; font-weight: 600; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .kpi-card { background: var(--an-surface); border: 1px solid var(--an-border); border-radius: 8px; padding: 14px; }
+    .kpi-label { font-size: 11px; text-transform: uppercase; color: var(--an-muted); font-weight: 700; letter-spacing: .04em; }
+    .kpi-value { font-size: 28px; line-height: 1.1; font-weight: 700; color: var(--an-text); margin-top: 6px; }
+    .kpi-value.small { font-size: 24px; }
+    .analytics-filter-panel {
+      background: var(--an-surface); border: 1px solid var(--an-border); border-radius: 10px;
+      padding: 12px; margin-bottom: 14px;
+    }
+    .analytics-filter-panel label { color: var(--an-muted); font-size: 12px; font-weight: 700; }
+    .analytics-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(320px, .9fr); gap: 14px; align-items: start; }
+    .analytics-panel { background: var(--an-surface); border: 1px solid var(--an-border); border-radius: 10px; padding: 14px; min-width: 0; }
+    .analytics-panel h3 { font-size: 15px; color: var(--an-text); font-weight: 700; margin: 0 0 10px; }
+    .chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .chart-frame { height: 250px; }
+    .chart-frame.large { height: 310px; }
+    .chart-frame canvas { width: 100% !important; height: 100% !important; }
+    .chart-card {
+      border: 1px solid var(--an-border);
+      border-radius: 10px;
+      padding: 10px;
+      background: #fbfcfd;
+    }
+    .chart-card-title {
+      font-size: 12px;
+      color: var(--an-muted);
+      font-weight: 700;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .analytics-list { display: grid; gap: 8px; margin-top: 12px; }
+    .analytics-row {
+      display: flex; justify-content: space-between; gap: 12px; align-items: center;
+      border: 1px solid var(--an-border); border-radius: 8px; padding: 9px 10px;
+      background: #fbfcfd; font-size: 13px;
+    }
+    .analytics-row span:first-child { color: var(--an-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .analytics-row strong { color: var(--an-text); font-weight: 700; }
+    #analyticsReportsMap { height: 460px; border-radius: 8px; border: 1px solid var(--an-border); overflow: hidden; }
+    .import-panel { margin-top: 14px; }
+    .import-panel code { color: var(--an-text); }
+    .import-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+      border: 1px solid var(--an-border);
+      border-radius: 12px;
+      padding: 14px;
+      background: #fbfcfd;
+    }
+    .import-copy {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      min-width: 0;
+    }
+    .import-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #1a2238;
+      background: #eef2ff;
+      border: 1px solid #c7d2fe;
+      flex: 0 0 auto;
+    }
+    .import-title { font-size: 14px; font-weight: 700; color: var(--an-text); margin: 0; }
+    .import-help { font-size: 12.5px; color: var(--an-muted); margin: 3px 0 0; line-height: 1.45; }
+    .import-controls {
+      display: grid;
+      grid-template-columns: minmax(220px, 320px) auto;
+      gap: 8px;
+      align-items: center;
+    }
+    .import-file-label {
+      min-height: 38px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      border: 1px solid var(--an-border);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--an-text);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 8px 12px;
+    }
+    .import-file-label:hover { border-color: #9ca3af; }
+    .import-file-name {
+      grid-column: 1 / -1;
+      font-size: 12px;
+      color: var(--an-muted);
+      min-height: 18px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .import-submit {
+      border: 0;
+      border-radius: 8px;
+      min-height: 38px;
+      padding: 8px 13px;
+      font-size: 13px;
+      font-weight: 700;
+      background: #1a2238;
+      color: #fff;
+    }
+    .import-submit:hover { opacity: .9; color: #fff; }
+    .visually-hidden-file {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    @media (max-width: 1100px) {
+      .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .analytics-grid, .chart-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 620px) {
+      .analytics-page { padding: 12px; }
+      .kpi-grid { grid-template-columns: 1fr; }
+      .analytics-actions .btn { width: 100%; }
+      .import-card, .import-controls { grid-template-columns: 1fr; }
+    }
+    @media print {
+      body { background: #fff !important; }
+      .app-navbar, .app-footer, .admin-tabs, .analytics-actions, .analytics-filter-panel, .import-panel { display: none !important; }
+      .admin-dashboard-wrap { max-width: none !important; padding: 0 !important; }
+      .analytics-page, .analytics-panel, .kpi-card { box-shadow: none !important; break-inside: avoid; }
+      .analytics-grid, .chart-grid, .kpi-grid { grid-template-columns: 1fr 1fr !important; }
+      #analyticsReportsMap { height: 320px !important; }
+    }
+  </style>
+
+  <div class="analytics-page" id="analyticsReport">
+    <div class="analytics-head">
+      <div>
+        <h2>Аналитика на пријави</h2>
+        <p>Метриките и визуелизациите се освежуваат при отворање и при промена на филтрите.</p>
+      </div>
+      <div class="analytics-actions">
+        <a id="exportCsvBtn" class="btn btn-outline-dark btn-sm" href="{% url 'export_reports_csv' %}">
+          <i class="bi bi-filetype-csv me-1"></i>Извези CSV
+        </a>
+        <button id="exportPdfBtn" class="btn btn-dark btn-sm" type="button">
+          <i class="bi bi-file-earmark-pdf me-1"></i>Извези PDF извештај
+        </button>
       </div>
     </div>
-    <div class="col-12 col-lg-3">
-      <div class="card border-0 shadow-sm p-3">
-        <canvas id="categoryChart"></canvas>
+
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">Вкупно пријави</div><div class="kpi-value" id="kpiTotalReports">{{ stats.total_reports }}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Отворени</div><div class="kpi-value" id="kpiOpenReports">{{ stats.open_reports }}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Висок приоритет</div><div class="kpi-value" id="kpiHighPriority">{{ stats.high_priority_reports }}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Некласифицирани</div><div class="kpi-value" id="kpiUnclassified">{{ stats.unclassified_reports }}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Активни корисници</div><div class="kpi-value" id="kpiActiveUsers">{{ stats.active_users }}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Решеност</div><div class="kpi-value"><span id="kpiResolveRate">{{ stats.resolve_rate }}</span>%</div></div>
+      <div class="kpi-card"><div class="kpi-label">Просечно време</div><div class="kpi-value small"><span id="kpiAvgDays">{{ stats.avg_days }}</span> дена</div></div>
+    </div>
+
+    <form id="analyticsFilters" class="analytics-filter-panel">
+      <div class="row g-2 align-items-end">
+        <div class="col-12 col-md-3 col-lg-2">
+          <label class="form-label" for="filterFrom">Од датум</label>
+          <input id="filterFrom" class="form-control form-control-sm" type="date" name="from">
+        </div>
+        <div class="col-12 col-md-3 col-lg-2">
+          <label class="form-label" for="filterTo">До датум</label>
+          <input id="filterTo" class="form-control form-control-sm" type="date" name="to">
+        </div>
+        <div class="col-12 col-md-3 col-lg-2">
+          <label class="form-label" for="filterCategory">Категорија</label>
+          <select id="filterCategory" class="form-select form-select-sm" name="category">
+            <option value="">Сите</option>
+            {% for value,label in category_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-3 col-lg-2">
+          <label class="form-label" for="filterStatus">Статус</label>
+          <select id="filterStatus" class="form-select form-select-sm" name="status">
+            <option value="">Сите</option>
+            {% for value,label in status_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-3 col-lg-2">
+          <label class="form-label" for="filterSector">Сектор</label>
+          <select id="filterSector" class="form-select form-select-sm" name="sector">
+            <option value="">Сите</option>
+            {% for value,label in sector_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-3 col-lg-2">
+          <label class="form-label" for="filterPriority">Приоритет</label>
+          <select id="filterPriority" class="form-select form-select-sm" name="priority">
+            <option value="">Сите</option>
+            {% for value,label in priority_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-3 col-lg-2">
+          <label class="form-label" for="filterMunicipality">Општина</label>
+          <select id="filterMunicipality" class="form-select form-select-sm" name="municipality">
+            <option value="">Сите</option>
+            {% for value,label in municipality_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-3 col-lg-2">
+          <label class="form-label" for="periodSelect">Период</label>
+          <select id="periodSelect" class="form-select form-select-sm">
+            <option value="weekly">Неделно</option>
+            <option value="monthly" selected>Месечно</option>
+            <option value="yearly">Годишно</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-3 col-lg-2">
+          <label class="form-label" for="mapGroup">Групирај мапа</label>
+          <select id="mapGroup" class="form-select form-select-sm">
+            <option value="status">Статус</option>
+            <option value="category">Категорија</option>
+            <option value="sector">Сектор</option>
+            <option value="priority">Приоритет</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-6 col-lg-2 d-flex gap-2">
+          <button class="btn btn-dark btn-sm flex-fill" type="submit">Филтрирај</button>
+          <button id="clearAnalyticsFilters" class="btn btn-outline-secondary btn-sm" type="button">Исчисти</button>
+        </div>
+      </div>
+    </form>
+
+    <div class="analytics-grid">
+      <div class="analytics-panel">
+        <h3>Трендови и распределба</h3>
+        <div class="chart-frame large mb-3"><canvas id="timeSeriesChart"></canvas></div>
+        <div class="chart-grid">
+          <div class="chart-card">
+            <div class="chart-card-title">Категории</div>
+            <div class="chart-frame"><canvas id="categoryChart"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-title">Статуси</div>
+            <div class="chart-frame"><canvas id="statusChart"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-title">Приоритети</div>
+            <div class="chart-frame"><canvas id="priorityChart"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-title">Сектори</div>
+            <div class="chart-frame"><canvas id="sectorChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+      <div class="analytics-panel">
+        <h3>Мапа на проблеми</h3>
+        <div id="analyticsReportsMap"></div>
+        <div class="analytics-list" id="municipalitySummary"></div>
       </div>
     </div>
-    <div class="col-12 col-lg-3">
-      <div class="card border-0 shadow-sm p-3">
-        <canvas id="statusChart"></canvas>
-      </div>
+
+    <div class="analytics-panel import-panel">
+      <h3>Импорт на податоци</h3>
+      <form method="post" action="{% url 'import_reports' %}" enctype="multipart/form-data" class="import-card">
+        {% csrf_token %}
+        <div class="import-copy">
+          <div class="import-icon"><i class="bi bi-cloud-arrow-up"></i></div>
+          <div>
+            <p class="import-title">Додади пријави од датотека</p>
+            <p class="import-help">Поддржани формати: CSV, XLSX и XLSM. Дупликат ID се прескокнуваат автоматски.</p>
+            <p class="import-help">Потребни колони: <code>{{ export_columns|join:", " }}</code></p>
+          </div>
+        </div>
+        <div class="import-controls">
+          <input id="importFile" class="visually-hidden-file" type="file" name="file" accept=".csv,.xlsx,.xlsm" required>
+          <label class="import-file-label" for="importFile"><i class="bi bi-paperclip"></i>Избери датотека</label>
+          <button class="import-submit" type="submit"><i class="bi bi-upload me-1"></i>Импортирај</button>
+          <div id="importFileName" class="import-file-name">Нема избрана датотека</div>
+        </div>
+      </form>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script>
     (function () {
-      const endpoint = "/api/analytics/stats/";
-      async function load(period) {
+      const analyticsEndpoint = "/api/analytics/stats/";
+      const kpiEndpoint = "/api/analytics/kpi/";
+      const mapEndpoint = "{% url 'reports_json' %}";
+      const filters = document.getElementById('analyticsFilters');
+      const periodSelect = document.getElementById('periodSelect');
+      const groupSelect = document.getElementById('mapGroup');
+      const exportCsvBtn = document.getElementById('exportCsvBtn');
+      const exportPdfBtn = document.getElementById('exportPdfBtn');
+      const importFile = document.getElementById('importFile');
+      const importFileName = document.getElementById('importFileName');
+      const municipalitySummary = document.getElementById('municipalitySummary');
+      const kpiElements = {
+        totalReports: document.getElementById('kpiTotalReports'),
+        openReports: document.getElementById('kpiOpenReports'),
+        highPriority: document.getElementById('kpiHighPriority'),
+        unclassified: document.getElementById('kpiUnclassified'),
+        activeUsers: document.getElementById('kpiActiveUsers'),
+        resolveRate: document.getElementById('kpiResolveRate'),
+        avgDays: document.getElementById('kpiAvgDays')
+      };
+      const charts = {};
+      const chartPalette = ['#2563eb', '#16a34a', '#f59e0b', '#dc2626', '#7c3aed', '#0891b2', '#db2777', '#4f46e5'];
+      const statusPalette = {
+        new: '#2563eb',
+        in_progress: '#f59e0b',
+        resolved: '#16a34a',
+        rejected: '#dc2626',
+        withdrawn: '#6b7280',
+        unclassified: '#7c3aed',
+      };
+      const priorityPalette = {
+        low: '#0891b2',
+        medium: '#2563eb',
+        normal: '#2563eb',
+        high: '#f59e0b',
+        urgent: '#dc2626',
+      };
+      const sectorPalette = {
+        admin: '#7c3aed',
+        health: '#16a34a',
+        infrastructure: '#f59e0b',
+        safety: '#dc2626',
+        utilities: '#0891b2',
+      };
+      const labelMaps = {
+        category: Object.fromEntries([{% for value,label in category_choices %}["{{ value|escapejs }}", "{{ label|escapejs }}"]{% if not forloop.last %},{% endif %}{% endfor %}]),
+        status: Object.fromEntries([{% for value,label in status_choices %}["{{ value|escapejs }}", "{{ label|escapejs }}"]{% if not forloop.last %},{% endif %}{% endfor %}]),
+        priority: Object.fromEntries([{% for value,label in priority_choices %}["{{ value|escapejs }}", "{{ label|escapejs }}"]{% if not forloop.last %},{% endif %}{% endfor %}]),
+        sector: Object.fromEntries([{% for value,label in sector_choices %}["{{ value|escapejs }}", "{{ label|escapejs }}"]{% if not forloop.last %},{% endif %}{% endfor %}]),
+        municipality: Object.fromEntries([{% for value,label in municipality_choices %}["{{ value|escapejs }}", "{{ label|escapejs }}"]{% if not forloop.last %},{% endif %}{% endfor %}])
+      };
+
+      function currentParams() {
+        const params = new URLSearchParams(new FormData(filters));
+        [...params.entries()].forEach(([key, value]) => { if (!value) params.delete(key); });
+        return params;
+      }
+
+      function setExportLinks(params) {
+        const query = params.toString();
+        exportCsvBtn.href = "{% url 'export_reports_csv' %}" + (query ? `?${query}` : "");
+      }
+
+      function localLabel(type, value) {
+        return labelMaps[type][value] || value || '-';
+      }
+
+      function hexToRgba(hex, alpha) {
+        const clean = String(hex || '#2563eb').replace('#', '');
+        const full = clean.length === 3 ? clean.split('').map((char) => char + char).join('') : clean;
+        const value = parseInt(full, 16);
+        const red = (value >> 16) & 255;
+        const green = (value >> 8) & 255;
+        const blue = value & 255;
+        return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+      }
+
+      function colorsFor(type, rawLabels) {
+        return rawLabels.map((label, index) => {
+          if (type === 'status') return statusPalette[label] || chartPalette[index % chartPalette.length];
+          if (type === 'priority') return priorityPalette[label] || chartPalette[index % chartPalette.length];
+          if (type === 'sector') return sectorPalette[label] || chartPalette[index % chartPalette.length];
+          return chartPalette[index % chartPalette.length];
+        });
+      }
+
+      function makeChart(id, type, labels, values, label, colors) {
+        if (charts[id]) charts[id].destroy();
+        const isCircular = type === 'doughnut' || type === 'pie';
+        const chartColors = Array.isArray(colors) ? colors : [colors || '#2563eb'];
+        charts[id] = new Chart(document.getElementById(id), {
+          type,
+          data: {
+            labels,
+            datasets: [{
+              label,
+              data: values,
+              borderColor: isCircular ? chartColors : chartColors.map((color) => hexToRgba(color, .95)),
+              backgroundColor: chartColors.map((color) => hexToRgba(color, isCircular ? .68 : .52)),
+              borderWidth: isCircular ? 2 : 1,
+              tension: .35
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: isCircular, position: 'bottom', labels: { boxWidth: 14, padding: 12 } } },
+            scales: isCircular ? {} : {
+              x: { ticks: { color: '#5f6671', maxRotation: 28, minRotation: 0 }, grid: { display: false } },
+              y: { beginAtZero: true, ticks: { precision: 0, color: '#5f6671' }, grid: { color: 'rgba(15, 23, 42, .08)' } }
+            }
+          }
+        });
+      }
+
+      async function loadKpiMetrics() {
         try {
-          const resp = await fetch(`${endpoint}?period=${period}`);
+          const params = currentParams();
+          const resp = await fetch(`${kpiEndpoint}?${params.toString()}`);
+          if (!resp.ok) throw new Error('KPI response not ok');
+          const data = await resp.json();
+          kpiElements.totalReports.textContent = data.total_reports;
+          kpiElements.openReports.textContent = data.open_reports;
+          kpiElements.highPriority.textContent = data.high_priority_reports;
+          kpiElements.unclassified.textContent = data.unclassified_reports;
+          kpiElements.activeUsers.textContent = data.active_users;
+          kpiElements.resolveRate.textContent = data.resolve_rate;
+          kpiElements.avgDays.textContent = data.avg_days;
+        } catch (err) {
+          console.error('KPI fetch failed:', err);
+        }
+      }
+
+      async function loadCharts() {
+        try {
+          const params = currentParams();
+          params.set('period', periodSelect.value);
+          const resp = await fetch(`${analyticsEndpoint}?${params.toString()}`);
           if (!resp.ok) throw new Error('bad response');
-          await resp.json();
+          const data = await resp.json();
+          const periodLabels = data.by_period.data.map((row) => row.period ? row.period.slice(0, 10) : '-');
+          const categoryRaw = data.by_category.map((row) => row.label);
+          const statusRaw = data.by_status.map((row) => row.label);
+          const priorityRaw = data.by_priority.map((row) => row.label);
+          const sectorRaw = data.by_sector.map((row) => row.label);
+          makeChart('timeSeriesChart', 'line', periodLabels, data.by_period.data.map((row) => row.count), 'Пријави', ['#2563eb']);
+          makeChart('categoryChart', 'bar', categoryRaw.map((label) => localLabel('category', label)), data.by_category.map((row) => row.count), 'Категории', colorsFor('category', categoryRaw));
+          makeChart('statusChart', 'doughnut', statusRaw.map((label) => localLabel('status', label)), data.by_status.map((row) => row.count), 'Статуси', colorsFor('status', statusRaw));
+          makeChart('priorityChart', 'bar', priorityRaw.map((label) => localLabel('priority', label)), data.by_priority.map((row) => row.count), 'Приоритети', colorsFor('priority', priorityRaw));
+          makeChart('sectorChart', 'bar', sectorRaw.map((label) => localLabel('sector', label)), data.by_sector.map((row) => row.count), 'Сектори', colorsFor('sector', sectorRaw));
+          renderMunicipalitySummary(data.by_municipality);
         } catch (err) {
           console.error('Analytics fetch failed:', err);
         }
       }
-      const select = document.getElementById('periodSelect');
-      if (select) {
-        select.addEventListener('change', (e) => load(e.target.value));
-        load(select.value);
+
+      function renderMunicipalitySummary(rows) {
+        if (!municipalitySummary) return;
+        const topRows = [...(rows || [])].sort((a, b) => b.count - a.count).slice(0, 6);
+        if (!topRows.length) {
+          municipalitySummary.innerHTML = '<div class="analytics-row"><span>Нема податоци за општини</span><strong>0</strong></div>';
+          return;
+        }
+        municipalitySummary.innerHTML = topRows.map((row) => `
+          <div class="analytics-row">
+            <span>${escapeHtml(localLabel('municipality', row.label))}</span>
+            <strong>${row.count}</strong>
+          </div>
+        `).join('');
+      }
+
+      function exportPdfReport() {
+        Object.values(charts).forEach((chart) => chart.resize());
+        setTimeout(() => window.print(), 120);
+      }
+
+      const map = L.map("analyticsReportsMap").setView([41.9981, 21.4254], 12);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap contributors"
+      }).addTo(map);
+      const markersLayer = L.layerGroup().addTo(map);
+      const palette = ['#2563eb', '#16803c', '#c2410c', '#7c3aed', '#0f766e', '#b7791f', '#be123c'];
+
+      function colorFor(value) {
+        let hash = 0;
+        String(value || '').split('').forEach((char) => { hash = ((hash << 5) - hash) + char.charCodeAt(0); });
+        return palette[Math.abs(hash) % palette.length];
+      }
+
+      function escapeHtml(value) {
+        return String(value || '').replace(/[&<>"']/g, (char) => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#039;'
+        }[char]));
+      }
+
+      async function loadMap() {
+        const params = currentParams();
+        setExportLinks(params);
+        const response = await fetch(mapEndpoint + (params.toString() ? `?${params}` : ""));
+        if (!response.ok) return;
+        const payload = await response.json();
+        const reports = payload.results || [];
+        const group = groupSelect.value;
+        markersLayer.clearLayers();
+        const bounds = [];
+        reports.forEach((report) => {
+          const groupValue = report[group + '_label'] || report[group] || '-';
+          const marker = L.circleMarker([report.lat, report.lng], {
+            radius: 7,
+            color: colorFor(groupValue),
+            fillColor: colorFor(groupValue),
+            fillOpacity: .88,
+            weight: 2
+          }).addTo(markersLayer);
+          marker.bindPopup(`
+            <div style="min-width:220px;">
+              <strong>ПРЈ-${report.id}</strong>
+              <div class="small text-muted my-1">${escapeHtml(groupValue)}</div>
+              <div class="small mb-2">${escapeHtml(String(report.description || '').slice(0, 140))}</div>
+              <a class="btn btn-sm btn-primary" href="${escapeHtml(report.detail_url)}">Отвори</a>
+            </div>
+          `);
+          bounds.push([report.lat, report.lng]);
+        });
+        if (bounds.length) map.fitBounds(bounds, { padding: [28, 28], maxZoom: 15 });
+      }
+
+      filters.addEventListener('submit', (event) => {
+        event.preventDefault();
+        loadMap();
+        loadCharts();
+        loadKpiMetrics();
+      });
+      filters.querySelectorAll('select,input').forEach((field) => field.addEventListener('change', () => {
+        loadMap();
+        loadCharts();
+        loadKpiMetrics();
+      }));
+      groupSelect.addEventListener('change', loadMap);
+      periodSelect.addEventListener('change', loadCharts);
+      exportPdfBtn.addEventListener('click', exportPdfReport);
+      importFile.addEventListener('change', () => {
+        importFileName.textContent = importFile.files.length ? importFile.files[0].name : 'Нема избрана датотека';
+      });
+      window.addEventListener('beforeprint', () => {
+        Object.values(charts).forEach((chart) => chart.resize());
+        if (map) setTimeout(() => map.invalidateSize(), 50);
+      });
+      document.getElementById('clearAnalyticsFilters').addEventListener('click', () => {
+        filters.reset();
+        loadMap();
+        loadCharts();
+        loadKpiMetrics();
+      });
+
+      if (typeof Chart !== 'undefined' && typeof L !== 'undefined') {
+        loadCharts();
+        loadKpiMetrics();
+        loadMap();
       }
     })();
   </script>
@@ -409,47 +958,336 @@
   </div>
   {% endif %}
 
-  {% if active_tab == 'settings' %}
-  <div class="row g-4">
-    <div class="col-12 col-lg-6">
-      <div class="card border-0 shadow-sm">
-        <div class="card-body">
-          <h2 class="h5">Категории</h2>
-          <form method="post" action="{% url 'create_category' %}" class="row g-2 mb-3">
-            {% csrf_token %}
-            <div class="col"><input class="form-control" name="name" placeholder="Име"></div>
-            <div class="col-auto"><button class="btn btn-primary" type="submit">Додај</button></div>
-          </form>
-          {% for category in categories %}
-          <div class="d-flex justify-content-between border-top py-2 small">
-            <span>{{ category.name }}</span>
-            <span class="text-muted">{{ category.key }}</span>
-          </div>
-          {% empty %}
-          <p class="text-muted mb-0">Нема категории.</p>
-          {% endfor %}
-        </div>
+  {% if active_tab == 'unclassified' %}
+  <style>
+    .unclassified-page {
+      --au-bg: #f6f5f2;
+      --au-surface: #ffffff;
+      --au-border: #e8e5df;
+      --au-border-2: #d4cfc5;
+      --au-text: #1a1916;
+      --au-muted: #6b6760;
+      --au-faint: #9e9a93;
+      --au-blue: #2563eb;
+      --au-red: #dc2626;
+      --au-amber: #b7791f;
+      --au-shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+      background: var(--au-bg);
+      border: 1px solid var(--au-border);
+      border-radius: 14px;
+      padding: 20px;
+    }
+    .unclassified-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 14px; flex-wrap: wrap; margin-bottom: 16px;
+    }
+    .unclassified-header h2 { font-size: 22px; font-weight: 600; color: var(--au-text); margin: 0; }
+    .unclassified-header p { font-size: 13px; color: var(--au-muted); margin: 3px 0 0; }
+    .unclassified-count-card {
+      min-width: 138px; background: var(--au-surface); border: 1px solid var(--au-border);
+      border-radius: 10px; padding: 10px 14px; box-shadow: var(--au-shadow);
+    }
+    .unclassified-count-label {
+      font-size: 11px; color: var(--au-faint); font-weight: 700;
+      text-transform: uppercase; letter-spacing: .04em;
+    }
+    .unclassified-count { display: block; font-size: 26px; line-height: 1.1; font-weight: 700; color: var(--au-red); margin-top: 4px; }
+    .unclassified-list {
+      display: grid; gap: 10px;
+    }
+    .unclassified-item {
+      display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 430px);
+      gap: 14px; align-items: stretch;
+      background: var(--au-surface); border: 1px solid var(--au-border);
+      border-radius: 12px; padding: 16px; box-shadow: var(--au-shadow);
+      transition: border-color .15s, transform .15s;
+    }
+    .unclassified-item:hover { border-color: var(--au-border-2); transform: translateY(-1px); }
+    .unclassified-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 7px; }
+    .unclassified-title { font-weight: 700; color: var(--au-text); font-size: 15px; }
+    .unclassified-meta { font-size: 12px; color: var(--au-muted); margin-bottom: 8px; }
+    .unclassified-desc { font-size: 13px; color: var(--au-text); line-height: 1.45; margin: 0; }
+    .unclassified-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+    .unclassified-chip {
+      display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 9px;
+      font-size: 11px; font-weight: 700; border: 1px solid var(--au-border); color: var(--au-muted);
+      background: #fbfaf8;
+    }
+    .unclassified-chip.danger { color: var(--au-red); background: #fef2f2; border-color: #fecaca; }
+    .unclassified-chip.warning { color: #92400e; background: #fffbeb; border-color: #fde68a; }
+    .unclassified-form {
+      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;
+      align-content: end; padding-left: 14px; border-left: 1px solid var(--au-border);
+    }
+    .unclassified-form select {
+      min-height: 36px; font-size: 12px; border-radius: 6px; border-color: var(--au-border-2);
+    }
+    .unclassified-form select:focus { border-color: var(--au-text); box-shadow: none; }
+    .unclassified-form button {
+      grid-column: 1 / -1; border: 0; border-radius: 6px; background: var(--au-text);
+      color: #fff; min-height: 36px; font-size: 13px; font-weight: 600;
+    }
+    .unclassified-form button:hover { opacity: .86; color: #fff; }
+    .unclassified-empty {
+      background: var(--au-surface); border: 1px solid var(--au-border);
+      border-radius: 12px; padding: 38px; text-align: center; color: var(--au-muted);
+      box-shadow: var(--au-shadow);
+    }
+    .unclassified-empty-icon {
+      width: 42px; height: 42px; border-radius: 999px; display: inline-flex;
+      align-items: center; justify-content: center; background: #f0fdf4; color: #15803d;
+      border: 1px solid #bbf7d0; margin-bottom: 10px;
+    }
+    .unclassified-empty p { margin: 0; font-size: 14px; font-weight: 600; color: var(--au-text); }
+    .unclassified-empty small { display: block; margin-top: 4px; font-size: 12px; color: var(--au-muted); }
+    @media (max-width: 980px) {
+      .unclassified-item { grid-template-columns: 1fr; }
+      .unclassified-form { padding-left: 0; padding-top: 12px; border-left: 0; border-top: 1px solid var(--au-border); }
+    }
+    @media (max-width: 620px) {
+      .unclassified-page { padding: 14px; }
+      .unclassified-form { grid-template-columns: 1fr; }
+      .unclassified-count-card { width: 100%; }
+    }
+  </style>
+
+  <div class="unclassified-page">
+    <div class="unclassified-header">
+      <div>
+        <h2>Редица за класификација</h2>
+        <p>Пријави што треба да добијат категорија, приоритет и сектор.</p>
+      </div>
+      <div class="unclassified-count-card">
+        <div class="unclassified-count-label">Чекаат</div>
+        <span class="unclassified-count">{{ unclassified_count }}</span>
       </div>
     </div>
-    <div class="col-12 col-lg-6">
-      <div class="card border-0 shadow-sm">
-        <div class="card-body">
-          <h2 class="h5">Сектори</h2>
-          <form method="post" action="{% url 'create_sector' %}" class="row g-2 mb-3">
-            {% csrf_token %}
-            <div class="col"><input class="form-control" name="name" placeholder="Име"></div>
-            <div class="col-auto"><button class="btn btn-primary" type="submit">Додај</button></div>
-          </form>
-          {% for sector in sectors %}
-          <div class="d-flex justify-content-between border-top py-2 small">
-            <span>{{ sector.name }}</span>
-            <span class="text-muted">{{ sector.key }}</span>
+
+    {% if unclassified_reports %}
+    <div class="unclassified-list">
+      {% for report in unclassified_reports %}
+      <div class="unclassified-item">
+        <div class="unclassified-info">
+          <div class="unclassified-title-row">
+            <div class="unclassified-title">ПРЈ-{{ report.id }}</div>
+            {% if report.category == 'other' %}<span class="unclassified-chip danger">Некласифицирано</span>{% endif %}
           </div>
-          {% empty %}
-          <p class="text-muted mb-0">Нема сектори.</p>
-          {% endfor %}
+          <div class="unclassified-meta">
+            {{ report.citizen.username }} • {{ report.created_at|date:"d.m.Y H:i" }}
+          </div>
+          <p class="unclassified-desc">{{ report.description|truncatewords:24 }}</p>
+          <div class="unclassified-badges">
+            {% if report.municipality %}<span class="unclassified-chip">{{ report.municipality }}</span>{% endif %}
+            {% if report.status == 'unclassified' %}<span class="unclassified-chip warning">Статус: Некласифицирано</span>{% endif %}
+          </div>
+        </div>
+
+        <form method="post" action="{% url 'classify_report' report.id %}" class="unclassified-form">
+          {% csrf_token %}
+          <select name="category" class="form-select" required>
+            <option value="">Категорија</option>
+            {% for value, label in category_choices %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+          <select name="priority" class="form-select" required>
+            <option value="">Приоритет</option>
+            {% for value, label in priority_choices %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+          <select name="sector" class="form-select" required>
+            <option value="">Сектор</option>
+            {% for value, label in sector_choices %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn btn-primary">Класифицирај</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="unclassified-empty">
+      <div class="unclassified-empty-icon"><i class="bi bi-check2"></i></div>
+      <p>Нема некласифицирани извештаи</p>
+      <small>Сите извештаи се класифицирани.</small>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if active_tab == 'settings' %}
+  <style>
+    .admin-settings-page {
+      --au-bg: #f6f5f2;
+      --au-surface: #ffffff;
+      --au-border: #e8e5df;
+      --au-border-2: #d4cfc5;
+      --au-text: #1a1916;
+      --au-muted: #6b6760;
+      --au-faint: #9e9a93;
+      --au-green: #15803d;
+      --au-red: #dc2626;
+      --au-shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+      background: var(--au-bg);
+      border: 1px solid var(--au-border);
+      border-radius: 14px;
+      padding: 20px;
+    }
+    .settings-head {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 14px; flex-wrap: wrap; margin-bottom: 16px;
+    }
+    .settings-head h2 { font-size: 22px; font-weight: 600; color: var(--au-text); margin: 0; }
+    .settings-head p { font-size: 13px; color: var(--au-muted); margin: 3px 0 0; }
+    .sector-input-row {
+      display: grid; grid-template-columns: minmax(220px, 1fr) auto;
+      gap: 10px; margin-bottom: 14px; background: var(--au-surface);
+      border: 1px solid var(--au-border); border-radius: 12px;
+      padding: 12px; box-shadow: var(--au-shadow);
+    }
+    .sector-input-row input {
+      border-color: var(--au-border-2); border-radius: 6px; font-size: 13px;
+    }
+    .sector-input-row .btn {
+      border: 0; border-radius: 6px; background: var(--au-text);
+      color: #fff; font-weight: 600; font-size: 13px; min-height: 38px;
+    }
+    .sector-input-row .btn:hover { opacity: .86; color: #fff; }
+    .sectors-table {
+      background: var(--au-surface); border: 1px solid var(--au-border); border-radius: 12px;
+      overflow: hidden; box-shadow: var(--au-shadow);
+    }
+    .sector-row {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 12px; align-items: center;
+      padding: 14px 16px; border-bottom: 1px solid var(--au-border);
+      transition: background .15s;
+    }
+    .sector-row:hover { background: #fbfaf8; }
+    .sector-row:last-child { border-bottom: 0; }
+    .sector-name { font-weight: 600; color: var(--au-text); font-size: 14px; }
+    .sector-key { color: var(--au-faint); font-size: 12px; margin-top: 2px; }
+    .sector-status {
+      display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 700;
+      border: 1px solid transparent; white-space: nowrap;
+    }
+    .sector-status.active { color: var(--au-green); background: #f0fdf4; border-color: #bbf7d0; }
+    .sector-status.inactive { color: var(--au-muted); background: #f3f2ee; border-color: #e4e1d9; }
+    .sector-actions {
+      display: flex; gap: 8px; align-items: center;
+    }
+    .sector-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 34px; height: 34px; border-radius: 999px;
+      border: 1px solid var(--au-border-2); background: #fff; color: var(--au-muted);
+      font-size: 13px; transition: all .15s;
+    }
+    .sector-btn.toggle {
+      color: var(--au-green); border-color: #bbf7d0;
+    }
+    .sector-btn.toggle.is-hidden {
+      color: var(--au-muted); border-color: var(--au-border-2);
+    }
+    .sector-btn:hover { color: var(--au-text); border-color: var(--au-muted); }
+    .sector-btn.delete {
+      border-color: #fecdd3; color: var(--au-red);
+    }
+    .sector-btn.delete:hover { border-color: #dc2626; background: #fee2e2; }
+    .sector-empty { grid-column: 1 / -1; text-align: center; color: var(--au-faint); padding: 24px 12px; }
+    @media (max-width: 720px) {
+      .sector-input-row { grid-template-columns: 1fr; }
+      .sector-row { grid-template-columns: 1fr; align-items: start; }
+      .sector-actions { justify-content: flex-start; }
+    }
+  </style>
+
+  <div class="admin-settings-page">
+    <div class="settings-head">
+      <div>
+        <h2>Управување со сектори</h2>
+        <p>Контролирајте кои сектори се достапни при креирање и класификација на пријави.</p>
+      </div>
+    </div>
+
+    <form method="post" action="{% url 'create_sector' %}" class="sector-input-row">
+      {% csrf_token %}
+      <input class="form-control" type="text" name="name" placeholder="Ново име на сектор" required>
+      <button class="btn btn-primary" type="submit">+ Додај</button>
+    </form>
+
+    <div class="sectors-table">
+      {% for sector in sectors %}
+      <div class="sector-row">
+        <div>
+          <div class="sector-name">{{ sector.name }}</div>
+          <div class="sector-key">{{ sector.key }}</div>
+        </div>
+        <div>
+          <span class="sector-status {% if sector.is_active %}active{% else %}inactive{% endif %}">
+            {% if sector.is_active %}Видлив{% else %}Скриен{% endif %}
+          </span>
+        </div>
+        <div class="sector-actions">
+          <form method="post" action="{% url 'update_sector' sector.id %}" style="display: inline;">
+            {% csrf_token %}
+            <input type="hidden" name="key" value="{{ sector.key }}">
+            <input type="hidden" name="name" value="{{ sector.name }}">
+            <input type="hidden" name="is_active" value="{% if sector.is_active %}false{% else %}true{% endif %}">
+            <button type="submit" class="sector-btn toggle {% if not sector.is_active %}is-hidden{% endif %}" title="{% if sector.is_active %}Скриј сектор{% else %}Прикажи сектор{% endif %}" aria-label="{% if sector.is_active %}Скриј {{ sector.name }}{% else %}Прикажи {{ sector.name }}{% endif %}">
+              {% if sector.is_active %}<i class="bi bi-eye-slash"></i>{% else %}<i class="bi bi-eye"></i>{% endif %}
+            </button>
+          </form>
+          <button type="button" class="sector-btn edit" data-bs-toggle="modal" data-bs-target="#editSectorModal{{ sector.id }}" title="Уреди" aria-label="Уреди {{ sector.name }}">
+            <i class="bi bi-pencil"></i>
+          </button>
+          <form method="post" action="{% url 'delete_sector' sector.id %}" style="display: inline;">
+            {% csrf_token %}
+            <button type="submit" class="sector-btn delete" title="Избриши" aria-label="Избриши {{ sector.name }}" onclick="return confirm('Сигурни ли сте?')">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
         </div>
       </div>
+
+      <!-- Edit Sector Modal -->
+      <div class="modal fade" id="editSectorModal{{ sector.id }}" tabindex="-1">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Уреди сектор</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'update_sector' sector.id %}" class="edit-sector-form">
+              {% csrf_token %}
+              <div class="modal-body">
+                <div class="mb-3">
+                  <label class="form-label">Име</label>
+                  <input type="text" class="form-control" name="name" value="{{ sector.name }}" required>
+                </div>
+                <input type="hidden" name="key" value="{{ sector.key }}">
+                <div class="form-check form-switch">
+                  <input class="form-check-input is-active-toggle" type="checkbox" name="is_active" value="1" id="isActiveSector{{ sector.id }}" {% if sector.is_active %}checked{% endif %}>
+                  <label class="form-check-label" for="isActiveSector{{ sector.id }}">
+                    Видлив за нови извештаи
+                  </label>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Откажи</button>
+                <button type="submit" class="btn btn-primary">Сачувај</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="sector-row">
+        <div class="sector-empty">Нема сектори.</div>
+      </div>
+      {% endfor %}
     </div>
   </div>
   {% endif %}

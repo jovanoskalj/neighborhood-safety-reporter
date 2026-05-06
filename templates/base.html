@@ -9,15 +9,15 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Syne:wght@600;700;800&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&family=Syne:wght@600;700;800&display=swap"
         rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{% static 'css/main.css' %}?v=20260407">
+    <link rel="stylesheet" href="{% static 'css/main.css' %}?v=20260506">
     {% block extra_head %}{% endblock %}
     {% block extra_css %}{% endblock %}
 </head>
-<body class="app-body d-flex flex-column min-vh-100">
+<body class="app-body d-flex flex-column min-vh-100{% if user|has_group:'admin' or user|has_group:'administrators' or user.is_superuser %} admin-user{% endif %}{% if user.is_superuser %} superadmin-user{% endif %}">
     <nav class="navbar navbar-expand-lg navbar-dark app-navbar" style="background-color:#1a2238 !important;">
         <div class="container app-navbar-wrap">
             <a class="navbar-brand fw-bold text-white" href="/">
@@ -31,31 +31,30 @@
             </button>
             <div class="collapse navbar-collapse" id="mainNavbar">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                    {% if user|has_group:'officer' or user|has_group:'officers' or user|has_group:'admin' or user|has_group:'administrators' or user.is_superuser %}
+                    {% if user|has_group:'officer' or user|has_group:'officers' %}
                     <li class="nav-item"><a class="nav-link" href="{% url 'map_view' %}">Мапа</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'search_page' %}">Пребарај</a></li>
-                    {% endif %}
-                    {% if user|has_group:'officer' or user|has_group:'officers' %}
                     <li class="nav-item"><a class="nav-link" href="{% url 'officer_panel' %}">Работен панел</a></li>
-                    {% endif %}
-                    {% if user|has_group:'admin' or user|has_group:'administrators' or user.is_superuser %}
-                    <li class="nav-item"><a class="nav-link" href="{% url 'dashboard' %}">Админ панел</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'notifications_log' %}">Известувања</a></li>
                     {% endif %}
                 </ul>
                 <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-2">
+                    {% if user|has_group:'admin' or user|has_group:'administrators' or user.is_superuser %}
+                    <li class="nav-item">
+                        <a class="nav-link admin-dashboard-link" href="/dashboard/">
+                            <i class="bi bi-speedometer2 me-1"></i>Админ панел
+                        </a>
+                    </li>
+                    {% endif %}
                     <!-- Notifications (hidden from admins) -->
                     {% if request.user.profile.role != 'admin' %}
                     <li class="nav-item dropdown">
                         <a class="nav-link position-relative nav-icon" href="#" id="notificationsDropdown" role="button"
                            data-bs-toggle="dropdown" aria-expanded="false" aria-label="Известувања">
                             <i class="bi bi-bell"></i>
-                            {% if unread_notification_count > 0 %}
-                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                            <span id="notificationBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger {% if unread_notification_count == 0 %}d-none{% endif %}" data-unread-count="{{ unread_notification_count }}">
                                 {{ unread_notification_count }}
                                 <span class="visually-hidden">непрочитани известувања</span>
                             </span>
-                            {% endif %}
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notificationsDropdown" style="min-width: 360px;">
                             <li class="dropdown-header d-flex justify-content-between align-items-center bg-light">
@@ -70,10 +69,12 @@
                                 {% endif %}
                             </li>
                             <li><hr class="dropdown-divider my-0"></li>
+                            <li class="p-0">
+                            <ul id="notificationsMenuItems" class="list-unstyled mb-0">
                             {% for notification in recent_notifications %}
-                            <li>
+                            <li class="notification-item">
                                 <a class="dropdown-item p-3 {% if not notification.is_read %}unread-notification{% endif %}" 
-                                   href="{% if notification.report %}{% url 'my_reports' %}#report-{{ notification.report.id }}{% else %}#{% endif %}">
+                                   href="{% if notification.report %}{% url 'report_detail' notification.report.id %}{% else %}#{% endif %}">
                                     <div class="d-flex justify-content-between align-items-start mb-2">
                                         <strong class="text-truncate me-2">{{ notification.title }}</strong>
                                         <div class="d-flex align-items-center">
@@ -93,13 +94,15 @@
                                 </a>
                             </li>
                             {% empty %}
-                            <li>
+                            <li class="notification-empty">
                                 <a class="dropdown-item text-center text-muted py-4" href="#" style="pointer-events: none;">
                                     <i class="bi bi-bell-slash d-block mb-2 fs-4"></i>
                                     Нема известувања
                                 </a>
                             </li>
                             {% endfor %}
+                            </ul>
+                            </li>
                             <li><hr class="dropdown-divider my-0"></li>
                             <li>
                                 <a class="dropdown-item text-center app-link" href="{% url 'notifications_list' %}">
@@ -218,35 +221,75 @@
                 });
             });
             
+            function escapeHtml(value) {
+                return String(value || '').replace(/[&<>"']/g, (char) => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                }[char]));
+            }
+
+            function renderNotificationItems(items) {
+                const menuItems = document.getElementById('notificationsMenuItems');
+                if (!menuItems) return;
+                if (!items.length) {
+                    menuItems.innerHTML = `
+                        <li class="notification-empty">
+                            <a class="dropdown-item text-center text-muted py-4" href="#" style="pointer-events: none;">
+                                <i class="bi bi-bell-slash d-block mb-2 fs-4"></i>
+                                Нема известувања
+                            </a>
+                        </li>`;
+                    return;
+                }
+                menuItems.innerHTML = items.map((notification) => {
+                    const href = notification.report_id ? `/reports/reports/${notification.report_id}/` : '#';
+                    const unreadClass = notification.is_read ? '' : 'unread-notification';
+                    const unreadBadge = notification.is_read ? '' : '<span class="badge bg-primary me-2">Ново</span>';
+                    const reportMeta = notification.report_id
+                        ? `<div class="d-flex align-items-center text-muted small"><i class="bi bi-exclamation-triangle me-1"></i>Пријава #${notification.report_id}</div>`
+                        : '';
+                    return `
+                        <li class="notification-item">
+                            <a class="dropdown-item p-3 ${unreadClass}" href="${href}">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <strong class="text-truncate me-2">${escapeHtml(notification.title)}</strong>
+                                    <div class="d-flex align-items-center">
+                                        ${unreadBadge}
+                                        <small class="text-muted">${escapeHtml(notification.created_at)}</small>
+                                    </div>
+                                </div>
+                                <p class="text-muted small mb-1">${escapeHtml(notification.message).slice(0, 80)}</p>
+                                ${reportMeta}
+                            </a>
+                        </li>`;
+                }).join('');
+            }
+
             // Update notification count periodically
             function updateNotificationCount() {
-                fetch('/accounts/notifications/', {
+                fetch('/accounts/notifications/summary/', {
                     headers: {
-                        'Accept': 'text/html',
+                        'Accept': 'application/json',
                     }
                 })
-                .then(response => response.text())
-                .then(html => {
-                    // Parse the HTML to extract the notification count
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-                    const unreadCountElement = doc.querySelector('[data-unread-count]');
-                    if (unreadCountElement) {
-                        const newCount = parseInt(unreadCountElement.dataset.unreadCount);
-                        const badge = document.querySelector('.navbar .badge');
-                        if (badge) {
-                            if (newCount > 0) {
-                                badge.textContent = newCount;
-                                badge.style.display = '';
-                            } else {
-                                badge.style.display = 'none';
-                            }
-                        }
+                .then(response => response.json())
+                .then(data => {
+                    const newCount = Number(data.unread_count || 0);
+                    const badge = document.getElementById('notificationBadge');
+                    if (badge) {
+                        badge.dataset.unreadCount = newCount;
+                        badge.firstChild.nodeValue = newCount;
+                        badge.classList.toggle('d-none', newCount === 0);
                     }
+                    renderNotificationItems(data.recent || []);
                 })
                 .catch(error => console.log('Error updating notification count:', error));
             }
             
+            updateNotificationCount();
             // Update notification count every 30 seconds
             setInterval(updateNotificationCount, 30000);
         });

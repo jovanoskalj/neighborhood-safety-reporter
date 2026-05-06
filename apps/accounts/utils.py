@@ -1,6 +1,8 @@
 """Utility functions for managing user notifications."""
 
-from .models import UserNotification
+from apps.reports.models import ReportCategory, Sector
+
+from .models import UserNotification, UserProfile
 
 
 def create_user_notification(user, notification_type, title, message, report=None):
@@ -65,6 +67,110 @@ def notify_report_resolved(report):
             message=f'Вашата пријава е успешно решена. Ви благодариме за пријавување!',
             report=report
         )
+
+
+def notify_report_status_changed(report, old_status, new_status):
+    """Create an in-app notification for the citizen when a report status changes."""
+    if not report.citizen or old_status == new_status:
+        return None
+
+    status_labels = dict(report.STATUS_CHOICES)
+    old_status_label = status_labels.get(old_status, old_status)
+    new_status_label = status_labels.get(new_status, new_status)
+
+    return create_user_notification(
+        user=report.citizen,
+        notification_type="status_change",
+        title=f"Статусот на пријава #{report.id} е променет",
+        message=f"Статусот е променет од {old_status_label} во {new_status_label}.",
+        report=report,
+    )
+
+
+def notify_report_classified(report, classified_by=None):
+    """Notify the citizen and active officers/workers assigned to the report's sector."""
+    officer_profiles = UserProfile.objects.select_related("user").filter(
+        role="officer",
+        sector=report.sector,
+        user__is_active=True,
+    )
+
+    sector_labels = {
+        **dict(report.SECTOR_CHOICES),
+        **dict(Sector.objects.values_list("key", "name")),
+    }
+    category_labels = {
+        **dict(report.CATEGORY_CHOICES),
+        **dict(ReportCategory.objects.values_list("key", "name")),
+    }
+    classifier_name = classified_by.get_full_name() or classified_by.username if classified_by else "Администратор"
+    notifications = []
+    category_label = category_labels.get(report.category, report.category)
+    sector_label = sector_labels.get(report.sector, report.sector)
+
+    if report.citizen:
+        notifications.append(
+            create_user_notification(
+                user=report.citizen,
+                notification_type="system",
+                title=f"Пријава #{report.id} е класифицирана",
+                message=f"Вашата пријава е класифицирана како {category_label}.",
+                report=report,
+            )
+        )
+
+    for profile in officer_profiles:
+        notifications.append(
+            create_user_notification(
+                user=profile.user,
+                notification_type="report_assigned",
+                title=f"Пријава #{report.id} е класифицирана",
+                message=(
+                    f"{classifier_name} ја класифицираше пријавата како "
+                    f"{category_label} "
+                    f"и ја додели на сектор {sector_label}."
+                ),
+                report=report,
+            )
+        )
+
+    return notifications
+
+
+def notify_report_reassigned(report, old_sector, reassigned_by=None):
+    """Notify active officers/workers in the destination sector after reassignment."""
+    officer_profiles = UserProfile.objects.select_related("user").filter(
+        role="officer",
+        sector=report.sector,
+        user__is_active=True,
+    )
+    if report.municipality:
+        officer_profiles = officer_profiles.filter(municipality__in=["", report.municipality])
+
+    sector_labels = {
+        **dict(report.SECTOR_CHOICES),
+        **dict(Sector.objects.values_list("key", "name")),
+    }
+    actor_name = reassigned_by.get_full_name() or reassigned_by.username if reassigned_by else "Работник"
+    old_sector_label = sector_labels.get(old_sector, old_sector)
+    new_sector_label = sector_labels.get(report.sector, report.sector)
+    notifications = []
+
+    for profile in officer_profiles:
+        notifications.append(
+            create_user_notification(
+                user=profile.user,
+                notification_type="report_assigned",
+                title=f"Пријава #{report.id} е пренасочена",
+                message=(
+                    f"{actor_name} ја пренасочи пријавата од сектор "
+                    f"{old_sector_label} кон {new_sector_label}."
+                ),
+                report=report,
+            )
+        )
+
+    return notifications
 
 
 def cleanup_old_notifications(days_old=90):

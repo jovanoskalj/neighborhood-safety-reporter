@@ -17,7 +17,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.contrib.admin.views.decorators import staff_member_required
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_GET, require_http_methods
 from apps.reports.models import MUNICIPALITY_CHOICES, Report
 
 from .forms import LocalizedPasswordChangeForm, ProfileForm, RegisterForm
@@ -142,6 +142,8 @@ def login_view(request):
             profile = UserProfile.objects.filter(user=user).first()
             if profile and profile.must_change_password:
                 next_url = "profile"
+            elif user.is_superuser:
+                next_url = "/dashboard/"
             elif _is_admin_user(user):
                 next_url = "/dashboard/?tab=users"
             else:
@@ -411,6 +413,30 @@ def notifications_list(request):
             "notification_type": notification_type,
             "read_status": read_status,
         },
+    )
+
+
+@login_required
+@require_GET
+def notifications_summary(request):
+    """Return lightweight notification data for the navbar poller."""
+    unread_count = UserNotification.objects.filter(user=request.user, is_read=False).count()
+    recent_notifications = UserNotification.objects.filter(user=request.user).order_by("-created_at")[:5]
+    return JsonResponse(
+        {
+            "unread_count": unread_count,
+            "recent": [
+                {
+                    "id": notification.id,
+                    "title": notification.title,
+                    "message": notification.message,
+                    "is_read": notification.is_read,
+                    "report_id": notification.report_id,
+                    "created_at": notification.created_at.strftime("%H:%M"),
+                }
+                for notification in recent_notifications
+            ],
+        }
     )
 
 

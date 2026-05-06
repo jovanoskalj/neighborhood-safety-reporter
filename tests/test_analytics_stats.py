@@ -147,6 +147,18 @@ def test_stats_by_priority_counts(client, report_dataset):
     assert counts["low"] == 1
 
 
+@pytest.mark.django_db
+def test_stats_filters_by_municipality(client, staff_user):
+    client.force_login(staff_user)
+    _make_report(staff_user, municipality="centar", category="safety")
+    _make_report(staff_user, municipality="karposh", category="health")
+
+    data = client.get(reverse("api_analytics:stats") + "?municipality=centar").json()
+
+    assert data["total"] == 1
+    assert data["by_category"] == [{"label": "safety", "count": 1}]
+
+
 # ---------------------------------------------------------------------------
 # Period parameter
 # ---------------------------------------------------------------------------

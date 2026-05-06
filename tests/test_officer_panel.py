@@ -6,6 +6,7 @@ import pytest
 from django.contrib.auth.models import Group, User
 from django.urls import reverse
 
+from apps.accounts.models import UserNotification
 from apps.reports.models import Report
 
 
@@ -100,6 +101,18 @@ def test_priority_filter_dropdown_exposes_model_values(client, safety_officer):
     assert 'value="medium"' not in content
     assert 'value="high"' not in content
     assert 'value="critical"' not in content
+
+
+@pytest.mark.django_db
+def test_officer_panel_includes_sector_map_controls(client, safety_officer, sector_reports):
+    client.login(username="safety_officer", password="password123")
+    content = client.get(reverse("officer_panel")).content.decode()
+
+    assert 'id="sector-map"' in content
+    assert 'id="heatmap-toggle"' in content
+    assert 'id="map-filter-category"' in content
+    assert 'id="map-filter-status"' in content
+    assert 'id="map-filter-priority"' in content
 
 
 # ---------------------------------------------------------------------------
@@ -213,3 +226,65 @@ def test_status_update_sends_email(mock_send_mail, client, safety_officer, secto
     mock_send_mail.assert_called_once()
     recipient_list = mock_send_mail.call_args.kwargs["recipient_list"]
     assert report.citizen.email in recipient_list
+
+
+@pytest.mark.django_db
+@patch("apps.notifications.senders.send_mail")
+def test_status_update_creates_in_app_notification(mock_send_mail, client, safety_officer, sector_reports):
+    client.login(username="safety_officer", password="password123")
+    report = sector_reports[0]
+
+    response = client.patch(
+        reverse("update_report_status", args=[report.pk]),
+        data=json.dumps({"status": "in_progress"}),
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    notification = UserNotification.objects.get(
+        user=report.citizen,
+        report=report,
+        type="status_change",
+    )
+    assert "Статусот" in notification.title
+    assert "Во тек" in notification.message
+
+
+@pytest.mark.django_db
+def test_officer_can_reassign_wrong_sector_report(client, safety_officer, sector_reports):
+    utilities_group, _ = Group.objects.get_or_create(name="officer")
+    destination_worker = User.objects.create_user(
+        username="utilities_worker",
+        email="utilities@test.com",
+        password="password123",
+    )
+    destination_worker.groups.add(utilities_group)
+    destination_worker.profile.role = "officer"
+    destination_worker.profile.sector = "utilities"
+    destination_worker.profile.municipality = ""
+    destination_worker.profile.save()
+
+    report = sector_reports[0]
+    client.login(username="safety_officer", password="password123")
+    response = client.post(
+        reverse("reassign_report_sector", args=[report.pk]),
+        {"sector": "utilities"},
+    )
+
+    assert response.status_code == 200
+    report.refresh_from_db()
+    assert report.sector == "utilities"
+    assert report.assigned_officer is None
+    assert not Report.objects.filter(pk=report.pk, sector="safety").exists()
+    assert Report.objects.filter(pk=report.pk, sector="utilities").exists()
+    assert UserNotification.objects.filter(
+        user=destination_worker,
+        report=report,
+        type="report_assigned",
+        title__icontains="пренасочена",
+    ).exists()
+
+    client.logout()
+    client.login(username="utilities_worker", password="password123")
+    destination_response = client.get(reverse("officer_panel"))
+    assert report in list(destination_response.context["reports"])

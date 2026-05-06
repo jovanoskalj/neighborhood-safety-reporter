@@ -1,9 +1,12 @@
 """Smoke tests for the admin dashboard."""
+from io import StringIO
+
 import pytest
 from django.contrib.auth.models import Group, User
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 
-from apps.accounts.models import AuditLog
+from apps.accounts.models import AuditLog, UserNotification
 from apps.reports.models import Report, ReportCategory, Sector
 
 
@@ -50,6 +53,12 @@ def test_analytics_tab_includes_t27_chart_widgets(client, admin_with_profile):
     assert 'id="categoryChart"' in content
     assert 'id="statusChart"' in content
     assert 'id="periodSelect"' in content
+    assert 'id="analyticsReportsMap"' in content
+    assert 'id="mapGroup"' in content
+    assert 'id="filterMunicipality"' in content
+    assert 'name="municipality"' in content
+    assert reverse("import_reports") in content
+    assert reverse("export_reports_excel") in content
     # Period selector exposes all three buckets the API understands.
     for bucket in ("weekly", "monthly", "yearly"):
         assert f'value="{bucket}"' in content
@@ -85,11 +94,13 @@ def test_dashboard_redirects_officer_to_panel(client, officer_user):
 @pytest.mark.django_db
 def test_non_admin_cannot_create_category(client, citizen_user):
     client.login(username="citizen", password="citizen123")
+    initial_count = ReportCategory.objects.count()
     response = client.post(reverse("create_category"), {"key": "x", "name": "X"})
 
     # user_passes_test redirects unauthorized callers back to LOGIN_URL
     assert response.status_code == 302
-    assert ReportCategory.objects.count() == 0
+    # Should not add a new category
+    assert ReportCategory.objects.count() == initial_count
 
 
 # ---------------------------------------------------------------------------
@@ -290,3 +301,108 @@ def test_csv_export_streams_attachment(client, admin_with_profile):
     assert response["Content-Type"].startswith("text/csv")
     assert "attachment" in response["Content-Disposition"]
     assert "reports_export.csv" in response["Content-Disposition"]
+
+
+@pytest.mark.django_db
+def test_csv_export_includes_filtered_report_columns(client, admin_with_profile, citizen_user):
+    included = Report.objects.create(
+        citizen=citizen_user,
+        description="Broken hydrant",
+        latitude=41.99,
+        longitude=21.43,
+        category="utilities",
+        priority="urgent",
+        status="new",
+        sector="utilities",
+        municipality="centar",
+    )
+    Report.objects.create(
+        citizen=citizen_user,
+        description="Park issue",
+        latitude=41.98,
+        longitude=21.41,
+        category="safety",
+        priority="low",
+        status="resolved",
+        sector="safety",
+        municipality="karposh",
+    )
+
+    client.login(username="admin_user", password="AdminStrongPass9!")
+    response = client.get(reverse("export_reports_csv") + "?category=utilities")
+    content = response.content.decode()
+
+    assert "id,description,category,priority,status,sector,location" in content
+    assert f"{included.id},Broken hydrant,utilities,urgent,new,utilities" in content
+    assert "Park issue" not in content
+
+
+@pytest.mark.django_db
+def test_import_reports_validates_duplicates_and_invalid_rows(client, admin_with_profile):
+    existing = Report.objects.create(
+        citizen=admin_with_profile,
+        description="Existing row",
+        latitude=41.99,
+        longitude=21.43,
+        category="utilities",
+        priority="normal",
+        status="new",
+        sector="utilities",
+    )
+    csv_buffer = StringIO()
+    csv_buffer.write("id,description,category,priority,status,sector,location,municipality\n")
+    csv_buffer.write(f"{existing.id},Duplicate,utilities,normal,new,utilities,\"41.1,21.1\",centar\n")
+    csv_buffer.write("9999,Imported row,safety,urgent,new,safety,\"41.2,21.2\",karposh\n")
+    csv_buffer.write(",Bad row,unknown,urgent,new,safety,\"41.3,21.3\",karposh\n")
+    upload = SimpleUploadedFile("reports.csv", csv_buffer.getvalue().encode("utf-8"), content_type="text/csv")
+
+    client.login(username="admin_user", password="AdminStrongPass9!")
+    response = client.post(reverse("import_reports"), {"file": upload})
+
+    assert response.status_code == 302
+    assert Report.objects.filter(pk=9999, description="Imported row").exists()
+    assert Report.objects.filter(description="Duplicate").count() == 0
+    assert Report.objects.filter(description="Bad row").count() == 0
+
+
+@pytest.mark.django_db
+def test_admin_classification_notifies_assigned_worker(client, admin_with_profile, citizen_user, officer_user):
+    officer_profile = officer_user.profile
+    officer_profile.role = "officer"
+    officer_profile.sector = "safety"
+    officer_profile.municipality = "aerodrom"
+    officer_profile.save()
+    report = Report.objects.create(
+        citizen=citizen_user,
+        description="Needs classification",
+        latitude=41.99,
+        longitude=21.43,
+        category="other",
+        priority="normal",
+        status="unclassified",
+        sector="admin",
+        municipality="berovo",
+    )
+
+    client.login(username="admin_user", password="AdminStrongPass9!")
+    response = client.post(
+        reverse("classify_report", args=[report.id]),
+        {"category": "safety", "priority": "urgent", "sector": "safety"},
+    )
+
+    assert response.status_code == 302
+    report.refresh_from_db()
+    assert report.category == "safety"
+    assert report.sector == "safety"
+    assert UserNotification.objects.filter(
+        user=officer_user,
+        report=report,
+        type="report_assigned",
+        title__icontains="класифицирана",
+    ).exists()
+    assert UserNotification.objects.filter(
+        user=citizen_user,
+        report=report,
+        type="system",
+        title__icontains="класифицирана",
+    ).exists()

@@ -88,6 +88,13 @@ def bulk_notify_preview(request):
     """Preview page — admin избира филтри и гледа колку ќе се испратат."""
     municipality = request.GET.get("municipality", "")
     sector = request.GET.get("sector", "")
+    default_subject = "Известување од Безбеден Град"
+    default_message = (
+        "Почитувани,\n\n"
+        "Ве информираме дека пријавите што одговараат на избраните филтри се обработени. "
+        "Ви благодариме што придонесувате за побезбедна заедница.\n\n"
+        "Со почит,\nТимот на Безбеден Град"
+    )
 
     qs = Report.objects.filter(status="resolved").exclude(citizen__email="")
     if municipality:
@@ -104,6 +111,8 @@ def bulk_notify_preview(request):
         "sector": sector,
         "municipality_choices": municipality_choices,
         "sector_choices": sector_choices,
+        "default_subject": default_subject,
+        "default_message": default_message,
     })
 
 
@@ -116,6 +125,13 @@ def bulk_notify_send(request):
 
     municipality = request.POST.get("municipality", "")
     sector = request.POST.get("sector", "")
+    subject = (request.POST.get("subject") or "").strip()
+    message = (request.POST.get("message") or "").strip()
+
+    if not subject or not message:
+        return JsonResponse({
+            "error": "Внесете наслов и порака за масовното известување.",
+        }, status=400)
 
     qs = (
         Report.objects
@@ -130,7 +146,14 @@ def bulk_notify_send(request):
 
     succeeded, failed = 0, 0
     for report in qs:
-        n = send_bulk_resolved_email(report)
+        personalized_message = (
+            f"Здраво {report.citizen.username},\n\n"
+            f"{message}\n\n"
+            f"Пријава #{report.pk}: {report.description[:180]}\n"
+            f"Општина: {report.get_municipality_display()}\n"
+            f"Сектор: {report.get_sector_display()}"
+        )
+        n = send_bulk_resolved_email(report, subject=subject, message=personalized_message)
         if n and n.status == "sent":
             succeeded += 1
         else:

@@ -101,9 +101,17 @@ class ReportCategoryForm(forms.ModelForm):
 class SectorForm(forms.ModelForm):
     """Form for creating and updating sectors from admin panel."""
 
+    is_active = forms.BooleanField(required=False, widget=forms.CheckboxInput)
+
     class Meta:
         model = Sector
         fields = ["key", "name", "is_active"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Ensure is_active is properly set from POST data
+        if self.instance.pk and not self.data:
+            self.fields['is_active'].initial = self.instance.is_active
 
 
 class AdminUserCreateForm(forms.Form):
@@ -119,8 +127,14 @@ class AdminUserCreateForm(forms.Form):
     email = forms.EmailField()
     password = forms.CharField(max_length=128, widget=forms.PasswordInput)
     role = forms.ChoiceField(choices=ROLE_CHOICES)
-    sector = forms.ChoiceField(choices=[("", "---------")] + list(Report.SECTOR_CHOICES), required=False)
+    sector = forms.ChoiceField(required=False)
     municipality = forms.ChoiceField(choices=[("", "---------")] + list(MUNICIPALITY_CHOICES), required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Dynamically populate sector choices from active sectors
+        active_sectors = Sector.objects.filter(is_active=True).values_list('key', 'name')
+        self.fields['sector'].choices = [("", "---------")] + list(active_sectors)
 
     def clean_username(self) -> str:
         username = (self.cleaned_data.get("username") or "").strip()
@@ -172,8 +186,14 @@ class AdminUserUpdateForm(forms.Form):
     ROLE_CHOICES = AdminUserCreateForm.ROLE_CHOICES
 
     role = forms.ChoiceField(choices=ROLE_CHOICES)
-    sector = forms.ChoiceField(choices=[("", "---------")] + list(Report.SECTOR_CHOICES), required=False)
+    sector = forms.ChoiceField(required=False)
     municipality = forms.ChoiceField(choices=[("", "---------")] + list(MUNICIPALITY_CHOICES), required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Dynamically populate sector choices from active sectors
+        active_sectors = Sector.objects.filter(is_active=True).values_list('key', 'name')
+        self.fields['sector'].choices = [("", "---------")] + list(active_sectors)
 
     def clean(self):
         cleaned_data = super().clean()

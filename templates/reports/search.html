@@ -29,18 +29,23 @@
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
 
           <select name="category" class="filter-select">
-            <option value="">Сите</option>
-            <option value="infrastructure" {% if query.category == "infrastructure" %}selected{% endif %}>Инфраструктура</option>
-            <option value="utilities" {% if query.category == "utilities" %}selected{% endif %}>Комунални</option>
-            <option value="safety" {% if query.category == "safety" %}selected{% endif %}>Безбедност</option>
-            <option value="health" {% if query.category == "health" %}selected{% endif %}>Здравство</option>
-            <option value="other" {% if query.category == "other" %}selected{% endif %}>Друго</option>
+            <option value="">Категорија</option>
+            {% for value, label in category_choices %}
+            <option value="{{ value }}" {% if query.category == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
           </select>
 
           <select name="status" class="filter-select">
             <option value="">Статус</option>
             {% for value, label in status_choices %}
             <option value="{{ value }}" {% if query.status == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+
+          <select name="sector" class="filter-select">
+            <option value="">Сектор</option>
+            {% for value, label in sector_choices %}
+            <option value="{{ value }}" {% if query.sector == value %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
           </select>
 

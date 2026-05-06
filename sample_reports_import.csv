@@ -1,0 +1,6 @@
+id,description,category,priority,status,sector,location,latitude,longitude,municipality,citizen,created_at,updated_at,status_changed_at
+,Broken street light near the main road,infrastructure,normal,new,infrastructure,"41.996120,21.431442",41.996120,21.431442,centar,test-user,2026-05-04T09:00:00+02:00,2026-05-04T09:00:00+02:00,
+,Overflowing trash containers behind the school,utilities,urgent,in_progress,utilities,"41.998100,21.425400",41.998100,21.425400,karposh,test-user,2026-05-04T10:15:00+02:00,2026-05-04T10:45:00+02:00,2026-05-04T10:45:00+02:00
+,Unsafe crossing with damaged traffic sign,safety,urgent,new,safety,"41.989900,21.441000",41.989900,21.441000,aerodrom,test-user,2026-05-04T11:20:00+02:00,2026-05-04T11:20:00+02:00,
+,Medical waste left near public clinic,health,normal,resolved,health,"41.977500,21.436800",41.977500,21.436800,berovo,test-user,2026-05-03T14:00:00+02:00,2026-05-04T12:00:00+02:00,2026-05-04T12:00:00+02:00
+,Unclear report that needs manual classification,other,low,unclassified,admin,"41.993300,21.427700",41.993300,21.427700,ohrid,test-user,2026-05-02T08:30:00+02:00,2026-05-02T08:30:00+02:00,

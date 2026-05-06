@@ -5,6 +5,7 @@ from django.db.models.signals import post_migrate, post_save, pre_save
 from django.dispatch import receiver
 
 from .models import UserProfile, UserNotification
+from .utils import notify_report_status_changed
 from apps.reports.models import Report
 
 ROLE_GROUPS = {
@@ -81,26 +82,5 @@ def report_status_change_notification(sender, instance, created, **kwargs):
                 report=instance
             )
     elif instance.citizen and hasattr(instance, '_original_status'):
-        # Status changed - notify the citizen who submitted the report
-        if instance._original_status != instance.status:
-            # Only create notification for resolved status
-            if instance.status == 'resolved':
-                create_notification(
-                    user=instance.citizen,
-                    notification_type='status_change',
-                    title=f'Пријавата #{instance.id} е решена',
-                    message=f'Вашата пријава е успешно решена. Ви благодариме за пријавување!',
-                    report=instance
-                )
-            # Also notify when status changes from resolved back to other states
-            elif instance._original_status == 'resolved':
-                status_labels = dict(Report.STATUS_CHOICES)
-                new_status_label = status_labels.get(instance.status, instance.status)
-                
-                create_notification(
-                    user=instance.citizen,
-                    notification_type='status_change',
-                    title=f'Статусот на пријава #{instance.id} е променет',
-                    message=f'Статусот на вашата пријава е променет од решено на: {new_status_label}',
-                    report=instance
-                )
+        # Status changed - notify the citizen who submitted the report.
+        notify_report_status_changed(instance, instance._original_status, instance.status)
