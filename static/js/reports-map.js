@@ -21,7 +21,7 @@
         maxZoom: 19,
     }).addTo(map);
 
-    const markersLayer = L.layerGroup().addTo(map);
+    const markersLayer = L.markerClusterGroup().addTo(map);
     let heatmapLayer = null;
 
     const heatmapUrl = window.reportsMapConfig && window.reportsMapConfig.heatmapUrl;
@@ -161,10 +161,12 @@
 
             markersLayer.clearLayers();
 
+            const markersArray = [];
             results.forEach(function (report) {
                 const marker = createMarker(report);
-                marker.addTo(markersLayer);
+                markersArray.push(marker);
             });
+            markersLayer.addLayers(markersArray);
         } catch (error) {
             console.error("Error loading reports:", error);
         }
