@@ -964,3 +964,22 @@ def export_reports(request):
     for r in reports:
         writer.writerow(get_row(r))
     return response
+
+
+
+@login_required
+@_admin_only()
+def delete_report(request: HttpRequest, report_id: int) -> HttpResponse:
+    """Soft-delete a report (reversible)."""
+    if request.method == "POST":
+        report = get_object_or_404(Report.all_objects, pk=report_id)
+        report.soft_delete()
+        _write_audit_log(
+            request,
+            action="soft_delete_report",
+            target_model="Report",
+            target_id=report_id,
+            details={"report_id": report_id},
+        )
+        messages.success(request, f"Пријавата #{report_id} е избришана (може да се врати).")
+    return redirect(f"{reverse('dashboard')}?tab=analytics")

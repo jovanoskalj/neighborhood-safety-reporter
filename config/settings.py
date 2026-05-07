@@ -16,7 +16,7 @@ def _env_bool(name: str, default: str = "False") -> bool:
     return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
 
 SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-fallback-key")
-DEBUG = _env_bool("DEBUG", "False")
+DEBUG = _env_bool("DEBUG", "True")
 ALLOWED_HOSTS = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "localhost").split(",") if host.strip()]
 
 INSTALLED_APPS = [
