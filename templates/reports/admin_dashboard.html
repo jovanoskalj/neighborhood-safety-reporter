@@ -1,0 +1,1627 @@
+{% extends 'base.html' %}
+
+{% block title %}Админ панел{% endblock %}
+
+{% block content %}
+<style>
+  .admin-dashboard-wrap {
+    font-family: "Poppins", "Inter", "Segoe UI", Arial, sans-serif;
+    max-width: 1280px;
+    padding-top: 2rem !important;
+  }
+  .admin-dashboard-wrap input,
+  .admin-dashboard-wrap select,
+  .admin-dashboard-wrap textarea,
+  .admin-dashboard-wrap button,
+  .admin-dashboard-wrap table {
+    font-family: inherit;
+  }
+  .admin-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 14px;
+  }
+  .admin-page-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1a1916;
+    margin: 0;
+    letter-spacing: 0;
+  }
+  .admin-page-subtitle {
+    color: #6b6760;
+    font-size: 13px;
+    margin-top: 4px;
+  }
+  .admin-tabs {
+    display: inline-flex;
+    width: auto;
+    gap: 4px;
+    padding: 4px;
+    margin-bottom: 16px !important;
+    background: #ffffff;
+    border: 1px solid #e8e5df;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  }
+  .admin-tabs .nav-link {
+    border-radius: 7px;
+    color: #6b6760;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 13px;
+  }
+  .admin-tabs .nav-link:hover {
+    color: #1a1916;
+    background: #f6f5f2;
+  }
+  .admin-tabs .nav-link.active {
+    background: #1a1916;
+    color: #ffffff;
+    font-weight: 700;
+  }
+  @media (max-width: 640px) {
+    .admin-tabs {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      width: 100%;
+    }
+    .admin-tabs .nav-link {
+      text-align: center;
+    }
+  }
+</style>
+
+<section class="container py-4 admin-dashboard-wrap">
+  <div class="admin-page-header">
+    <div>
+      <h1 class="admin-page-title">Админ панел</h1>
+      <div class="admin-page-subtitle">Корисници, аналитика и системски поставки на едно место.</div>
+    </div>
+  </div>
+
+  <nav class="nav admin-tabs mb-4">
+    <a class="nav-link {% if active_tab == 'analytics' %}active{% endif %}" href="?tab=analytics">Аналитика</a>
+    <a class="nav-link {% if active_tab == 'users' %}active{% endif %}" href="?tab=users">Корисници</a>
+    <a class="nav-link {% if active_tab == 'unclassified' %}active{% endif %}" href="?tab=unclassified">
+      <span>Некласифицирано</span>
+      {% if unclassified_count %}<span class="badge bg-danger ms-1">{{ unclassified_count }}</span>{% endif %}
+    </a>
+    <a class="nav-link {% if active_tab == 'duplicates' %}active{% endif %}" href="?tab=duplicates">
+      <span>Дупликати</span>
+      {% if pending_duplicate_count %}<span class="badge bg-warning text-dark ms-1">{{ pending_duplicate_count }}</span>{% endif %}
+    </a>
+    <a class="nav-link {% if active_tab == 'settings' %}active{% endif %}" href="?tab=settings">Подесувања</a>
+    <a class="nav-link {% if active_tab == 'bulk_notify' %}active{% endif %}" href="?tab=bulk_notify">Масовно известување</a>
+    <a class="nav-link {% if active_tab == 'log' %}active{% endif %}" href="?tab=log">Системски лог</a>
+  </nav>
+
+  {% if active_tab == 'analytics' %}
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <style>
+    .analytics-page {
+      --an-bg: #f6f7f8;
+      --an-surface: #ffffff;
+      --an-border: #e2e5e9;
+      --an-text: #171a1f;
+      --an-muted: #68707c;
+      --an-blue: #2563eb;
+      --an-green: #16803c;
+      --an-amber: #b7791f;
+      --an-red: #c2410c;
+      background: var(--an-bg);
+      border: 1px solid var(--an-border);
+      border-radius: 14px;
+      padding: 18px;
+    }
+    .analytics-head { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 14px; }
+    .analytics-head h2 { font-size: 20px; font-weight: 700; color: var(--an-text); margin: 0; }
+    .analytics-head p { color: var(--an-muted); font-size: 13px; margin: 3px 0 0; }
+    .analytics-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .analytics-actions .btn { border-radius: 8px; font-size: 13px; font-weight: 600; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .kpi-card { background: var(--an-surface); border: 1px solid var(--an-border); border-radius: 8px; padding: 14px; }
+    .kpi-label { font-size: 11px; text-transform: uppercase; color: var(--an-muted); font-weight: 700; letter-spacing: .04em; }
+    .kpi-value { font-size: 28px; line-height: 1.1; font-weight: 700; color: var(--an-text); margin-top: 6px; }
+    .kpi-value.small { font-size: 24px; }
+    .analytics-filter-panel {
+      background: var(--an-surface); border: 1px solid var(--an-border); border-radius: 10px;
+      padding: 12px; margin-bottom: 14px;
+    }
+    .analytics-filter-panel label { color: var(--an-muted); font-size: 12px; font-weight: 700; }
+    .analytics-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(320px, .9fr); gap: 14px; align-items: start; }
+    .analytics-panel { background: var(--an-surface); border: 1px solid var(--an-border); border-radius: 10px; padding: 14px; min-width: 0; }
+    .analytics-panel h3 { font-size: 15px; color: var(--an-text); font-weight: 700; margin: 0 0 10px; }
+    .chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .chart-frame { height: 250px; }
+    .chart-frame.large { height: 310px; }
+    .chart-frame canvas { width: 100% !important; height: 100% !important; }
+    .chart-card {
+      border: 1px solid var(--an-border);
+      border-radius: 10px;
+      padding: 10px;
+      background: #fbfcfd;
+    }
+    .chart-card-title {
+      font-size: 12px;
+      color: var(--an-muted);
+      font-weight: 700;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .analytics-list { display: grid; gap: 8px; margin-top: 12px; }
+    .analytics-row {
+      display: flex; justify-content: space-between; gap: 12px; align-items: center;
+      border: 1px solid var(--an-border); border-radius: 8px; padding: 9px 10px;
+      background: #fbfcfd; font-size: 13px;
+    }
+    .analytics-row span:first-child { color: var(--an-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .analytics-row strong { color: var(--an-text); font-weight: 700; }
+    #analyticsReportsMap { height: 460px; border-radius: 8px; border: 1px solid var(--an-border); overflow: hidden; }
+    .import-panel { margin-top: 14px; }
+    .import-panel code { color: var(--an-text); }
+    .import-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+      border: 1px solid var(--an-border);
+      border-radius: 12px;
+      padding: 14px;
+      background: #fbfcfd;
+    }
+    .import-copy {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      min-width: 0;
+    }
+    .import-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #1a2238;
+      background: #eef2ff;
+      border: 1px solid #c7d2fe;
+      flex: 0 0 auto;
+    }
+    .import-title { font-size: 14px; font-weight: 700; color: var(--an-text); margin: 0; }
+    .import-help { font-size: 12.5px; color: var(--an-muted); margin: 3px 0 0; line-height: 1.45; }
+    .import-controls {
+      display: grid;
+      grid-template-columns: minmax(220px, 320px) auto;
+      gap: 8px;
+      align-items: center;
+    }
+    .import-file-label {
+      min-height: 38px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      border: 1px solid var(--an-border);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--an-text);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 8px 12px;
+    }
+    .import-file-label:hover { border-color: #9ca3af; }
+    .import-file-name {
+      grid-column: 1 / -1;
+      font-size: 12px;
+      color: var(--an-muted);
+      min-height: 18px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .import-submit {
+      border: 0;
+      border-radius: 8px;
+      min-height: 38px;
+      padding: 8px 13px;
+      font-size: 13px;
+      font-weight: 700;
+      background: #1a2238;
+      color: #fff;
+    }
+    .import-submit:hover { opacity: .9; color: #fff; }
+    .visually-hidden-file {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    @media (max-width: 1100px) {
+      .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .analytics-grid, .chart-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 620px) {
+      .analytics-page { padding: 12px; }
+      .kpi-grid { grid-template-columns: 1fr; }
+      .analytics-actions .btn { width: 100%; }
+      .import-card, .import-controls { grid-template-columns: 1fr; }
+    }
+    @media print {
+      body { background: #fff !important; }
+      .app-navbar, .app-footer, .admin-tabs, .analytics-actions, .analytics-filter-panel, .import-panel { display: none !important; }
+      .admin-dashboard-wrap { max-width: none !important; padding: 0 !important; }
+      .analytics-page, .analytics-panel, .kpi-card { box-shadow: none !important; break-inside: avoid; }
+      .analytics-grid, .chart-grid, .kpi-grid { grid-template-columns: 1fr 1fr !important; }
+      #analyticsReportsMap { height: 320px !important; }
+    }
+  </style>
+
+  <div class="analytics-page" id="analyticsReport">
+    <div class="analytics-head">
+      <div>
+        <h2>Аналитика на пријави</h2>
+        <p>Метриките и визуелизациите се освежуваат при отворање и при промена на филтрите.</p>
+      </div>
+      <div class="analytics-actions">
+        <a id="exportCsvBtn" class="btn btn-outline-dark btn-sm" href="{% url 'export_reports_csv' %}">
+          <i class="bi bi-filetype-csv me-1"></i>Извези CSV
+        </a>
+        <button id="exportPdfBtn" class="btn btn-dark btn-sm" type="button">
+          <i class="bi bi-file-earmark-pdf me-1"></i>Извези PDF извештај
+        </button>
+      </div>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">Вкупно пријави</div><div class="kpi-value" id="kpiTotalReports">{{ stats.total_reports }}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Отворени</div><div class="kpi-value" id="kpiOpenReports">{{ stats.open_reports }}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Висок приоритет</div><div class="kpi-value" id="kpiHighPriority">{{ stats.high_priority_reports }}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Некласифицирани</div><div class="kpi-value" id="kpiUnclassified">{{ stats.unclassified_reports }}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Активни корисници</div><div class="kpi-value" id="kpiActiveUsers">{{ stats.active_users }}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Решеност</div><div class="kpi-value"><span id="kpiResolveRate">{{ stats.resolve_rate }}</span>%</div></div>
+      <div class="kpi-card"><div class="kpi-label">Просечно време</div><div class="kpi-value small"><span id="kpiAvgDays">{{ stats.avg_days }}</span> дена</div></div>
+    </div>
+
+    <form id="analyticsFilters" class="analytics-filter-panel">
+      <div class="row g-2 align-items-end">
+        <div class="col-12 col-md-3 col-lg-2">
+          <label class="form-label" for="filterFrom">Од датум</label>
+          <input id="filterFrom" class="form-control form-control-sm" type="date" name="from">
+        </div>
+        <div class="col-12 col-md-3 col-lg-2">
+          <label class="form-label" for="filterTo">До датум</label>
+          <input id="filterTo" class="form-control form-control-sm" type="date" name="to">
+        </div>
+        <div class="col-12 col-md-3 col-lg-2">
+          <label class="form-label" for="filterCategory">Категорија</label>
+          <select id="filterCategory" class="form-select form-select-sm" name="category">
+            <option value="">Сите</option>
+            {% for value,label in category_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-3 col-lg-2">
+          <label class="form-label" for="filterStatus">Статус</label>
+          <select id="filterStatus" class="form-select form-select-sm" name="status">
+            <option value="">Сите</option>
+            {% for value,label in status_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-3 col-lg-2">
+          <label class="form-label" for="filterSector">Сектор</label>
+          <select id="filterSector" class="form-select form-select-sm" name="sector">
+            <option value="">Сите</option>
+            {% for value,label in sector_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-3 col-lg-2">
+          <label class="form-label" for="filterPriority">Приоритет</label>
+          <select id="filterPriority" class="form-select form-select-sm" name="priority">
+            <option value="">Сите</option>
+            {% for value,label in priority_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-3 col-lg-2">
+          <label class="form-label" for="filterMunicipality">Општина</label>
+          <select id="filterMunicipality" class="form-select form-select-sm" name="municipality">
+            <option value="">Сите</option>
+            {% for value,label in municipality_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-3 col-lg-2">
+          <label class="form-label" for="periodSelect">Период</label>
+          <select id="periodSelect" class="form-select form-select-sm">
+            <option value="weekly">Неделно</option>
+            <option value="monthly" selected>Месечно</option>
+            <option value="yearly">Годишно</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-3 col-lg-2">
+          <label class="form-label" for="mapGroup">Групирај мапа</label>
+          <select id="mapGroup" class="form-select form-select-sm">
+            <option value="status">Статус</option>
+            <option value="category">Категорија</option>
+            <option value="sector">Сектор</option>
+            <option value="priority">Приоритет</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-6 col-lg-2 d-flex gap-2">
+          <button class="btn btn-dark btn-sm flex-fill" type="submit">Филтрирај</button>
+          <button id="clearAnalyticsFilters" class="btn btn-outline-secondary btn-sm" type="button">Исчисти</button>
+        </div>
+      </div>
+    </form>
+
+    <div class="analytics-grid">
+      <div class="analytics-panel">
+        <h3>Трендови и распределба</h3>
+        <div class="chart-frame large mb-3"><canvas id="timeSeriesChart"></canvas></div>
+        <div class="chart-grid">
+          <div class="chart-card">
+            <div class="chart-card-title">Категории</div>
+            <div class="chart-frame"><canvas id="categoryChart"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-title">Статуси</div>
+            <div class="chart-frame"><canvas id="statusChart"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-title">Приоритети</div>
+            <div class="chart-frame"><canvas id="priorityChart"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-title">Сектори</div>
+            <div class="chart-frame"><canvas id="sectorChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+      <div class="analytics-panel">
+        <h3>Мапа на проблеми</h3>
+        <div id="analyticsReportsMap"></div>
+        <div class="analytics-list" id="municipalitySummary"></div>
+      </div>
+    </div>
+
+    <div class="analytics-panel import-panel">
+      <h3>Импорт на податоци</h3>
+      <form method="post" action="{% url 'import_reports' %}" enctype="multipart/form-data" class="import-card">
+        {% csrf_token %}
+        <div class="import-copy">
+          <div class="import-icon"><i class="bi bi-cloud-arrow-up"></i></div>
+          <div>
+            <p class="import-title">Додади пријави од датотека</p>
+            <p class="import-help">Поддржани формати: CSV, XLSX и XLSM. Дупликат ID се прескокнуваат автоматски.</p>
+            <p class="import-help">Потребни колони: <code>{{ export_columns|join:", " }}</code></p>
+          </div>
+        </div>
+        <div class="import-controls">
+          <input id="importFile" class="visually-hidden-file" type="file" name="file" accept=".csv,.xlsx,.xlsm" required>
+          <label class="import-file-label" for="importFile"><i class="bi bi-paperclip"></i>Избери датотека</label>
+          <button class="import-submit" type="submit"><i class="bi bi-upload me-1"></i>Импортирај</button>
+          <div id="importFileName" class="import-file-name">Нема избрана датотека</div>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script>
+    (function () {
+      const analyticsEndpoint = "/api/analytics/stats/";
+      const kpiEndpoint = "/api/analytics/kpi/";
+      const mapEndpoint = "{% url 'reports_json' %}";
+      const filters = document.getElementById('analyticsFilters');
+      const periodSelect = document.getElementById('periodSelect');
+      const groupSelect = document.getElementById('mapGroup');
+      const exportCsvBtn = document.getElementById('exportCsvBtn');
+      const exportPdfBtn = document.getElementById('exportPdfBtn');
+      const importFile = document.getElementById('importFile');
+      const importFileName = document.getElementById('importFileName');
+      const municipalitySummary = document.getElementById('municipalitySummary');
+      const kpiElements = {
+        totalReports: document.getElementById('kpiTotalReports'),
+        openReports: document.getElementById('kpiOpenReports'),
+        highPriority: document.getElementById('kpiHighPriority'),
+        unclassified: document.getElementById('kpiUnclassified'),
+        activeUsers: document.getElementById('kpiActiveUsers'),
+        resolveRate: document.getElementById('kpiResolveRate'),
+        avgDays: document.getElementById('kpiAvgDays')
+      };
+      const charts = {};
+      const chartPalette = ['#2563eb', '#16a34a', '#f59e0b', '#dc2626', '#7c3aed', '#0891b2', '#db2777', '#4f46e5'];
+      const statusPalette = {
+        new: '#2563eb',
+        in_progress: '#f59e0b',
+        resolved: '#16a34a',
+        rejected: '#dc2626',
+        withdrawn: '#6b7280',
+        unclassified: '#7c3aed',
+      };
+      const priorityPalette = {
+        low: '#0891b2',
+        medium: '#2563eb',
+        normal: '#2563eb',
+        high: '#f59e0b',
+        urgent: '#dc2626',
+      };
+      const sectorPalette = {
+        admin: '#7c3aed',
+        health: '#16a34a',
+        infrastructure: '#f59e0b',
+        safety: '#dc2626',
+        utilities: '#0891b2',
+      };
+      const labelMaps = {
+        category: Object.fromEntries([{% for value,label in category_choices %}["{{ value|escapejs }}", "{{ label|escapejs }}"]{% if not forloop.last %},{% endif %}{% endfor %}]),
+        status: Object.fromEntries([{% for value,label in status_choices %}["{{ value|escapejs }}", "{{ label|escapejs }}"]{% if not forloop.last %},{% endif %}{% endfor %}]),
+        priority: Object.fromEntries([{% for value,label in priority_choices %}["{{ value|escapejs }}", "{{ label|escapejs }}"]{% if not forloop.last %},{% endif %}{% endfor %}]),
+        sector: Object.fromEntries([{% for value,label in sector_choices %}["{{ value|escapejs }}", "{{ label|escapejs }}"]{% if not forloop.last %},{% endif %}{% endfor %}]),
+        municipality: Object.fromEntries([{% for value,label in municipality_choices %}["{{ value|escapejs }}", "{{ label|escapejs }}"]{% if not forloop.last %},{% endif %}{% endfor %}])
+      };
+
+      function currentParams() {
+        const params = new URLSearchParams(new FormData(filters));
+        [...params.entries()].forEach(([key, value]) => { if (!value) params.delete(key); });
+        return params;
+      }
+
+      function setExportLinks(params) {
+        const query = params.toString();
+        exportCsvBtn.href = "{% url 'export_reports_csv' %}" + (query ? `?${query}` : "");
+      }
+
+      function localLabel(type, value) {
+        return labelMaps[type][value] || value || '-';
+      }
+
+      function hexToRgba(hex, alpha) {
+        const clean = String(hex || '#2563eb').replace('#', '');
+        const full = clean.length === 3 ? clean.split('').map((char) => char + char).join('') : clean;
+        const value = parseInt(full, 16);
+        const red = (value >> 16) & 255;
+        const green = (value >> 8) & 255;
+        const blue = value & 255;
+        return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+      }
+
+      function colorsFor(type, rawLabels) {
+        return rawLabels.map((label, index) => {
+          if (type === 'status') return statusPalette[label] || chartPalette[index % chartPalette.length];
+          if (type === 'priority') return priorityPalette[label] || chartPalette[index % chartPalette.length];
+          if (type === 'sector') return sectorPalette[label] || chartPalette[index % chartPalette.length];
+          return chartPalette[index % chartPalette.length];
+        });
+      }
+
+      function makeChart(id, type, labels, values, label, colors) {
+        if (charts[id]) charts[id].destroy();
+        const isCircular = type === 'doughnut' || type === 'pie';
+        const chartColors = Array.isArray(colors) ? colors : [colors || '#2563eb'];
+        charts[id] = new Chart(document.getElementById(id), {
+          type,
+          data: {
+            labels,
+            datasets: [{
+              label,
+              data: values,
+              borderColor: isCircular ? chartColors : chartColors.map((color) => hexToRgba(color, .95)),
+              backgroundColor: chartColors.map((color) => hexToRgba(color, isCircular ? .68 : .52)),
+              borderWidth: isCircular ? 2 : 1,
+              tension: .35
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: isCircular, position: 'bottom', labels: { boxWidth: 14, padding: 12 } } },
+            scales: isCircular ? {} : {
+              x: { ticks: { color: '#5f6671', maxRotation: 28, minRotation: 0 }, grid: { display: false } },
+              y: { beginAtZero: true, ticks: { precision: 0, color: '#5f6671' }, grid: { color: 'rgba(15, 23, 42, .08)' } }
+            }
+          }
+        });
+      }
+
+      async function loadKpiMetrics() {
+        try {
+          const params = currentParams();
+          const resp = await fetch(`${kpiEndpoint}?${params.toString()}`);
+          if (!resp.ok) throw new Error('KPI response not ok');
+          const data = await resp.json();
+          kpiElements.totalReports.textContent = data.total_reports;
+          kpiElements.openReports.textContent = data.open_reports;
+          kpiElements.highPriority.textContent = data.high_priority_reports;
+          kpiElements.unclassified.textContent = data.unclassified_reports;
+          kpiElements.activeUsers.textContent = data.active_users;
+          kpiElements.resolveRate.textContent = data.resolve_rate;
+          kpiElements.avgDays.textContent = data.avg_days;
+        } catch (err) {
+          console.error('KPI fetch failed:', err);
+        }
+      }
+
+      async function loadCharts() {
+        try {
+          const params = currentParams();
+          params.set('period', periodSelect.value);
+          const resp = await fetch(`${analyticsEndpoint}?${params.toString()}`);
+          if (!resp.ok) throw new Error('bad response');
+          const data = await resp.json();
+          const periodLabels = data.by_period.data.map((row) => row.period ? row.period.slice(0, 10) : '-');
+          const categoryRaw = data.by_category.map((row) => row.label);
+          const statusRaw = data.by_status.map((row) => row.label);
+          const priorityRaw = data.by_priority.map((row) => row.label);
+          const sectorRaw = data.by_sector.map((row) => row.label);
+          makeChart('timeSeriesChart', 'line', periodLabels, data.by_period.data.map((row) => row.count), 'Пријави', ['#2563eb']);
+          makeChart('categoryChart', 'bar', categoryRaw.map((label) => localLabel('category', label)), data.by_category.map((row) => row.count), 'Категории', colorsFor('category', categoryRaw));
+          makeChart('statusChart', 'doughnut', statusRaw.map((label) => localLabel('status', label)), data.by_status.map((row) => row.count), 'Статуси', colorsFor('status', statusRaw));
+          makeChart('priorityChart', 'bar', priorityRaw.map((label) => localLabel('priority', label)), data.by_priority.map((row) => row.count), 'Приоритети', colorsFor('priority', priorityRaw));
+          makeChart('sectorChart', 'bar', sectorRaw.map((label) => localLabel('sector', label)), data.by_sector.map((row) => row.count), 'Сектори', colorsFor('sector', sectorRaw));
+          renderMunicipalitySummary(data.by_municipality);
+        } catch (err) {
+          console.error('Analytics fetch failed:', err);
+        }
+      }
+
+      function renderMunicipalitySummary(rows) {
+        if (!municipalitySummary) return;
+        const topRows = [...(rows || [])].sort((a, b) => b.count - a.count).slice(0, 6);
+        if (!topRows.length) {
+          municipalitySummary.innerHTML = '<div class="analytics-row"><span>Нема податоци за општини</span><strong>0</strong></div>';
+          return;
+        }
+        municipalitySummary.innerHTML = topRows.map((row) => `
+          <div class="analytics-row">
+            <span>${escapeHtml(localLabel('municipality', row.label))}</span>
+            <strong>${row.count}</strong>
+          </div>
+        `).join('');
+      }
+
+      function exportPdfReport() {
+        Object.values(charts).forEach((chart) => chart.resize());
+        setTimeout(() => window.print(), 120);
+      }
+
+      const map = L.map("analyticsReportsMap").setView([41.9981, 21.4254], 12);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap contributors"
+      }).addTo(map);
+      const markersLayer = L.layerGroup().addTo(map);
+      const palette = ['#2563eb', '#16803c', '#c2410c', '#7c3aed', '#0f766e', '#b7791f', '#be123c'];
+
+      function colorFor(value) {
+        let hash = 0;
+        String(value || '').split('').forEach((char) => { hash = ((hash << 5) - hash) + char.charCodeAt(0); });
+        return palette[Math.abs(hash) % palette.length];
+      }
+
+      function escapeHtml(value) {
+        return String(value || '').replace(/[&<>"']/g, (char) => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#039;'
+        }[char]));
+      }
+
+      async function loadMap() {
+        const params = currentParams();
+        setExportLinks(params);
+        const response = await fetch(mapEndpoint + (params.toString() ? `?${params}` : ""));
+        if (!response.ok) return;
+        const payload = await response.json();
+        const reports = payload.results || [];
+        const group = groupSelect.value;
+        markersLayer.clearLayers();
+        const bounds = [];
+        reports.forEach((report) => {
+          const groupValue = report[group + '_label'] || report[group] || '-';
+          const marker = L.circleMarker([report.lat, report.lng], {
+            radius: 7,
+            color: colorFor(groupValue),
+            fillColor: colorFor(groupValue),
+            fillOpacity: .88,
+            weight: 2
+          }).addTo(markersLayer);
+          marker.bindPopup(`
+            <div style="min-width:220px;">
+              <strong>ПРЈ-${report.id}</strong>
+              <div class="small text-muted my-1">${escapeHtml(groupValue)}</div>
+              <div class="small mb-2">${escapeHtml(String(report.description || '').slice(0, 140))}</div>
+              <a class="btn btn-sm btn-primary" href="${escapeHtml(report.detail_url)}">Отвори</a>
+            </div>
+          `);
+          bounds.push([report.lat, report.lng]);
+        });
+        if (bounds.length) map.fitBounds(bounds, { padding: [28, 28], maxZoom: 15 });
+      }
+
+      filters.addEventListener('submit', (event) => {
+        event.preventDefault();
+        loadMap();
+        loadCharts();
+        loadKpiMetrics();
+      });
+      filters.querySelectorAll('select,input').forEach((field) => field.addEventListener('change', () => {
+        loadMap();
+        loadCharts();
+        loadKpiMetrics();
+      }));
+      groupSelect.addEventListener('change', loadMap);
+      periodSelect.addEventListener('change', loadCharts);
+      exportPdfBtn.addEventListener('click', exportPdfReport);
+      importFile.addEventListener('change', () => {
+        importFileName.textContent = importFile.files.length ? importFile.files[0].name : 'Нема избрана датотека';
+      });
+      window.addEventListener('beforeprint', () => {
+        Object.values(charts).forEach((chart) => chart.resize());
+        if (map) setTimeout(() => map.invalidateSize(), 50);
+      });
+      document.getElementById('clearAnalyticsFilters').addEventListener('click', () => {
+        filters.reset();
+        loadMap();
+        loadCharts();
+        loadKpiMetrics();
+      });
+
+      if (typeof Chart !== 'undefined' && typeof L !== 'undefined') {
+        loadCharts();
+        loadKpiMetrics();
+        loadMap();
+      }
+    })();
+  </script>
+  {% endif %}
+
+  {% if active_tab == 'users' %}
+  <style>
+    .admin-users-page {
+      --au-bg: #f6f5f2;
+      --au-surface: #ffffff;
+      --au-border: #e8e5df;
+      --au-border-2: #d4cfc5;
+      --au-text: #1a1916;
+      --au-muted: #6b6760;
+      --au-faint: #9e9a93;
+      --au-blue: #2563eb;
+      --au-blue-bg: #eff5ff;
+      --au-green: #15803d;
+      --au-red: #dc2626;
+      --au-radius: 10px;
+      --au-shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+      background: var(--au-bg);
+      border: 1px solid var(--au-border);
+      border-radius: 14px;
+      padding: 20px;
+    }
+    .admin-users-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+    .admin-users-head h2 { font-size: 22px; font-weight: 600; color: var(--au-text); margin: 0; }
+    .admin-users-head p { font-size: 13px; color: var(--au-muted); margin: 3px 0 0; }
+    .role-filter-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .role-filter-card {
+      display: flex; justify-content: space-between; align-items: center; gap: 10px;
+      background: var(--au-surface); border: 1px solid var(--au-border); border-radius: var(--au-radius);
+      padding: 12px 14px; color: var(--au-muted); text-decoration: none; box-shadow: var(--au-shadow);
+      transition: border-color .15s, transform .15s;
+    }
+    .role-filter-card:hover { border-color: var(--au-border-2); color: var(--au-text); transform: translateY(-1px); }
+    .role-filter-card.active { border-color: #bfdbfe; background: var(--au-blue-bg); color: var(--au-blue); }
+    .role-filter-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+    .role-filter-count { font-size: 22px; font-weight: 600; color: var(--au-text); }
+    .admin-users-layout { display: grid; grid-template-columns: 330px 1fr; gap: 14px; align-items: start; }
+    .admin-user-panel, .admin-user-list {
+      background: var(--au-surface); border: 1px solid var(--au-border); border-radius: 14px;
+      box-shadow: var(--au-shadow); overflow: hidden;
+    }
+    .admin-user-panel-body { padding: 18px; }
+    .admin-user-panel h3, .admin-user-list h3 { font-size: 16px; font-weight: 600; color: var(--au-text); margin: 0; }
+    .admin-user-panel-sub, .admin-user-list-sub { font-size: 12.5px; color: var(--au-muted); margin-top: 3px; }
+    .admin-user-panel label { font-size: 12px; font-weight: 600; color: var(--au-muted); margin-bottom: 5px; }
+    .admin-user-panel .form-control, .admin-user-panel .form-select,
+    .admin-users-table .form-select {
+      border-color: var(--au-border-2); border-radius: 6px; font-size: 13px;
+    }
+    .admin-user-panel .form-control:focus, .admin-user-panel .form-select:focus,
+    .admin-users-table .form-select:focus { border-color: var(--au-text); box-shadow: none; }
+    .admin-user-list-header {
+      display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+      padding: 16px 18px; border-bottom: 1px solid var(--au-border);
+    }
+    .admin-users-table-wrap { overflow-x: auto; }
+    .admin-users-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .admin-users-table th {
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em;
+      color: var(--au-faint); background: #fbfaf8; border-bottom: 1px solid var(--au-border);
+      padding: 10px 12px; white-space: nowrap;
+    }
+    .admin-users-table td { padding: 12px; border-bottom: 1px solid var(--au-border); vertical-align: middle; color: var(--au-text); }
+    .admin-users-table tbody tr:hover td { background: #fbfaf8; }
+    .admin-users-table tbody tr:last-child td { border-bottom: 0; }
+    .user-name-cell { min-width: 170px; }
+    .user-name-cell .name { font-weight: 600; }
+    .user-name-cell .handle, .user-assignment-empty { color: var(--au-faint); font-size: 12px; }
+    .role-badge, .status-badge {
+      display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 9px;
+      font-size: 12px; font-weight: 600; border: 1px solid transparent;
+    }
+    .status-badge.active { color: var(--au-green); background: #f0fdf4; border-color: #bbf7d0; }
+    .status-badge.inactive { color: var(--au-muted); background: #f3f2ee; border-color: #e4e1d9; }
+    .password-badge { color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 999px; padding: 3px 8px; font-size: 11px; font-weight: 600; }
+    .assignment-grid { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(130px, 1fr); gap: 8px; min-width: 280px; }
+    .worker-only-fields[hidden] { display: none !important; }
+    .admin-action-stack { display: inline-flex; gap: 6px; align-items: center; justify-content: flex-end; }
+    .admin-icon-action {
+      width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 999px; border: 1px solid var(--au-border-2); background: #fff; color: var(--au-muted);
+    }
+    .admin-icon-action:hover { color: var(--au-text); border-color: var(--au-muted); }
+    .admin-icon-action.danger { color: var(--au-red); border-color: #fecdd3; }
+    .admin-icon-action.success { color: var(--au-green); border-color: #bbf7d0; }
+    .admin-create-btn {
+      border: 0; border-radius: 6px; background: var(--au-text); color: #fff;
+      min-height: 38px; font-size: 13px; font-weight: 600;
+    }
+    .admin-create-btn:hover { opacity: .86; color: #fff; }
+    .admin-empty-row td { text-align: center; color: var(--au-faint); padding: 36px 12px; }
+    @media (max-width: 1100px) {
+      .admin-users-layout { grid-template-columns: 1fr; }
+      .role-filter-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 620px) {
+      .admin-users-page { padding: 14px; }
+      .role-filter-strip { grid-template-columns: 1fr; }
+      .assignment-grid { grid-template-columns: 1fr; min-width: 220px; }
+    }
+  </style>
+
+  <div class="admin-users-page">
+    <div class="admin-users-head">
+      <div>
+        <h2>Управување со корисници</h2>
+        <p>Филтрирај по улога, додај работници и ажурирај пристап без напуштање на страницата.</p>
+      </div>
+      <a class="btn btn-outline-dark btn-sm" href="{% url 'export_reports_csv' %}">
+        <i class="bi bi-download me-1"></i>Извоз
+      </a>
+    </div>
+
+    <div class="role-filter-strip" aria-label="Филтер по улога">
+      {% for role_card in role_filter_cards %}
+      <a class="role-filter-card {% if selected_user_role == role_card.value %}active{% endif %}" href="?tab=users{% if role_card.value %}&role={{ role_card.value }}{% endif %}">
+        <span class="role-filter-label">{{ role_card.label }}</span>
+        <span class="role-filter-count">{{ role_card.count }}</span>
+      </a>
+      {% endfor %}
+    </div>
+
+    <div class="admin-users-layout">
+      <div class="admin-user-panel">
+        <div class="admin-user-panel-body">
+          <h3>Нов корисник</h3>
+          <div class="admin-user-panel-sub mb-3">Почетната лозинка се менува при првата најава.</div>
+          <form method="post" action="{% url 'create_user' %}" class="vstack gap-3">
+            {% csrf_token %}
+            <div>
+              <label class="form-label" for="id_username">Корисничко име</label>
+              <input class="form-control" id="id_username" type="text" name="username" autocomplete="off">
+            </div>
+            <div>
+              <label class="form-label" for="id_email">Е-пошта</label>
+              <input class="form-control" id="id_email" type="email" name="email" required>
+            </div>
+            <div>
+              <label class="form-label" for="id_password">Почетна лозинка</label>
+              <input class="form-control" id="id_password" type="password" name="password" required>
+              <div class="form-text">Корисникот ќе мора да ја промени при првата најава.</div>
+            </div>
+            <div>
+              <label class="form-label" for="id_role">Улога</label>
+              <select class="form-select js-role-select" id="id_role" name="role" data-worker-target="create-worker-fields">
+                {% for value,label in role_choices %}
+                <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div id="create-worker-fields" class="vstack gap-3 worker-only-fields" hidden>
+              <div>
+                <label class="form-label" for="id_sector">Сектор</label>
+                <select class="form-select" id="id_sector" name="sector">
+                  <option value="">---------</option>
+                  {% for value,label in sector_choices %}
+                  <option value="{{ value }}">{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div>
+                <label class="form-label" for="id_municipality">Општина</label>
+                <select class="form-select" id="id_municipality" name="municipality">
+                  <option value="">---------</option>
+                  {% for value,label in municipality_choices %}
+                  <option value="{{ value }}">{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <button class="btn admin-create-btn" type="submit">
+              <i class="bi bi-person-plus me-1"></i>Креирај профил
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="admin-user-list">
+        <div class="admin-user-list-header">
+          <div>
+            <h3>Листа на корисници</h3>
+            <div class="admin-user-list-sub">
+              {% if selected_user_role %}Прикажани се само избраните улоги.{% else %}Прикажани се сите улоги.{% endif %}
+            </div>
+          </div>
+          {% if selected_user_role %}
+          <a class="btn btn-sm btn-outline-secondary" href="?tab=users">Сите улоги</a>
+          {% endif %}
+        </div>
+        <div class="admin-users-table-wrap">
+          <table class="admin-users-table">
+            <thead>
+            <tr>
+              <th>Име</th>
+              <th>Е-пошта</th>
+              <th>Улога</th>
+              <th>Статус</th>
+              <th>Доделување</th>
+              <th class="text-end">Акција</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for listed_user in users %}
+            <tr>
+              <td class="user-name-cell">
+                <div class="name">{{ listed_user.get_full_name|default:listed_user.username }}</div>
+                <div class="handle">@{{ listed_user.username }}</div>
+              </td>
+              <td>{{ listed_user.email|default:"—" }}</td>
+              <td style="min-width: 150px;">
+                <form id="update-user-{{ listed_user.id }}" method="post" action="{% url 'update_user' listed_user.id %}">
+                  {% csrf_token %}
+                  <select class="form-select form-select-sm js-role-select" name="role" data-worker-target="worker-fields-{{ listed_user.id }}">
+                    {% for value,label in role_choices %}
+                    <option value="{{ value }}" {% if listed_user.profile.role == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                </form>
+              </td>
+              <td>
+                <span class="status-badge {% if listed_user.is_active %}active{% else %}inactive{% endif %}">
+                  {% if listed_user.is_active %}Активен{% else %}Неактивен{% endif %}
+                </span>
+                {% if listed_user.profile.must_change_password %}
+                <span class="password-badge ms-1">Нова лозинка</span>
+                {% endif %}
+              </td>
+              <td style="min-width: 280px;">
+                <div id="worker-fields-{{ listed_user.id }}" class="assignment-grid worker-only-fields" {% if listed_user.profile.role != 'officer' %}hidden{% endif %}>
+                  <div>
+                    <select class="form-select form-select-sm" name="sector" form="update-user-{{ listed_user.id }}">
+                      <option value="">Сектор</option>
+                      {% for value,label in sector_choices %}
+                      <option value="{{ value }}" {% if listed_user.profile.sector == value %}selected{% endif %}>{{ label }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div>
+                    <select class="form-select form-select-sm" name="municipality" form="update-user-{{ listed_user.id }}">
+                      <option value="">Општина</option>
+                      {% for value,label in municipality_choices %}
+                      <option value="{{ value }}" {% if listed_user.profile.municipality == value %}selected{% endif %}>{{ label }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                </div>
+                {% if listed_user.profile.role != 'officer' %}
+                <span id="worker-empty-{{ listed_user.id }}" class="user-assignment-empty">Не е потребно</span>
+                {% else %}
+                <span id="worker-empty-{{ listed_user.id }}" class="user-assignment-empty" hidden>Не е потребно</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                <div class="admin-action-stack">
+                  <button class="admin-icon-action" type="submit" form="update-user-{{ listed_user.id }}" title="Зачувај" aria-label="Зачувај корисник">
+                    <i class="bi bi-check2"></i>
+                  </button>
+                  <form method="post" action="{% url 'toggle_user_active' listed_user.id %}">
+                    {% csrf_token %}
+                    <button class="admin-icon-action {% if listed_user.is_active %}danger{% else %}success{% endif %}" type="submit" {% if listed_user.id == request.user.id %}disabled{% endif %} title="{% if listed_user.is_active %}Деактивирај{% else %}Активирај{% endif %}" aria-label="{% if listed_user.is_active %}Деактивирај{% else %}Активирај{% endif %}">
+                      {% if listed_user.is_active %}<i class="bi bi-pause-circle"></i>{% else %}<i class="bi bi-play-circle"></i>{% endif %}
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr class="admin-empty-row"><td colspan="6">Нема корисници за избраниот филтер.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if active_tab == 'unclassified' %}
+  <style>
+    .unclassified-page {
+      --au-bg: #f6f5f2;
+      --au-surface: #ffffff;
+      --au-border: #e8e5df;
+      --au-border-2: #d4cfc5;
+      --au-text: #1a1916;
+      --au-muted: #6b6760;
+      --au-faint: #9e9a93;
+      --au-blue: #2563eb;
+      --au-red: #dc2626;
+      --au-amber: #b7791f;
+      --au-shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+      background: var(--au-bg);
+      border: 1px solid var(--au-border);
+      border-radius: 14px;
+      padding: 20px;
+    }
+    .unclassified-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 14px; flex-wrap: wrap; margin-bottom: 16px;
+    }
+    .unclassified-header h2 { font-size: 22px; font-weight: 600; color: var(--au-text); margin: 0; }
+    .unclassified-header p { font-size: 13px; color: var(--au-muted); margin: 3px 0 0; }
+    .unclassified-count-card {
+      min-width: 138px; background: var(--au-surface); border: 1px solid var(--au-border);
+      border-radius: 10px; padding: 10px 14px; box-shadow: var(--au-shadow);
+    }
+    .unclassified-count-label {
+      font-size: 11px; color: var(--au-faint); font-weight: 700;
+      text-transform: uppercase; letter-spacing: .04em;
+    }
+    .unclassified-count { display: block; font-size: 26px; line-height: 1.1; font-weight: 700; color: var(--au-red); margin-top: 4px; }
+    .unclassified-list {
+      display: grid; gap: 10px;
+    }
+    .unclassified-item {
+      display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 430px);
+      gap: 14px; align-items: stretch;
+      background: var(--au-surface); border: 1px solid var(--au-border);
+      border-radius: 12px; padding: 16px; box-shadow: var(--au-shadow);
+      transition: border-color .15s, transform .15s;
+    }
+    .unclassified-item:hover { border-color: var(--au-border-2); transform: translateY(-1px); }
+    .unclassified-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 7px; }
+    .unclassified-title { font-weight: 700; color: var(--au-text); font-size: 15px; }
+    .unclassified-meta { font-size: 12px; color: var(--au-muted); margin-bottom: 8px; }
+    .unclassified-desc { font-size: 13px; color: var(--au-text); line-height: 1.45; margin: 0; }
+    .unclassified-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+    .unclassified-chip {
+      display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 9px;
+      font-size: 11px; font-weight: 700; border: 1px solid var(--au-border); color: var(--au-muted);
+      background: #fbfaf8;
+    }
+    .unclassified-chip.danger { color: var(--au-red); background: #fef2f2; border-color: #fecaca; }
+    .unclassified-chip.warning { color: #92400e; background: #fffbeb; border-color: #fde68a; }
+    .unclassified-form {
+      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;
+      align-content: end; padding-left: 14px; border-left: 1px solid var(--au-border);
+    }
+    .unclassified-form select {
+      min-height: 36px; font-size: 12px; border-radius: 6px; border-color: var(--au-border-2);
+    }
+    .unclassified-form select:focus { border-color: var(--au-text); box-shadow: none; }
+    .unclassified-form button {
+      grid-column: 1 / -1; border: 0; border-radius: 6px; background: var(--au-text);
+      color: #fff; min-height: 36px; font-size: 13px; font-weight: 600;
+    }
+    .unclassified-form button:hover { opacity: .86; color: #fff; }
+    .unclassified-empty {
+      background: var(--au-surface); border: 1px solid var(--au-border);
+      border-radius: 12px; padding: 38px; text-align: center; color: var(--au-muted);
+      box-shadow: var(--au-shadow);
+    }
+    .unclassified-empty-icon {
+      width: 42px; height: 42px; border-radius: 999px; display: inline-flex;
+      align-items: center; justify-content: center; background: #f0fdf4; color: #15803d;
+      border: 1px solid #bbf7d0; margin-bottom: 10px;
+    }
+    .unclassified-empty p { margin: 0; font-size: 14px; font-weight: 600; color: var(--au-text); }
+    .unclassified-empty small { display: block; margin-top: 4px; font-size: 12px; color: var(--au-muted); }
+    @media (max-width: 980px) {
+      .unclassified-item { grid-template-columns: 1fr; }
+      .unclassified-form { padding-left: 0; padding-top: 12px; border-left: 0; border-top: 1px solid var(--au-border); }
+    }
+    @media (max-width: 620px) {
+      .unclassified-page { padding: 14px; }
+      .unclassified-form { grid-template-columns: 1fr; }
+      .unclassified-count-card { width: 100%; }
+    }
+  </style>
+
+  <div class="unclassified-page">
+    <div class="unclassified-header">
+      <div>
+        <h2>Редица за класификација</h2>
+        <p>Пријави што треба да добијат категорија, приоритет и сектор.</p>
+      </div>
+      <div class="unclassified-count-card">
+        <div class="unclassified-count-label">Чекаат</div>
+        <span class="unclassified-count">{{ unclassified_count }}</span>
+      </div>
+    </div>
+
+    {% if unclassified_reports %}
+    <div class="unclassified-list">
+      {% for report in unclassified_reports %}
+      <div class="unclassified-item">
+        <div class="unclassified-info">
+          <div class="unclassified-title-row">
+            <div class="unclassified-title">ПРЈ-{{ report.id }}</div>
+            {% if report.category == 'other' %}<span class="unclassified-chip danger">Некласифицирано</span>{% endif %}
+          </div>
+          <div class="unclassified-meta">
+            {{ report.citizen.username }} • {{ report.created_at|date:"d.m.Y H:i" }}
+          </div>
+          <p class="unclassified-desc">{{ report.description|truncatewords:24 }}</p>
+          <div class="unclassified-badges">
+            {% if report.municipality %}<span class="unclassified-chip">{{ report.municipality }}</span>{% endif %}
+            {% if report.status == 'unclassified' %}<span class="unclassified-chip warning">Статус: Некласифицирано</span>{% endif %}
+          </div>
+        </div>
+
+        <form method="post" action="{% url 'classify_report' report.id %}" class="unclassified-form">
+          {% csrf_token %}
+          <select name="category" class="form-select" required>
+            <option value="">Категорија</option>
+            {% for value, label in category_choices %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+          <select name="priority" class="form-select" required>
+            <option value="">Приоритет</option>
+            {% for value, label in priority_choices %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+          <select name="sector" class="form-select" required>
+            <option value="">Сектор</option>
+            {% for value, label in sector_choices %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn btn-primary">Класифицирај</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="unclassified-empty">
+      <div class="unclassified-empty-icon"><i class="bi bi-check2"></i></div>
+      <p>Нема некласифицирани извештаи</p>
+      <small>Сите извештаи се класифицирани.</small>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if active_tab == 'duplicates' %}
+  <style>
+    .dup-queue-page {
+      --dq-bg: #f6f5f2;
+      --dq-surface: #ffffff;
+      --dq-border: #e8e5df;
+      --dq-text: #1a1916;
+      --dq-muted: #6b6760;
+      background: var(--dq-bg);
+      border: 1px solid var(--dq-border);
+      border-radius: 14px;
+      padding: 18px;
+    }
+    .dup-queue-head {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 14px; flex-wrap: wrap; margin-bottom: 16px;
+    }
+    .dup-queue-head h2 { font-size: 20px; font-weight: 700; color: var(--dq-text); margin: 0; }
+    .dup-queue-head p { color: var(--dq-muted); font-size: 13px; margin: 4px 0 0; }
+    .dup-queue-count {
+      min-width: 120px; background: var(--dq-surface); border: 1px solid var(--dq-border);
+      border-radius: 10px; padding: 10px 14px; text-align: center;
+    }
+    .dup-queue-count-label { font-size: 11px; color: var(--dq-muted); font-weight: 700; text-transform: uppercase; }
+    .dup-queue-count-num { font-size: 28px; font-weight: 700; color: #b45309; }
+    .dup-queue-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 14px;
+      align-items: start;
+      background: var(--dq-surface);
+      border: 1px solid var(--dq-border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.05);
+    }
+    .dup-queue-meta { font-size: 12px; color: var(--dq-muted); margin-bottom: 8px; }
+    .dup-queue-desc { font-size: 13px; color: var(--dq-text); line-height: 1.45; margin: 0 0 10px; }
+    .dup-queue-ref {
+      font-size: 13px;
+      font-weight: 600;
+      color: #92400e;
+      margin-bottom: 10px;
+    }
+    .dup-queue-ref a { color: #2563eb; font-weight: 600; }
+    .dup-queue-actions { display: flex; flex-direction: column; gap: 8px; min-width: 160px; }
+    .dup-queue-actions button {
+      border: 0; border-radius: 8px; padding: 10px 14px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .dup-btn-confirm { background: #1a1916; color: #fff; }
+    .dup-btn-confirm:hover { opacity: .9; }
+    .dup-btn-reject { background: #fff; color: #1a1916; border: 1px solid var(--dq-border) !important; }
+    .dup-btn-reject:hover { background: #f6f5f2; }
+    .dup-queue-empty {
+      text-align: center; padding: 40px 20px; color: var(--dq-muted);
+      background: var(--dq-surface); border: 1px dashed var(--dq-border); border-radius: 12px;
+    }
+    @media (max-width: 720px) {
+      .dup-queue-item { grid-template-columns: 1fr; }
+      .dup-queue-actions { flex-direction: row; flex-wrap: wrap; }
+    }
+  </style>
+  <div class="dup-queue-page">
+    <div class="dup-queue-head">
+      <div>
+        <h2>Преглед на можни дупликати</h2>
+        <p>Системот предложува врска со постара пријава. Потврдете или одбијте за секоја нова пријава.</p>
+      </div>
+      <div class="dup-queue-count">
+        <div class="dup-queue-count-label">Чекаат</div>
+        <div class="dup-queue-count-num">{{ pending_duplicate_count }}</div>
+      </div>
+    </div>
+
+    {% if pending_duplicate_reports %}
+      {% for report in pending_duplicate_reports %}
+      <div class="dup-queue-item">
+        <div>
+          <div class="dup-queue-meta">
+            <strong>ПРЈ-{{ report.id }}</strong> · {{ report.citizen.username }} · {{ report.created_at|date:"d.m.Y H:i" }}
+          </div>
+          <p class="dup-queue-desc">{{ report.description|truncatewords:40 }}</p>
+          <div class="dup-queue-ref">
+            Предложен оригинал:
+            {% if report.duplicate_of_id %}
+            <a href="{% url 'report_detail' report.duplicate_of_id %}" target="_blank" rel="noopener">ПРЈ-{{ report.duplicate_of_id }}</a>
+            {% else %}
+            —
+            {% endif %}
+          </div>
+        </div>
+        <div class="dup-queue-actions">
+          <form method="post" action="{% url 'review_duplicate_report' report.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="confirm" />
+            <button type="submit" class="dup-btn-confirm w-100">Потврди дупликат</button>
+          </form>
+          <form method="post" action="{% url 'review_duplicate_report' report.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reject" />
+            <button type="submit" class="dup-btn-reject w-100">Не е дупликат</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="dup-queue-empty">
+        <p class="mb-0 fw-semibold text-dark">Нема пријави што чекаат одлука за дупликат.</p>
+      </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if active_tab == 'bulk_notify' %}
+  <style>
+    .bulk-tab-page {
+      --bt-bg: #f6f5f2;
+      --bt-surface: #ffffff;
+      --bt-border: #e8e5df;
+      --bt-border-2: #d4cfc5;
+      --bt-text: #1a1916;
+      --bt-muted: #6b6760;
+      --bt-faint: #9e9a93;
+      background: var(--bt-bg);
+      border: 1px solid var(--bt-border);
+      border-radius: 14px;
+      padding: 20px;
+    }
+    .bulk-tab-head {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 14px; flex-wrap: wrap; margin-bottom: 16px;
+    }
+    .bulk-tab-head h2 { font-size: 22px; font-weight: 600; color: var(--bt-text); margin: 0; }
+    .bulk-tab-head p { font-size: 13px; color: var(--bt-muted); margin: 3px 0 0; }
+    .bulk-tab-count {
+      min-width: 138px; background: var(--bt-surface); border: 1px solid var(--bt-border);
+      border-radius: 10px; padding: 10px 14px;
+    }
+    .bulk-tab-count-label {
+      font-size: 11px; color: var(--bt-faint); font-weight: 700;
+      text-transform: uppercase; letter-spacing: .04em;
+    }
+    .bulk-tab-count strong {
+      display: block; font-size: 26px; line-height: 1.1; color: var(--bt-text); margin-top: 4px;
+    }
+    .bulk-tab-grid {
+      display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 14px; align-items: start;
+    }
+    .bulk-tab-panel {
+      background: var(--bt-surface); border: 1px solid var(--bt-border);
+      border-radius: 12px; padding: 16px;
+    }
+    .bulk-tab-panel h3 { font-size: 16px; font-weight: 600; color: var(--bt-text); margin: 0 0 12px; }
+    .bulk-tab-panel label { font-size: 12px; font-weight: 700; color: var(--bt-muted); }
+    .bulk-tab-panel .form-control, .bulk-tab-panel .form-select {
+      border-color: var(--bt-border-2); border-radius: 7px; font-size: 13px;
+    }
+    .bulk-tab-panel .form-control:focus, .bulk-tab-panel .form-select:focus {
+      border-color: var(--bt-text); box-shadow: none;
+    }
+    .bulk-tab-message textarea { min-height: 190px; resize: vertical; }
+    .bulk-tab-note {
+      background: #fbfaf8; border: 1px solid var(--bt-border); border-radius: 10px;
+      padding: 12px; color: var(--bt-muted); font-size: 12.5px; line-height: 1.5; margin-top: 12px;
+    }
+    .bulk-tab-actions {
+      display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px;
+    }
+    .bulk-tab-send {
+      border: 0; border-radius: 7px; background: var(--bt-text); color: #fff;
+      min-height: 40px; padding: 9px 14px; font-size: 13px; font-weight: 700;
+    }
+    .bulk-tab-send:hover { opacity: .88; color: #fff; }
+    .bulk-tab-send:disabled { opacity: .45; }
+    @media (max-width: 900px) {
+      .bulk-tab-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+
+  <div class="bulk-tab-page">
+    <div class="bulk-tab-head">
+      <div>
+        <h2>Масовно известување</h2>
+        <p>Изберете примачи и напишете ја пораката што ќе се испрати по email.</p>
+      </div>
+      <div class="bulk-tab-count">
+        <div class="bulk-tab-count-label">Примачи</div>
+        <strong>{{ bulk_count }}</strong>
+      </div>
+    </div>
+
+    <div class="bulk-tab-grid">
+      <div class="bulk-tab-panel">
+        <h3>Филтри</h3>
+        <form method="get">
+          <input type="hidden" name="tab" value="bulk_notify">
+          <div class="mb-3">
+            <label class="form-label" for="bulkMunicipality">Општина</label>
+            <select id="bulkMunicipality" name="bulk_municipality" class="form-select">
+              <option value="">Сите општини</option>
+              {% for key, label in municipality_choices %}
+              <option value="{{ key }}" {% if bulk_municipality == key %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="bulkSector">Сектор</label>
+            <select id="bulkSector" name="bulk_sector" class="form-select">
+              <option value="">Сите сектори</option>
+              {% for key, label in sector_choices %}
+              <option value="{{ key }}" {% if bulk_sector == key %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="btn btn-outline-dark w-100">
+            <i class="bi bi-funnel me-1"></i>Освежи примачи
+          </button>
+        </form>
+      </div>
+
+      <div class="bulk-tab-panel bulk-tab-message">
+        <h3>Порака</h3>
+        <form id="dashboardBulkSendForm" method="post" action="{% url 'notifications_bulk_notify_send' %}">
+          {% csrf_token %}
+          <input type="hidden" name="municipality" value="{{ bulk_municipality }}">
+          <input type="hidden" name="sector" value="{{ bulk_sector }}">
+          <div class="mb-3">
+            <label class="form-label" for="dashboardBulkSubject">Наслов на email</label>
+            <input id="dashboardBulkSubject" class="form-control" type="text" name="subject" value="{{ default_bulk_subject }}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="dashboardBulkMessage">Broadcast порака</label>
+            <textarea id="dashboardBulkMessage" class="form-control" name="message" required>{{ default_bulk_message }}</textarea>
+          </div>
+          <div class="bulk-tab-note">
+            До секој email автоматски се додаваат името на корисникот и кратки податоци за неговата решена пријава.
+          </div>
+          <div class="bulk-tab-actions">
+            <span class="text-muted small">Ќе се испрати до {{ bulk_count }} примачи.</span>
+            <button type="submit" class="bulk-tab-send" {% if bulk_count == 0 %}disabled{% endif %}>
+              <i class="bi bi-megaphone me-1"></i>Испрати
+            </button>
+          </div>
+        </form>
+        <div id="dashboardBulkResult" class="mt-3"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('dashboardBulkSendForm')?.addEventListener('submit', async function(event) {
+      event.preventDefault();
+      const result = document.getElementById('dashboardBulkResult');
+      const button = this.querySelector('button[type=submit]');
+      button.disabled = true;
+      button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Испраќање...';
+
+      const response = await fetch(this.action, {
+        method: 'POST',
+        body: new FormData(this),
+        headers: {'X-CSRFToken': '{{ csrf_token }}'}
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        result.innerHTML = `<div class="alert alert-danger border-0">${data.error || 'Неуспешно испраќање.'}</div>`;
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-megaphone me-1"></i>Испрати';
+        return;
+      }
+
+      result.innerHTML = `
+        <div class="alert alert-success border-0">
+          <i class="bi bi-check-circle me-2"></i>
+          Успешно испратени: <strong>${data.succeeded}</strong> / ${data.total}
+          ${data.failed ? `<br><span class="text-danger"><i class="bi bi-x-circle me-1"></i>Неуспешни: ${data.failed}</span>` : ''}
+        </div>`;
+      button.innerHTML = '<i class="bi bi-check-lg me-1"></i>Завршено';
+    });
+  </script>
+  {% endif %}
+
+  {% if active_tab == 'settings' %}
+  <style>
+    .admin-settings-page {
+      --au-bg: #f6f5f2;
+      --au-surface: #ffffff;
+      --au-border: #e8e5df;
+      --au-border-2: #d4cfc5;
+      --au-text: #1a1916;
+      --au-muted: #6b6760;
+      --au-faint: #9e9a93;
+      --au-green: #15803d;
+      --au-red: #dc2626;
+      --au-shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+      background: var(--au-bg);
+      border: 1px solid var(--au-border);
+      border-radius: 14px;
+      padding: 20px;
+    }
+    .settings-head {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 14px; flex-wrap: wrap; margin-bottom: 16px;
+    }
+    .settings-head h2 { font-size: 22px; font-weight: 600; color: var(--au-text); margin: 0; }
+    .settings-head p { font-size: 13px; color: var(--au-muted); margin: 3px 0 0; }
+    .sector-input-row {
+      display: grid; grid-template-columns: minmax(220px, 1fr) auto;
+      gap: 10px; margin-bottom: 14px; background: var(--au-surface);
+      border: 1px solid var(--au-border); border-radius: 12px;
+      padding: 12px; box-shadow: var(--au-shadow);
+    }
+    .sector-input-row input {
+      border-color: var(--au-border-2); border-radius: 6px; font-size: 13px;
+    }
+    .sector-input-row .btn {
+      border: 0; border-radius: 6px; background: var(--au-text);
+      color: #fff; font-weight: 600; font-size: 13px; min-height: 38px;
+    }
+    .sector-input-row .btn:hover { opacity: .86; color: #fff; }
+    .sectors-table {
+      background: var(--au-surface); border: 1px solid var(--au-border); border-radius: 12px;
+      overflow: hidden; box-shadow: var(--au-shadow);
+    }
+    .sector-row {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 12px; align-items: center;
+      padding: 14px 16px; border-bottom: 1px solid var(--au-border);
+      transition: background .15s;
+    }
+    .sector-row:hover { background: #fbfaf8; }
+    .sector-row:last-child { border-bottom: 0; }
+    .sector-name { font-weight: 600; color: var(--au-text); font-size: 14px; }
+    .sector-key { color: var(--au-faint); font-size: 12px; margin-top: 2px; }
+    .sector-status {
+      display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 700;
+      border: 1px solid transparent; white-space: nowrap;
+    }
+    .sector-status.active { color: var(--au-green); background: #f0fdf4; border-color: #bbf7d0; }
+    .sector-status.inactive { color: var(--au-muted); background: #f3f2ee; border-color: #e4e1d9; }
+    .sector-actions {
+      display: flex; gap: 8px; align-items: center;
+    }
+    .sector-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 34px; height: 34px; border-radius: 999px;
+      border: 1px solid var(--au-border-2); background: #fff; color: var(--au-muted);
+      font-size: 13px; transition: all .15s;
+    }
+    .sector-btn.toggle {
+      color: var(--au-green); border-color: #bbf7d0;
+    }
+    .sector-btn.toggle.is-hidden {
+      color: var(--au-muted); border-color: var(--au-border-2);
+    }
+    .sector-btn:hover { color: var(--au-text); border-color: var(--au-muted); }
+    .sector-btn.delete {
+      border-color: #fecdd3; color: var(--au-red);
+    }
+    .sector-btn.delete:hover { border-color: #dc2626; background: #fee2e2; }
+    .sector-empty { grid-column: 1 / -1; text-align: center; color: var(--au-faint); padding: 24px 12px; }
+    @media (max-width: 720px) {
+      .sector-input-row { grid-template-columns: 1fr; }
+      .sector-row { grid-template-columns: 1fr; align-items: start; }
+      .sector-actions { justify-content: flex-start; }
+    }
+  </style>
+
+  <div class="admin-settings-page">
+    <div class="settings-head">
+      <div>
+        <h2>Управување со сектори</h2>
+        <p>Контролирајте кои сектори се достапни при креирање и класификација на пријави.</p>
+      </div>
+    </div>
+
+    <form method="post" action="{% url 'create_sector' %}" class="sector-input-row">
+      {% csrf_token %}
+      <input class="form-control" type="text" name="name" placeholder="Ново име на сектор" required>
+      <button class="btn btn-primary" type="submit">+ Додај</button>
+    </form>
+
+    <div class="sectors-table">
+      {% for sector in sectors %}
+      <div class="sector-row">
+        <div>
+          <div class="sector-name">{{ sector.name }}</div>
+          <div class="sector-key">{{ sector.key }}</div>
+        </div>
+        <div>
+          <span class="sector-status {% if sector.is_active %}active{% else %}inactive{% endif %}">
+            {% if sector.is_active %}Видлив{% else %}Скриен{% endif %}
+          </span>
+        </div>
+        <div class="sector-actions">
+          <form method="post" action="{% url 'update_sector' sector.id %}" style="display: inline;">
+            {% csrf_token %}
+            <input type="hidden" name="key" value="{{ sector.key }}">
+            <input type="hidden" name="name" value="{{ sector.name }}">
+            <input type="hidden" name="is_active" value="{% if sector.is_active %}false{% else %}true{% endif %}">
+            <button type="submit" class="sector-btn toggle {% if not sector.is_active %}is-hidden{% endif %}" title="{% if sector.is_active %}Скриј сектор{% else %}Прикажи сектор{% endif %}" aria-label="{% if sector.is_active %}Скриј {{ sector.name }}{% else %}Прикажи {{ sector.name }}{% endif %}">
+              {% if sector.is_active %}<i class="bi bi-eye-slash"></i>{% else %}<i class="bi bi-eye"></i>{% endif %}
+            </button>
+          </form>
+          <button type="button" class="sector-btn edit" data-bs-toggle="modal" data-bs-target="#editSectorModal{{ sector.id }}" title="Уреди" aria-label="Уреди {{ sector.name }}">
+            <i class="bi bi-pencil"></i>
+          </button>
+          <form method="post" action="{% url 'delete_sector' sector.id %}" style="display: inline;">
+            {% csrf_token %}
+            <button type="submit" class="sector-btn delete" title="Избриши" aria-label="Избриши {{ sector.name }}" onclick="return confirm('Сигурни ли сте?')">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Edit Sector Modal -->
+      <div class="modal fade" id="editSectorModal{{ sector.id }}" tabindex="-1">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Уреди сектор</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'update_sector' sector.id %}" class="edit-sector-form">
+              {% csrf_token %}
+              <div class="modal-body">
+                <div class="mb-3">
+                  <label class="form-label">Име</label>
+                  <input type="text" class="form-control" name="name" value="{{ sector.name }}" required>
+                </div>
+                <input type="hidden" name="key" value="{{ sector.key }}">
+                <div class="form-check form-switch">
+                  <input class="form-check-input is-active-toggle" type="checkbox" name="is_active" value="1" id="isActiveSector{{ sector.id }}" {% if sector.is_active %}checked{% endif %}>
+                  <label class="form-check-label" for="isActiveSector{{ sector.id }}">
+                    Видлив за нови извештаи
+                  </label>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Откажи</button>
+                <button type="submit" class="btn btn-primary">Сачувај</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="sector-row">
+        <div class="sector-empty">Нема сектори.</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if active_tab == 'log' %}
+  <div class="table-responsive bg-white border rounded shadow-sm">
+    <table class="table align-middle mb-0">
+      <thead class="table-light"><tr><th>Време</th><th>Корисник</th><th>Акција</th><th>Детали</th></tr></thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td>{{ log.timestamp|date:"Y-m-d H:i" }}</td>
+          <td>{{ log.user.username|default:"—" }}</td>
+          <td>{{ log.action }}</td>
+          <td><code>{{ log.details }}</code></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="text-center text-muted py-4">Нема записи.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</section>
+<script>
+  document.querySelectorAll('.js-role-select').forEach((select) => {
+    const sync = () => {
+      const target = document.getElementById(select.dataset.workerTarget);
+      const empty = target && target.id.startsWith('worker-fields-')
+        ? document.getElementById(target.id.replace('worker-fields-', 'worker-empty-'))
+        : null;
+      if (!target) return;
+      const isWorker = select.value === 'officer';
+      target.hidden = !isWorker;
+      target.classList.toggle('d-none', !isWorker);
+      target.querySelectorAll('select').forEach((field) => {
+        field.disabled = !isWorker;
+        field.required = isWorker;
+      });
+      if (empty) {
+        empty.hidden = isWorker;
+        empty.classList.toggle('d-none', isWorker);
+      }
+    };
+    select.addEventListener('change', sync);
+    sync();
+  });
+</script>
+{% endblock %}

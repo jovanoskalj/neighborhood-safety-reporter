@@ -1,0 +1,506 @@
+{% extends "base.html" %}
+
+{% block title %}Поднеси пријава{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #f6f5f2;
+    --surface:  #ffffff;
+    --border:   #e8e5df;
+    --border-2: #d4cfc5;
+    --text-1:   #1a1916;
+    --text-2:   #6b6760;
+    --text-3:   #9e9a93;
+    --blue:     #2563eb;
+    --blue-bg:  #eff5ff;
+    --blue-bd:  #bfdbfe;
+    --green:    #15803d;
+    --green-bg: #f0fdf4;
+    --green-bd: #bbf7d0;
+    --red:      #dc2626;
+    --red-bg:   #fff1f2;
+    --red-bd:   #fecdd3;
+    --gray-bg:  #f3f2ee;
+    --gray-bd:  #e4e1d9;
+    --radius-sm: 6px;
+    --radius:    10px;
+    --radius-lg: 14px;
+    --font-body: 'DM Sans', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+    --shadow:   0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  }
+
+  body { font-family: var(--font-body); background: var(--bg); color: var(--text-1); }
+
+  .sr-page { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem 3rem; }
+
+  /* ── Header ── */
+  .sr-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 12px; flex-wrap: wrap; margin-bottom: 1.75rem;
+  }
+  .sr-header h1 { font-size: 20px; font-weight: 500; letter-spacing: -.02em; }
+  .sr-header p  { font-size: 13px; color: var(--text-2); margin-top: 3px; }
+
+  .quota-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--blue);
+    background: var(--blue-bg);
+    border: 1px solid var(--blue-bd);
+    border-radius: 999px;
+    padding: 4px 10px;
+  }
+  .quota-pill.low {
+    color: var(--red);
+    background: var(--red-bg);
+    border-color: var(--red-bd);
+  }
+
+  .btn-back {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: transparent; border: 1px solid var(--border-2);
+    border-radius: var(--radius-sm); padding: 7px 13px;
+    font-size: 13px; font-family: var(--font-body); color: var(--text-2);
+    text-decoration: none; white-space: nowrap; transition: border-color .12s, color .12s;
+  }
+  .btn-back:hover { border-color: var(--text-2); color: var(--text-1); }
+
+  /* ── Card ── */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); box-shadow: var(--shadow); overflow: hidden;
+  }
+
+  /* ── Section headers inside card ── */
+  .section-head {
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-num {
+    width: 22px; height: 22px; border-radius: 50%; background: var(--text-1);
+    color: #fff; font-size: 11px; font-weight: 500; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .section-title { font-size: 13.5px; font-weight: 500; color: var(--text-1); }
+  .section-sub   { font-size: 12px; color: var(--text-3); margin-top: 1px; }
+
+  .section-body  { padding: 20px; border-bottom: 1px solid var(--border); }
+  .section-body:last-of-type { border-bottom: none; }
+
+  /* ── Form fields ── */
+  .field + .field { margin-top: 16px; }
+
+  .field label {
+    display: block; font-size: 12px; font-weight: 500; text-transform: uppercase;
+    letter-spacing: .06em; color: var(--text-3); margin-bottom: 6px;
+  }
+
+  .field input[type="text"],
+  .field input[type="number"],
+  .field textarea,
+  .field select {
+    width: 100%; border: 1px solid var(--border-2); border-radius: var(--radius-sm);
+    padding: 9px 12px; font-size: 14px; font-family: var(--font-body);
+    background: var(--surface); color: var(--text-1);
+    transition: border-color .15s, box-shadow .15s;
+    appearance: none;
+  }
+  .field select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b6760' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px;
+  }
+  .field input:focus,
+  .field textarea:focus,
+  .field select:focus {
+    outline: none; border-color: var(--text-1);
+    box-shadow: 0 0 0 3px rgba(26,25,22,.07);
+  }
+  .field textarea { resize: vertical; min-height: 110px; line-height: 1.6; }
+
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .field-error {
+    margin-top: 5px; font-size: 12px; color: var(--red);
+    display: flex; align-items: center; gap: 4px;
+  }
+
+  /* ── AI badge ── */
+  .ai-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: var(--blue-bg); color: var(--blue); border: 1px solid var(--blue-bd);
+    border-radius: 99px; padding: 2px 9px; font-size: 11.5px; font-weight: 500;
+    margin-left: 8px; vertical-align: middle;
+  }
+
+  /* ── Map ── */
+  .map-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 8px; margin-bottom: 10px;
+  }
+  .map-toolbar label {
+    font-size: 12px; font-weight: 500; text-transform: uppercase;
+    letter-spacing: .06em; color: var(--text-3);
+  }
+  .btn-geo {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: transparent; border: 1px solid var(--blue-bd);
+    border-radius: var(--radius-sm); padding: 6px 12px;
+    font-size: 12.5px; font-family: var(--font-body); color: var(--blue);
+    cursor: pointer; transition: background .12s;
+  }
+  .btn-geo:hover { background: var(--blue-bg); }
+  .btn-geo.loading { opacity: .6; pointer-events: none; }
+
+  #report-map {
+    width: 100%; height: 320px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); overflow: hidden;
+  }
+
+  .coord-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+  .coord-row input { font-family: var(--font-mono); font-size: 13px; }
+
+  /* ── File upload ── */
+  .upload-zone {
+    border: 1.5px dashed var(--border-2); border-radius: var(--radius-sm);
+    padding: 28px 20px; text-align: center; cursor: pointer;
+    transition: border-color .15s, background .15s; position: relative;
+  }
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--blue); background: var(--blue-bg);
+  }
+  .upload-zone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .upload-icon {
+    width: 36px; height: 36px; border-radius: 50%; background: var(--gray-bg);
+    border: 1px solid var(--border); display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 10px;
+  }
+  .upload-text { font-size: 13.5px; color: var(--text-2); }
+  .upload-text strong { color: var(--text-1); font-weight: 500; }
+  .upload-hint { font-size: 12px; color: var(--text-3); margin-top: 3px; }
+
+  /* image preview */
+  .img-preview-wrap { margin-top: 12px; display: none; }
+  .img-preview-wrap.visible { display: block; }
+  .img-preview {
+    width: 100%; max-height: 300px; object-fit: cover;
+    border-radius: var(--radius-sm); border: 1px solid var(--border); display: block;
+  }
+  .img-preview-meta {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 8px; font-size: 12px; color: var(--text-3);
+  }
+  .btn-remove-img {
+    background: transparent; border: none; color: var(--red);
+    font-size: 12px; font-family: var(--font-body); cursor: pointer; padding: 0;
+  }
+  .btn-remove-img:hover { text-decoration: underline; }
+
+  /* ── Submit footer ── */
+  .sr-footer {
+    padding: 16px 20px; border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  }
+  .sr-footer-note { font-size: 12.5px; color: var(--text-3); }
+
+  .btn-submit {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--text-1); color: #fff; border: none;
+    border-radius: var(--radius-sm); padding: 10px 22px;
+    font-size: 14px; font-family: var(--font-body); font-weight: 500;
+    cursor: pointer; transition: opacity .15s;
+  }
+  .btn-submit:hover { opacity: .82; }
+  .btn-submit:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+  }
+
+  @media (max-width: 560px) {
+    .field-row, .coord-row { grid-template-columns: 1fr; }
+    .sr-page { padding: 1rem 1rem 2rem; }
+  }
+</style>
+
+<div class="sr-page">
+
+  <!-- Header -->
+  <div class="sr-header">
+    <div>
+      <h1>Поднеси пријава</h1>
+      <p>Опис, GPS локација и слика. AI автоматски ќе ја класифицира пријавата.</p>
+      <div class="quota-pill {% if remaining_quota == 0 %}low{% endif %}">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Преостанати пријави (24ч): <strong>{{ remaining_quota }} / {{ max_reports_per_24h }}</strong>
+      </div>
+    </div>
+    <a href="{% url 'my_reports' %}" class="btn-back">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Мои пријави
+    </a>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    <div class="card">
+
+      <!-- Section 1: Description -->
+      <div class="section-head">
+        <div class="section-num">1</div>
+        <div>
+          <div class="section-title">
+            Опис на пријавата
+            <span class="ai-badge">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+              AI класификација
+            </span>
+          </div>
+          <div class="section-sub">Детален опис и општина каде се наоѓа проблемот</div>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="field">
+          <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
+          {{ form.description }}
+          {% if form.description.errors %}
+          <div class="field-error">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+            {{ form.description.errors|join:', ' }}
+          </div>
+          {% endif %}
+        </div>
+        <div class="field" style="margin-top:14px">
+          <label for="{{ form.municipality.id_for_label }}">{{ form.municipality.label }}</label>
+          {{ form.municipality }}
+          {% if form.municipality.errors %}
+          <div class="field-error">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+            {{ form.municipality.errors|join:', ' }}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Section 2: Location -->
+      <div class="section-head">
+        <div class="section-num">2</div>
+        <div>
+          <div class="section-title">Локација</div>
+          <div class="section-sub">Кликнете на мапата или користете GPS за да ја одредите локацијата</div>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="map-toolbar">
+          <label>Локација на мапа</label>
+          <button id="geo-btn" type="button" class="btn-geo">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+            Користи моја GPS локација
+          </button>
+        </div>
+        <div id="report-map"></div>
+        <div class="coord-row">
+          <div class="field" style="margin-top:0">
+            <label for="{{ form.latitude.id_for_label }}">{{ form.latitude.label }}</label>
+            {{ form.latitude }}
+            {% if form.latitude.errors %}
+            <div class="field-error">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+              {{ form.latitude.errors|join:', ' }}
+            </div>
+            {% endif %}
+          </div>
+          <div class="field" style="margin-top:0">
+            <label for="{{ form.longitude.id_for_label }}">{{ form.longitude.label }}</label>
+            {{ form.longitude }}
+            {% if form.longitude.errors %}
+            <div class="field-error">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+              {{ form.longitude.errors|join:', ' }}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 3: Image -->
+      <div class="section-head">
+        <div class="section-num">3</div>
+        <div>
+          <div class="section-title">Слика <span style="color:var(--text-3);font-weight:400;font-size:12px">(опционално)</span></div>
+          <div class="section-sub">Прикачете фотографија на проблемот</div>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="field">
+          <label for="{{ form.image.id_for_label }}">{{ form.image.label }}</label>
+          <div class="upload-zone" id="upload-zone">
+            {{ form.image }}
+            <div class="upload-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-2)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </div>
+            <div class="upload-text"><strong>Кликнете за да прикачите</strong> или повлечете датотека</div>
+            <div class="upload-hint">PNG, JPG, WEBP — макс. 10 MB</div>
+          </div>
+          {% if form.image.errors %}
+          <div class="field-error">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+            {{ form.image.errors|join:', ' }}
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="img-preview-wrap" id="img-preview-wrap">
+          <img id="image-preview" class="img-preview" alt="Преглед на слика"/>
+          <div class="img-preview-meta">
+            <span id="img-name"></span>
+            <button type="button" class="btn-remove-img" id="remove-img">Отстрани</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer / Submit -->
+      <div class="sr-footer">
+        <span class="sr-footer-note">AI автоматски ќе ги одреди категоријата, приоритетот и секторот.</span>
+        <button type="submit" class="btn-submit" {% if remaining_quota == 0 %}disabled{% endif %}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2 15 22l-4-9-9-4 20-7z"/></svg>
+          {% if remaining_quota == 0 %}Лимит достигнат{% else %}Поднеси пријава{% endif %}
+        </button>
+      </div>
+
+    </div><!-- /.card -->
+  </form>
+</div><!-- /.sr-page -->
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+(function () {
+  const latInput   = document.getElementById("{{ form.latitude.id_for_label }}");
+  const lngInput   = document.getElementById("{{ form.longitude.id_for_label }}");
+  const imageInput = document.getElementById("{{ form.image.id_for_label }}");
+  const preview    = document.getElementById("image-preview");
+  const previewWrap= document.getElementById("img-preview-wrap");
+  const imgName    = document.getElementById("img-name");
+  const removeBtn  = document.getElementById("remove-img");
+  const geoBtn     = document.getElementById("geo-btn");
+  const uploadZone = document.getElementById("upload-zone");
+
+  /* ── Map ── */
+  const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const tileUrl = isDark
+    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+
+  const initialLat = parseFloat(latInput?.value) || 41.9981;
+  const initialLng = parseFloat(lngInput?.value) || 21.4254;
+
+  const map = L.map("report-map", { attributionControl: false }).setView([initialLat, initialLng], 13);
+  L.tileLayer(tileUrl, { maxZoom: 19 }).addTo(map);
+
+  const marker = L.marker([initialLat, initialLng], { draggable: true }).addTo(map);
+
+  function setCoords(lat, lng) {
+    latInput.value = Number(lat).toFixed(6);
+    lngInput.value = Number(lng).toFixed(6);
+  }
+
+  marker.on("dragend", function (e) {
+    const { lat, lng } = e.target.getLatLng();
+    setCoords(lat, lng);
+  });
+
+  map.on("click", function (e) {
+    marker.setLatLng(e.latlng);
+    setCoords(e.latlng.lat, e.latlng.lng);
+  });
+
+  /* ── GPS button ── */
+  geoBtn?.addEventListener("click", function () {
+    if (!navigator.geolocation) {
+      alert("Вашиот прелистувач не поддржува Geolocation.");
+      return;
+    }
+    geoBtn.classList.add("loading");
+    geoBtn.textContent = "Барање локација…";
+
+    navigator.geolocation.getCurrentPosition(
+      function (pos) {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        map.setView([lat, lng], 16);
+        marker.setLatLng([lat, lng]);
+        setCoords(lat, lng);
+        geoBtn.classList.remove("loading");
+        geoBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg> Локацијата е поставена`;
+      },
+      function (err) {
+        geoBtn.classList.remove("loading");
+        geoBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg> Користи моја GPS локација`;
+        const msgs = {
+          1: "Локацијата е блокирана. Дозволете Location за localhost во прелистувачот.",
+          2: "Локацијата моментално не е достапна. Кликнете на мапа за да ја одредите рачно.",
+          3: "Барањето за локација истече. Кликнете на мапа или обидете се повторно.",
+        };
+        alert(msgs[err?.code] || "Не успеавме да ја добиеме вашата локација.");
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  });
+
+  /* ── Image upload & preview ── */
+  function showPreview(file) {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    preview.src = url;
+    previewWrap.classList.add("visible");
+    const kb = (file.size / 1024).toFixed(0);
+    imgName.textContent = file.name + " · " + (kb > 1024 ? (kb/1024).toFixed(1)+" MB" : kb+" KB");
+  }
+
+  function clearPreview() {
+    preview.src = "";
+    previewWrap.classList.remove("visible");
+    imgName.textContent = "";
+    imageInput.value = "";
+  }
+
+  imageInput?.addEventListener("change", function (e) {
+    const file = e.target.files?.[0];
+    file ? showPreview(file) : clearPreview();
+  });
+
+  removeBtn?.addEventListener("click", clearPreview);
+
+  /* drag-and-drop visual feedback */
+  uploadZone?.addEventListener("dragover", function (e) {
+    e.preventDefault();
+    uploadZone.classList.add("dragover");
+  });
+  uploadZone?.addEventListener("dragleave", function () {
+    uploadZone.classList.remove("dragover");
+  });
+  uploadZone?.addEventListener("drop", function (e) {
+    e.preventDefault();
+    uploadZone.classList.remove("dragover");
+    const file = e.dataTransfer?.files?.[0];
+    if (file && imageInput) {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      imageInput.files = dt.files;
+      showPreview(file);
+    }
+  });
+})();
+</script>
+{% endblock %}

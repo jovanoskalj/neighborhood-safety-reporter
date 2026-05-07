@@ -1,0 +1,528 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Пребарај пријави{% endblock %}
+
+{% block content %}
+<div class="search-page-wrapper">
+  <div class="search-container">
+
+    <h1 class="search-title">Пребарај пријави</h1>
+
+    <form method="get" action="" id="search-form">
+      <div class="search-bar-row">
+        <div class="search-input-wrap">
+          <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input
+            type="text"
+            name="keyword"
+            class="search-input"
+            placeholder="Пребарај по клучен збор, ИД или локација..."
+            value="{{ query.keyword|default:'' }}"
+          />
+        </div>
+        <button type="submit" class="search-btn">Пребарај</button>
+      </div>
+
+      <div class="filter-row">
+        <div class="filter-left">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+
+          <select name="category" class="filter-select">
+            <option value="">Категорија</option>
+            {% for value, label in category_choices %}
+            <option value="{{ value }}" {% if query.category == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+
+          <select name="status" class="filter-select">
+            <option value="">Статус</option>
+            {% for value, label in status_choices %}
+            <option value="{{ value }}" {% if query.status == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+
+          <select name="sector" class="filter-select">
+            <option value="">Сектор</option>
+            {% for value, label in sector_choices %}
+            <option value="{{ value }}" {% if query.sector == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+
+          <select name="opshtina" class="filter-select">
+            <option value="">Општина</option>
+            {% for slug, label in municipalities %}
+            <option value="{{ slug }}" {% if query.opshtina == slug %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+
+          <select name="priority" class="filter-select">
+            <option value="">Приоритет</option>
+            {% for value, label in priority_choices %}
+            <option value="{{ value }}" {% if query.priority == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="view-toggle">
+          <button type="button" class="toggle-btn active" id="list-toggle" onclick="switchView('list')">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          </button>
+          <button type="button" class="toggle-btn" id="map-toggle" onclick="switchView('map')">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
+          </button>
+        </div>
+      </div>
+    </form>
+
+    <div class="sort-row">
+      <div class="sort-controls">
+        <span class="sort-label">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+          Подреди по:
+        </span>
+        <a href="?{% for k, v in query.items %}{% if k != 'sort' and v %}{{ k }}={{ v }}&{% endif %}{% endfor %}sort=date"
+           class="sort-link {% if query.sort == 'date' or not query.sort %}active{% endif %}">Датум</a>
+        <a href="?{% for k, v in query.items %}{% if k != 'sort' and v %}{{ k }}={{ v }}&{% endif %}{% endfor %}sort=priority"
+           class="sort-link {% if query.sort == 'priority' %}active{% endif %}">Приоритет</a>
+        <a href="?{% for k, v in query.items %}{% if k != 'sort' and v %}{{ k }}={{ v }}&{% endif %}{% endfor %}sort=status"
+           class="sort-link {% if query.sort == 'status' %}active{% endif %}">Статус</a>
+      </div>
+      <span class="results-count">{{ total }} резултат{{ total|pluralize:"и" }}</span>
+    </div>
+
+    <div id="list-view">
+      {% if reports %}
+      <div class="results-table-wrap">
+        <table class="results-table">
+          <thead>
+            <tr>
+              <th>ИД</th>
+              <th>Категорија</th>
+              <th>Локација</th>
+              <th>Општина</th>
+              <th>Приоритет</th>
+              <th>Статус</th>
+              <th>Датум</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for report in reports %}
+            <tr>
+              <td>
+                <a href="{% url 'home' %}?id={{ report.id }}" class="report-id-link">
+                  ПРЈ-{{ report.id|stringformat:"03d" }}
+                </a>
+              </td>
+              <td>
+                {% if report.category == 'infrastructure' %}Инфраструктура
+                {% elif report.category == 'utilities' %}Комунални услуги
+                {% elif report.category == 'safety' %}Безбедност
+                {% elif report.category == 'health' %}Здравство
+                {% elif report.category == 'other' %}Друго
+                {% else %}{{ report.get_category_display }}{% endif %}
+              </td>
+              <td class="report-location"
+                  data-lat="{{ report.latitude }}"
+                  data-lng="{{ report.longitude }}">
+                {{ report.latitude|floatformat:4 }}, {{ report.longitude|floatformat:4 }}
+              </td>
+              <td>
+                {% for slug, label in municipalities %}
+                  {% if slug == report.municipality %}{{ label }}{% endif %}
+                {% endfor %}
+                {% if not report.municipality %}—{% endif %}
+              </td>
+              <td>
+                <span class="badge priority-{{ report.priority }}">
+                  {% if report.priority == 'urgent' %}Итно
+                  {% elif report.priority == 'normal' %}Нормално
+                  {% elif report.priority == 'low' %}Ниско
+                  {% else %}{{ report.priority }}{% endif %}
+                </span>
+              </td>
+              <td>
+                <span class="badge status-{{ report.status }}">
+                  {% if report.status == 'new' %}Нова
+                  {% elif report.status == 'in_progress' %}Во тек
+                  {% elif report.status == 'resolved' %}Решена
+                  {% elif report.status == 'unclassified' %}Некласифицирана
+                  {% else %}{{ report.status }}{% endif %}
+                </span>
+              </td>
+              <td class="report-date">{{ report.created_at|date:"Y-m-d" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="no-results">
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <p>Нема резултати за вашето пребарување.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <div id="map-view" style="display:none;">
+      <div id="search-map" style="height: 500px; border-radius: 12px; overflow: hidden;"></div>
+    </div>
+
+  </div>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+  const reportsData = [
+    {% for report in reports %}
+    {
+      id: {{ report.id }},
+      lat: {{ report.latitude }},
+      lng: {{ report.longitude }},
+      description: "{{ report.description|truncatechars:60|escapejs }}",
+      status: "{{ report.status }}",
+      priority: "{{ report.priority }}",
+    },
+    {% endfor %}
+  ];
+
+  let mapInstance = null;
+
+  function switchView(view) {
+    const listView = document.getElementById('list-view');
+    const mapView = document.getElementById('map-view');
+    const listBtn = document.getElementById('list-toggle');
+    const mapBtn = document.getElementById('map-toggle');
+
+    if (view === 'map') {
+      listView.style.display = 'none';
+      mapView.style.display = 'block';
+      listBtn.classList.remove('active');
+      mapBtn.classList.add('active');
+      initMap();
+    } else {
+      listView.style.display = 'block';
+      mapView.style.display = 'none';
+      listBtn.classList.add('active');
+      mapBtn.classList.remove('active');
+    }
+  }
+
+  function initMap() {
+    if (mapInstance) return;
+    mapInstance = L.map('search-map').setView([41.9981, 21.4254], 9);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap'
+    }).addTo(mapInstance);
+
+    reportsData.forEach(function(r) {
+      const colors = { urgent: '#ef4444', normal: '#3b82f6', low: '#6b7280' };
+      const color = colors[r.priority] || '#3b82f6';
+      const marker = L.circleMarker([r.lat, r.lng], {
+        radius: 8,
+        fillColor: color,
+        color: '#fff',
+        weight: 2,
+        opacity: 1,
+        fillOpacity: 0.85
+      }).addTo(mapInstance);
+      marker.bindPopup(`<b>ПРЈ-${String(r.id).padStart(3,'0')}</b><br>${r.description}<br><small>${r.status}</small>`);
+    });
+  }
+
+  document.querySelectorAll('.filter-select').forEach(function(sel) {
+    sel.addEventListener('change', function() {
+      document.getElementById('search-form').submit();
+    });
+  });
+
+  async function reverseGeocode(lat, lng) {
+    const key = `geo_${lat}_${lng}`;
+    const cached = localStorage.getItem(key);
+    if (cached) return cached;
+
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`;
+    try {
+      const resp = await fetch(url, { headers: { 'Accept-Language': 'mk' } });
+      const data = await resp.json();
+      const address = data.address?.road
+        ? `${data.address.road}${data.address.house_number ? ' ' + data.address.house_number : ''}`
+        : `${lat}, ${lng}`;
+      localStorage.setItem(key, address);
+      return address;
+    } catch {
+      return `${lat}, ${lng}`;
+    }
+  }
+
+  async function loadLocations() {
+    const cells = document.querySelectorAll('td[data-lat]');
+    for (const cell of cells) {
+      const lat = cell.dataset.lat;
+      const lng = cell.dataset.lng;
+      const address = await reverseGeocode(lat, lng);
+      cell.textContent = address;
+      await new Promise(r => setTimeout(r, 1100));
+    }
+  }
+
+  loadLocations();
+</script>
+
+<style>
+  .search-page-wrapper {
+    background: #f9fafb;
+    min-height: 100vh;
+    padding: 2rem 1rem;
+  }
+
+  .search-container {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .search-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 1.5rem;
+  }
+
+  .search-bar-row {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .search-input-wrap {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 14px;
+    color: #9ca3af;
+    pointer-events: none;
+  }
+
+  .search-input {
+    width: 100%;
+    padding: 0.75rem 1rem 0.75rem 2.75rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    background: #fff;
+    color: #111827;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .search-input:focus {
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16,185,129,0.1);
+  }
+
+  .search-btn {
+    padding: 0.75rem 1.5rem;
+    background: #10b981;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+
+  .search-btn:hover { background: #059669; }
+
+  .filter-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 0.65rem 1rem;
+    gap: 0.75rem;
+    flex-wrap: nowrap;
+    margin-bottom: 1.25rem;
+  }
+
+  .filter-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+
+  .filter-select {
+    padding: 0.45rem 2rem 0.45rem 0.75rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 7px;
+    font-size: 0.875rem;
+    color: #374151;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 0.6rem center;
+    appearance: none;
+    cursor: pointer;
+    outline: none;
+  }
+
+  .filter-select:focus { border-color: #10b981; }
+
+  .view-toggle {
+    display: flex;
+    gap: 4px;
+    background: #f3f4f6;
+    border-radius: 8px;
+    padding: 3px;
+  }
+
+  .toggle-btn {
+    padding: 0.4rem 0.65rem;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #6b7280;
+    display: flex;
+    align-items: center;
+    transition: all 0.15s;
+  }
+
+  .toggle-btn.active {
+    background: #1d4ed8;
+    color: #fff;
+  }
+
+  .sort-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+  }
+
+  .sort-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .sort-label {
+    font-size: 0.85rem;
+    color: #6b7280;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .sort-link {
+    font-size: 0.85rem;
+    color: #6b7280;
+    text-decoration: none;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: color 0.15s;
+  }
+
+  .sort-link:hover { color: #111827; }
+  .sort-link.active { color: #111827; font-weight: 600; }
+
+  .results-count {
+    font-size: 0.875rem;
+    color: #6b7280;
+  }
+
+  .results-table-wrap {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .results-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+
+  .results-table thead th {
+    padding: 0.85rem 1rem;
+    text-align: left;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #6b7280;
+    background: #fff;
+    border-bottom: 1px solid #f3f4f6;
+    letter-spacing: 0.02em;
+  }
+
+  .results-table tbody tr {
+    border-bottom: 1px solid #f9fafb;
+    transition: background 0.1s;
+  }
+
+  .results-table tbody tr:last-child { border-bottom: none; }
+  .results-table tbody tr:hover { background: #f9fafb; }
+
+  .results-table tbody td {
+    padding: 0.9rem 1rem;
+    color: #374151;
+    vertical-align: middle;
+  }
+
+  .report-id-link {
+    color: #10b981;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .report-id-link:hover { text-decoration: underline; }
+
+  .report-location { color: #9ca3af; font-size: 0.82rem; }
+  .report-date { color: #9ca3af; font-size: 0.85rem; }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .priority-urgent   { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+  .priority-normal   { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+  .priority-low      { background: #f9fafb; color: #6b7280; border: 1px solid #e5e7eb; }
+
+  .status-new          { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+  .status-in_progress  { background: #fff7ed; color: #ea580c; border: 1px solid #fed7aa; }
+  .status-resolved     { background: #f0fdf4; color: #15803d; border: 1px solid #86efac; }
+  .status-unclassified { background: #fafafa; color: #78716c; border: 1px solid #e7e5e4; }
+
+  .no-results {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #9ca3af;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+  }
+
+  .no-results p { margin-top: 1rem; font-size: 0.95rem; }
+
+  @media (max-width: 768px) {
+    .search-bar-row { flex-direction: column; }
+    .filter-row { flex-direction: column; align-items: flex-start; }
+    .results-table { font-size: 0.8rem; }
+    .results-table thead th, .results-table tbody td { padding: 0.65rem 0.5rem; }
+  }
+</style>
+{% endblock %}

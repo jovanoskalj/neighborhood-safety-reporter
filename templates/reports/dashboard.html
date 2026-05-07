@@ -1,0 +1,990 @@
+{% extends 'base.html' %}
+{% comment %}
+{% block title %}Мои пријави{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #f6f5f2;
+    --surface:  #ffffff;
+    --border:   #e8e5df;
+    --border-2: #d4cfc5;
+    --text-1:   #1a1916;
+    --text-2:   #6b6760;
+    --text-3:   #9e9a93;
+    --blue:     #2563eb;
+    --blue-bg:  #eff5ff;
+    --blue-bd:  #bfdbfe;
+    --amber:    #b45309;
+    --amber-bg: #fffbeb;
+    --amber-bd: #fde68a;
+    --green:    #15803d;
+    --yellow:   #ca8a04;
+    --green-bg: #f0fdf4;
+    --green-bd: #bbf7d0;
+    --red:      #dc2626;
+    --red-bg:   #fff1f2;
+    --red-bd:   #fecdd3;
+    --gray-bg:  #f3f2ee;
+    --gray-bd:  #e4e1d9;
+    --radius-sm: 6px;
+    --radius:    10px;
+    --radius-lg: 14px;
+    --font-body: 'DM Sans', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+    --shadow:   0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  }
+
+  body { font-family: var(--font-body); background: var(--bg); color: var(--text-1); }
+
+  /* ─── Page wrapper ─── */
+  .mr-page { max-width: 1280px; margin: 0 auto; padding: 2rem 1.5rem 3rem; }
+
+  /* ─── Header ─── */
+  .mr-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 12px; flex-wrap: wrap; margin-bottom: 1.75rem;
+  }
+  .mr-header h1 { font-size: 22px; font-weight: 500; letter-spacing: -.02em; color: var(--text-1); }
+  .mr-header p  { font-size: 13.5px; color: var(--text-2); margin-top: 3px; }
+
+  .btn-new {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--text-1); color: #fff;
+    border: none; border-radius: var(--radius-sm);
+    padding: 9px 18px; font-size: 13.5px; font-family: var(--font-body); font-weight: 500;
+    cursor: pointer; white-space: nowrap; text-decoration: none;
+    transition: opacity .15s;
+  }
+  .btn-new:hover { opacity: .82; }
+
+  /* ─── Stats strip ─── */
+  .mr-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 1.25rem; }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px;
+    box-shadow: var(--shadow);
+  }
+  .stat-label { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); margin-bottom: 6px; }
+  .stat-val   { font-size: 26px; font-weight: 500; letter-spacing: -.03em; color: var(--text-1); font-family: var(--font-mono); }
+  .stat-val.blue   { color: var(--blue); }
+  .stat-val.amber  { color: var(--amber); }
+  .stat-val.green  { color: var(--green); }
+
+  /* ─── Layout ─── */
+  .mr-layout { display: grid; grid-template-columns: 1fr 290px; gap: 14px; align-items: start; }
+
+  /* ─── Card ─── */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); box-shadow: var(--shadow); overflow: hidden;
+  }
+  .card-body { padding: 1.25rem; }
+
+  /* ─── Filters ─── */
+  .mr-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: .85rem; align-items: center; }
+  .mr-filters select {
+    border: 1px solid var(--border-2); border-radius: var(--radius-sm);
+    padding: 4px 10px; font-size: 12.5px; font-family: var(--font-body);
+    background: var(--bg); color: var(--text-1); cursor: pointer;
+    appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b6760' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 8px center; padding-right: 24px;
+    min-height: 34px;
+    width: auto;
+    min-width: 210px;
+    transition: border-color .15s;
+  }
+  .mr-filters select:focus { outline: none; border-color: var(--text-1); }
+
+  .btn-filter {
+    background: var(--text-1); color: #fff; border: none;
+    border-radius: var(--radius-sm); padding: 5px 12px;
+    min-height: 34px;
+    font-size: 12.5px; font-family: var(--font-body); font-weight: 500; cursor: pointer;
+    transition: opacity .15s;
+  }
+  .btn-filter:hover { opacity: .8; }
+
+  .btn-reset {
+    background: transparent; color: var(--text-2);
+    border: 1px solid var(--border-2); border-radius: var(--radius-sm);
+    padding: 5px 11px; min-height: 34px;
+    font-size: 12.5px; font-family: var(--font-body); cursor: pointer;
+    text-decoration: none; display: inline-block; transition: border-color .15s;
+  }
+  .btn-reset:hover { border-color: var(--text-2); color: var(--text-1); }
+
+  /* ─── Table ─── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  thead th {
+    font-size: 11px; font-weight: 500; text-transform: uppercase;
+    letter-spacing: .06em; color: var(--text-3);
+    padding: 8px 12px; border-bottom: 1px solid var(--border); text-align: left;
+  }
+  thead th:last-child { text-align: right; }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--bg); }
+  td { padding: 11px 12px; vertical-align: middle; }
+  td:last-child { text-align: right; }
+
+  .report-main-cell { position: relative; }
+  .row-hover-card {
+    display: none;
+    position: absolute;
+    top: calc(100% - 4px);
+    left: 12px;
+    width: min(340px, 76vw);
+    z-index: 30;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, .12);
+    padding: 10px 11px;
+    text-align: left;
+  }
+  tbody tr:hover .row-hover-card { display: block; }
+  .hover-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--text-3);
+    margin-bottom: 6px;
+  }
+  .hover-desc {
+    font-size: 12.5px;
+    color: var(--text-1);
+    line-height: 1.45;
+    margin-bottom: 8px;
+  }
+  .hover-meta {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .hover-chip {
+    font-size: 11px;
+    color: var(--text-2);
+    background: var(--gray-bg);
+    border: 1px solid var(--gray-bd);
+    border-radius: 999px;
+    padding: 2px 8px;
+  }
+  .hover-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--blue);
+    text-decoration: none;
+    font-weight: 500;
+  }
+  .hover-link:hover { text-decoration: underline; }
+
+  /* Category pill */
+  .cat-pill {
+    display: inline-block; padding: 3px 9px; border-radius: 4px;
+    font-size: 12px; font-weight: 500;
+    background: var(--gray-bg); color: var(--text-2); border: 1px solid var(--gray-bd);
+  }
+
+  /* Priority */
+  .pri-wrap { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; }
+  .pri-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 0 2px rgba(0,0,0,.05); }
+  .pri-dot.urgent { background: #dc2626; }
+  .pri-dot.normal { background: #eab308; }
+  .pri-dot.low    { background: #16a34a; }
+  .pri-wrap.urgent { color: #b91c1c; }
+  .pri-wrap.normal { color: var(--yellow); }
+  .pri-wrap.low { color: #15803d; }
+
+  /* Status badge */
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 9px; border-radius: 99px; font-size: 12px; font-weight: 500;
+    border: 1px solid transparent;
+  }
+  .badge.new          { background: var(--blue-bg);  color: var(--blue);  border-color: var(--blue-bd); }
+  .badge.in_progress  { background: var(--amber-bg); color: var(--amber); border-color: var(--amber-bd); }
+  .badge.resolved     { background: var(--green-bg); color: var(--green); border-color: var(--green-bd); }
+  .badge.withdrawn    { background: var(--gray-bg);  color: var(--text-3); border-color: var(--gray-bd); }
+  .badge.unclassified { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+
+  /* Date */
+  .date-cell { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); }
+
+  /* Action buttons */
+  .actions { display: inline-flex; gap: 6px; align-items: center; }
+  .icon-btn {
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid var(--border-2);
+    background: #fff;
+    color: var(--text-2);
+    text-decoration: none;
+    cursor: pointer;
+    transition: all .12s ease;
+  }
+  .icon-btn svg { width: 15px; height: 15px; }
+  .icon-btn:hover {
+    color: var(--text-1);
+    border-color: var(--text-2);
+    transform: translateY(-1px);
+  }
+  .icon-btn.danger {
+    border-color: var(--red-bd);
+    color: var(--red);
+  }
+  .icon-btn.danger:hover {
+    background: var(--red-bg);
+    border-color: #fda4af;
+  }
+
+  /* Empty state */
+  .empty-row td { text-align: center; padding: 2.5rem; color: var(--text-3); font-size: 13px; }
+
+  /* ─── Map card ─── */
+  .map-card { display: flex; flex-direction: column; }
+  .map-head { padding: 14px 16px 12px; border-bottom: 1px solid var(--border); }
+  .map-head h2 { font-size: 13.5px; font-weight: 500; color: var(--text-1); }
+  .map-head p  { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+  #my-reports-map { flex: 1; min-height: 340px; border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
+
+  /* Map legend */
+  .map-legend { padding: 10px 16px; border-top: 1px solid var(--border); display: flex; gap: 12px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--text-2); }
+  .legend-dot  { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* ─── Responsive ─── */
+  @media (max-width: 900px) {
+    .mr-layout { grid-template-columns: 1fr; }
+    .mr-stats  { grid-template-columns: repeat(2, 1fr); }
+    .mr-filters select { width: 100%; min-width: 0; }
+  }
+  @media (max-width: 480px) {
+    .mr-stats  { grid-template-columns: repeat(2, 1fr); }
+    .mr-page   { padding: 1rem 1rem 2rem; }
+  }
+  @media (hover: none) {
+    .row-hover-card { display: none !important; }
+  }
+</style>
+
+<div class="mr-page">
+
+  <!-- Header -->
+  <div class="mr-header">
+    <div>
+      <h1>Мои пријави</h1>
+      <p>Преглед и филтри на вашите поднесени пријави.</p>
+    </div>
+    <a href="{% url 'submit_report' %}" class="btn-new">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      Нова пријава
+    </a>
+  </div>
+
+  <!-- Stats -->
+  <div class="mr-stats">
+    <div class="stat-card">
+      <div class="stat-label">Вкупно</div>
+      <div class="stat-val">{{ total_count|default:"0" }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Нови</div>
+      <div class="stat-val blue">{{ new_count|default:"0" }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Во тек</div>
+      <div class="stat-val amber">{{ in_progress_count|default:"0" }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Завршени</div>
+      <div class="stat-val green">{{ done_count|default:"0" }}</div>
+    </div>
+  </div>
+
+  <!-- Main layout -->
+  <div class="mr-layout">
+
+    <!-- Table card -->
+    <div class="card">
+      <div class="card-body">
+
+        <!-- Filters -->
+        <form method="get" class="mr-filters" id="mr-filter-form">
+          <select name="category" class="js-auto-filter">
+            <option value="">Категорија (сите)</option>
+            {% for value, label in category_choices %}
+              <option value="{{ value }}" {% if selected_category == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+
+          <select name="priority" class="js-auto-filter">
+            <option value="">Приоритет (сите)</option>
+            {% for value, label in priority_choices %}
+              <option value="{{ value }}" {% if selected_priority == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+
+          <select name="status" class="js-auto-filter">
+            <option value="">Статус (сите)</option>
+            {% for value, label in status_choices %}
+              <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+
+          <button class="btn-filter" type="submit">Филтрирај</button>
+          <a class="btn-reset" href="{% url 'my_reports' %}">Ресет</a>
+        </form>
+
+        <!-- Table -->
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Категорија</th>
+                <th>Приоритет</th>
+                <th>Статус</th>
+                <th>Датум</th>
+                <th>Акции</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for report in reports %}
+              <tr>
+                <td class="report-main-cell">
+                  <span class="cat-pill">{{ report.get_category_display }}</span>
+                  <div class="row-hover-card">
+                    <div class="hover-title">Брз преглед</div>
+                    <div class="hover-desc">{{ report.description|truncatechars:160 }}</div>
+                    <div class="hover-meta">
+                      <span class="hover-chip">{{ report.get_priority_display }}</span>
+                      <span class="hover-chip">{{ report.get_status_display }}</span>
+                      <span class="hover-chip">{{ report.created_at|date:"d.m.Y H:i" }}</span>
+                    </div>
+                    <a class="hover-link" href="{% url 'report_detail' report.id %}">
+                      Отвори детали
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </a>
+                  </div>
+                </td>
+                <td>
+                  <span class="pri-wrap {{ report.priority }}">
+                    <span class="pri-dot {{ report.priority }}"></span>
+                    {{ report.get_priority_display }}
+                  </span>
+                </td>
+                <td>
+                  <span class="badge {{ report.status }}">{{ report.get_status_display }}</span>
+                </td>
+                <td class="date-cell">{{ report.created_at|date:"d.m.Y H:i" }}</td>
+                <td>
+                  <div class="actions">
+                    <a href="{% url 'report_detail' report.id %}" class="icon-btn" title="Преглед" aria-label="Преглед">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                    </a>
+                    {% if report.status == 'new' or report.status == 'unclassified' %}
+                    <form method="post" action="{% url 'withdraw_report' report.id %}" style="display:inline">
+                      {% csrf_token %}
+                      <button type="submit" class="icon-btn danger" title="Повлечи" aria-label="Повлечи"
+                        onclick="return confirm('Дали сакате да ја повлечете пријавата?');">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <polyline points="3 6 5 6 21 6"></polyline>
+                          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                          <path d="M10 11v6M14 11v6"></path>
+                          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
+                        </svg>
+                      </button>
+                    </form>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% empty %}
+              <tr class="empty-row">
+                <td colspan="5">Нема пријави за прикажување.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        {% if page_obj and page_obj.paginator.num_pages > 1 %}
+        <nav class="d-flex justify-content-between align-items-center mt-3" aria-label="pagination">
+          <div class="small text-muted">Страна {{ page_obj.number }} од {{ page_obj.paginator.num_pages }}</div>
+          <div class="d-flex gap-2">
+            {% if page_obj.has_previous %}
+              <a class="btn-view" href="?{% if query_without_page %}{{ query_without_page }}&{% endif %}page={{ page_obj.previous_page_number }}">Претходна</a>
+            {% endif %}
+            {% if page_obj.has_next %}
+              <a class="btn-view" href="?{% if query_without_page %}{{ query_without_page }}&{% endif %}page={{ page_obj.next_page_number }}">Следна</a>
+            {% endif %}
+          </div>
+        </nav>
+        {% endif %}
+
+      </div>
+    </div>
+
+    <!-- Map card -->
+    <div class="card map-card">
+      <div class="map-head">
+        <h2>Локација на пријави</h2>
+        <p>Приказ на мапа</p>
+      </div>
+      <div id="my-reports-map"></div>
+      <div class="map-legend">
+        <span class="legend-item"><span class="legend-dot" style="background:#2563eb"></span>Нова</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#b45309"></span>Во тек</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#15803d"></span>Завршена</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#9e9a93"></span>Повлечена</span>
+      </div>
+    </div>
+
+  </div><!-- /.mr-layout -->
+</div><!-- /.mr-page -->
+
+{{ map_points|json_script:"map-points-data" }}
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+(function () {
+  const mapEl = document.getElementById("my-reports-map");
+  if (!mapEl) return;
+
+  const pointsNode = document.getElementById("map-points-data");
+  const points = pointsNode ? JSON.parse(pointsNode.textContent || "[]") : [];
+  const defaultCenter = points.length ? [points[0].lat, points[0].lng] : [41.9981, 21.4254];
+
+  const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const tileUrl = isDark
+    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+
+  const map = L.map("my-reports-map", { zoomControl: true, attributionControl: false })
+    .setView(defaultCenter, 14);
+
+  L.tileLayer(tileUrl, { maxZoom: 19 }).addTo(map);
+
+  const statusColors = {
+    new:       '#2563eb',
+    in_progress:  '#b45309',
+    resolved:      '#15803d',
+    unclassified: '#dc2626',
+    withdrawn: '#9e9a93',
+  };
+
+  points.forEach(function (pt) {
+    if (typeof pt.lat !== "number" || typeof pt.lng !== "number") return;
+    L.circleMarker([pt.lat, pt.lng], {
+      radius: 7,
+      color: '#fff',
+      weight: 2,
+      fillColor: statusColors[pt.status] || '#9e9a93',
+      fillOpacity: 0.95,
+    })
+    .addTo(map)
+    .bindPopup(
+      '<b>#' + pt.id + '</b><br>' + pt.category + '<br>' + pt.status,
+      { className: 'mr-popup' }
+    );
+  });
+
+  if (points.length > 1) {
+    const bounds = L.latLngBounds(points.map(p => [p.lat, p.lng]));
+    map.fitBounds(bounds, { padding: [30, 30] });
+  }
+
+  const filterForm = document.getElementById("mr-filter-form");
+  const autoFilters = document.querySelectorAll(".js-auto-filter");
+  autoFilters.forEach((el) => {
+    el.addEventListener("change", function () {
+      filterForm.requestSubmit();
+    });
+  });
+})();
+</script>
+{% endblock %}
+{% block title %}Админ панел{% endblock %}
+
+{% block content %}
+<section class="container py-4 py-lg-5 admin-dashboard-wrap">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3 mb-4">
+        <div>
+            <h1 class="h2 fw-bold mb-1">Админ панел</h1>
+            <p class="text-muted mb-0">Преглед на системот и управување</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-outline-dark" href="{% url 'export_reports_csv' %}">Извоз</a>
+            <a class="btn btn-outline-dark" href="{% url 'dashboard' %}?tab=analytics">Увоз</a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl-3">
+            <div class="card h-100 border-0 shadow-sm admin-stat-card">
+                <div class="card-body admin-stat-body">
+                    <div class="admin-stat-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <path d="M14 2v6h6"></path>
+                            <path d="M9 13h6"></path>
+                            <path d="M9 17h6"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="small text-uppercase text-muted">Вкупно пријави</div>
+                        <div class="display-6 fw-bold admin-stat-number">{{ stats.total_reports }}</div>
+                        <div class="admin-stat-delta">+12% овој месец</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card h-100 border-0 shadow-sm admin-stat-card">
+                <div class="card-body admin-stat-body">
+                    <div class="admin-stat-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="8.5" cy="7" r="4"></circle>
+                            <path d="M20 8v6"></path>
+                            <path d="M23 11h-6"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="small text-uppercase text-muted">Активни корисници</div>
+                        <div class="display-6 fw-bold admin-stat-number">{{ stats.active_users }}</div>
+                        <div class="admin-stat-delta">+8% овој месец</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card h-100 border-0 shadow-sm admin-stat-card">
+                <div class="card-body admin-stat-body">
+                    <div class="admin-stat-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 12h4l2-6 4 12 2-6h6"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="small text-uppercase text-muted">Стапка на решавање</div>
+                        <div class="display-6 fw-bold admin-stat-number">{{ stats.resolve_rate }}%</div>
+                        <div class="admin-stat-delta">+5% овој месец</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card h-100 border-0 shadow-sm admin-stat-card">
+                <div class="card-body admin-stat-body">
+                    <div class="admin-stat-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 20V10"></path>
+                            <path d="M18 20V4"></path>
+                            <path d="M6 20v-6"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="small text-uppercase text-muted">Просечно време</div>
+                        <div class="display-6 fw-bold admin-stat-number">{{ stats.avg_days }}д</div>
+                        <div class="admin-stat-delta">-15% овој месец</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <ul class="nav nav-pills admin-tabs mb-4" role="tablist">
+        <li class="nav-item" role="presentation">
+            <a class="nav-link {% if active_tab == 'analytics' %}active{% endif %}" href="{% url 'dashboard' %}?tab=analytics">Аналитика</a>
+        </li>
+        <li class="nav-item" role="presentation">
+            <a class="nav-link {% if active_tab == 'users' %}active{% endif %}" href="{% url 'dashboard' %}?tab=users">Корисници</a>
+        </li>
+        <li class="nav-item" role="presentation">
+            <a class="nav-link {% if active_tab == 'settings' %}active{% endif %}" href="{% url 'dashboard' %}?tab=settings">Подесувања</a>
+        </li>
+        <li class="nav-item" role="presentation">
+            <a class="nav-link {% if active_tab == 'logs' %}active{% endif %}" href="{% url 'dashboard' %}?tab=logs">Системски лог</a>
+        </li>
+    </ul>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-3 p-md-4">
+            {% if active_tab == 'analytics' %}
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+                    <h2 class="h4 mb-0 admin-section-title">Аналитика</h2>
+                    <div class="d-flex align-items-center gap-2">
+                        <label for="periodSelect" class="small fw-bold text-muted text-nowrap mb-0">Период:</label>
+                        <select id="periodSelect" class="form-select form-select-sm border-0 bg-light"
+                                style="min-width: 130px; border-radius: 8px; cursor: pointer;">
+                            <option value="weekly">Неделно</option>
+                            <option value="monthly" selected>Месечно</option>
+                            <option value="yearly">Годишно</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row g-4">
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-white py-3 border-0">
+                                <h3 class="h6 mb-0 fw-bold">Пријави низ времето</h3>
+                            </div>
+                            <div class="card-body p-4">
+                                <div style="height: 320px;">
+                                    <canvas id="timeSeriesChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-7">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-white py-3 border-0">
+                                <h3 class="h6 mb-0 fw-bold">Дистрибуција по категории</h3>
+                            </div>
+                            <div class="card-body p-4">
+                                <div style="height: 300px;">
+                                    <canvas id="categoryChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-5">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-white py-3 border-0">
+                                <h3 class="h6 mb-0 fw-bold">Статус на пријави</h3>
+                            </div>
+                            <div class="card-body p-4 d-flex align-items-center justify-content-center">
+                                <div style="height: 300px; width: 100%;">
+                                    <canvas id="statusChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="analyticsLoading"
+                     class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-white bg-opacity-75 d-none"
+                     style="z-index: 1050;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Се вчита...</span>
+                    </div>
+                </div>
+            {% elif active_tab == 'users' %}
+                <h2 class="h4 mb-3 admin-section-title">Управување со корисници</h2>
+                <div class="admin-users-table-wrap table-responsive">
+                    <table class="table align-middle admin-users-table">
+                        <thead>
+                            <tr>
+                                <th>Име</th>
+                                <th>E-пошта</th>
+                                <th>Улога</th>
+                                <th>Статус</th>
+                                <th>Акции</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for listed_user in users %}
+                                <tr>
+                                    <td>{{ listed_user.username }}</td>
+                                    <td>{{ listed_user.email|default:"-" }}</td>
+                                    <td>
+                                        <span class="admin-role-pill">
+                                            {% if listed_user.userprofile.role == 'admin' %}
+                                                Админ
+                                            {% elif listed_user.userprofile.role == 'officer' %}
+                                                Работник
+                                            {% else %}
+                                                Граѓанин
+                                            {% endif %}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if listed_user.is_active %}
+                                            <span class="admin-status-pill is-active">Активен</span>
+                                        {% else %}
+                                            <span class="admin-status-pill is-inactive">Неактивен</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="d-flex gap-2 align-items-center">
+                                            <form method="post" action="{% url 'toggle_user_active' listed_user.id %}" class="m-0">
+                                                {% csrf_token %}
+                                                <button type="submit" class="admin-switch-btn {% if listed_user.is_active %}is-on{% else %}is-off{% endif %}" title="Enable/Disable" aria-label="Enable or disable">
+                                                    <span class="admin-switch-icon" aria-hidden="true">{% if listed_user.is_active %}✓{% else %}✕{% endif %}</span>
+                                                    <span class="admin-switch-knob" aria-hidden="true"></span>
+                                                </button>
+                                            </form>
+                                            <form method="post" action="{% url 'delete_user' listed_user.id %}" class="m-0">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-sm admin-icon-btn admin-icon-btn-danger" title="Remove" aria-label="Remove user">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true">
+                                                        <path d="M18 6L6 18"></path>
+                                                        <path d="M6 6l12 12"></path>
+                                                    </svg>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="5" class="text-muted">Нема корисници.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-3">
+                    <button type="button" class="btn btn-sm admin-add-btn" data-bs-toggle="modal" data-bs-target="#addUserModal">+ Додај корисник</button>
+                </div>
+
+                <div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h3 class="modal-title fs-5" id="addUserModalLabel">Додај корисник</h3>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <form method="post" action="{% url 'create_user' %}">
+                                {% csrf_token %}
+                                <div class="modal-body d-grid gap-2">
+                                    <input type="text" name="username" class="form-control" placeholder="Корисничко име" required>
+                                    <input type="email" name="email" class="form-control" placeholder="E-пошта">
+                                    <input type="password" name="password" class="form-control" placeholder="Лозинка" required>
+                                    <select name="role" class="form-select" required>
+                                        <option value="citizen">Граѓанин</option>
+                                        <option value="officer">Работник</option>
+                                        <option value="admin">Админ</option>
+                                    </select>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Откажи</button>
+                                    <button type="submit" class="btn btn-dark">Додај</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            {% elif active_tab == 'settings' %}
+                <h2 class="h4 mb-4 admin-section-title">Подесувања</h2>
+                <div class="row g-4">
+                    <div class="col-lg-6">
+                        <div class="admin-settings-card">
+                            <h3 class="admin-settings-title">Категории</h3>
+                            <div class="admin-chip-list">
+                                {% for category in categories %}
+                                    <span class="admin-chip">{{ category.name }}</span>
+                                {% empty %}
+                                    <span class="text-muted small">Нема категории.</span>
+                                {% endfor %}
+                            </div>
+                            <form method="post" action="{% url 'create_category' %}" class="admin-inline-form mt-3">
+                                {% csrf_token %}
+                                <input type="text" name="name" class="form-control form-control-sm" placeholder="Нова категорија" required>
+                                <button type="submit" class="btn btn-sm admin-add-btn">+ Додади категорија</button>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="admin-settings-card">
+                            <h3 class="admin-settings-title">Општини / Сектори</h3>
+                            <div class="admin-chip-list">
+                                {% for sector in sectors %}
+                                    <form method="post" action="{% url 'delete_sector' sector.id %}" class="admin-chip-form">
+                                        {% csrf_token %}
+                                        <button type="submit" class="admin-chip admin-chip-removable" title="Отстрани општина" aria-label="Отстрани {{ sector.name }}">
+                                            <span>{{ sector.name }}</span>
+                                            <span class="admin-chip-remove" aria-hidden="true">x</span>
+                                        </button>
+                                    </form>
+                                {% empty %}
+                                    <span class="text-muted small">Нема сектори.</span>
+                                {% endfor %}
+                            </div>
+                            <form method="post" action="{% url 'create_sector' %}" class="admin-inline-form mt-3">
+                                {% csrf_token %}
+                                <input type="text" name="name" class="form-control form-control-sm" placeholder="Нова општина/сектор" required>
+                                <button type="submit" class="btn btn-sm admin-add-btn">+ Додади општина</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <h2 class="h4 mb-3 admin-section-title">Системски лог</h2>
+                <div class="vstack gap-2">
+                    {% for log in logs %}
+                        <div class="border rounded-3 p-3 bg-light">
+                            <div class="d-flex justify-content-between gap-3 flex-wrap">
+                                <strong>{{ log.action }}</strong>
+                                <small class="text-muted">{{ log.timestamp|date:"H:i" }}</small>
+                            </div>
+                            <div class="text-muted small">
+                                {% if log.user %}{{ log.user.username }}{% else %}Систем{% endif %} · {{ log.target_model }}{% if log.target_id %} #{{ log.target_id }}{% endif %}
+                            </div>
+                        </div>
+                    {% empty %}
+                        <p class="text-muted mb-0">Нема лог записи.</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+{% if active_tab == 'analytics' %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+    (function () {
+        const LABELS = {
+            new: 'Нови', in_progress: 'Во тек', resolved: 'Решени', unclassified: 'Некласификувани',
+            infrastructure: 'Инфраструктура', utilities: 'Комуналии', safety: 'Безбедност',
+            health: 'Здравство', other: 'Останато',
+            urgent: 'Итно', normal: 'Нормално', low: 'Ниско'
+        };
+        const translate = (key) => LABELS[key] || key;
+
+        const endpoint = "{% url 'api_analytics:stats' %}";
+        const overlay = document.getElementById('analyticsLoading');
+
+        let timeChart = null;
+        let categoryChart = null;
+        let statusChart = null;
+
+        function formatPeriodLabel(value, periodType) {
+            const d = new Date(value);
+            if (periodType === 'weekly') {
+                const end = new Date(d);
+                end.setDate(d.getDate() + 6);
+                const endStr = end.toLocaleDateString('mk-MK', { day: '2-digit', month: 'short' });
+                const startStr = d.toLocaleDateString('mk-MK', { day: '2-digit', month: 'short' });
+                return `${startStr} – ${endStr}`;
+            }
+            if (periodType === 'monthly') {
+                return d.toLocaleDateString('mk-MK', { month: 'short', year: 'numeric' });
+            }
+            return d.getFullYear();
+        }
+
+        function renderTimeSeries(data) {
+            const ctx = document.getElementById('timeSeriesChart');
+            if (!ctx) return;
+            if (timeChart) timeChart.destroy();
+            timeChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.by_period.data.map(item => formatPeriodLabel(item.period, data.by_period.period_type)),
+                    datasets: [{
+                        label: 'Пријави',
+                        data: data.by_period.data.map(item => item.count),
+                        borderColor: '#1a2238',
+                        backgroundColor: 'rgba(26, 34, 56, 0.08)',
+                        tension: 0.4,
+                        fill: true,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                },
+            });
+        }
+
+        function renderCategory(data) {
+            const ctx = document.getElementById('categoryChart');
+            if (!ctx) return;
+            if (categoryChart) categoryChart.destroy();
+            categoryChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.by_category.map(item => translate(item.label)),
+                    datasets: [{
+                        label: 'Број',
+                        data: data.by_category.map(item => item.count),
+                        backgroundColor: '#1a2238',
+                        borderRadius: 6,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                },
+            });
+        }
+
+        function renderStatus(data) {
+            const ctx = document.getElementById('statusChart');
+            if (!ctx) return;
+            if (statusChart) statusChart.destroy();
+            statusChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.by_status.map(item => translate(item.label)),
+                    datasets: [{
+                        data: data.by_status.map(item => item.count),
+                        backgroundColor: ['#1a2238', '#f39c12', '#2ecc71', '#7f8c8d'],
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: { legend: { position: 'bottom' } },
+                },
+            });
+        }
+
+        async function load(period) {
+            if (overlay) overlay.classList.remove('d-none');
+            try {
+                const resp = await fetch(`${endpoint}?period=${period}`);
+                if (!resp.ok) throw new Error(`status ${resp.status}`);
+                const data = await resp.json();
+                renderTimeSeries(data);
+                renderCategory(data);
+                renderStatus(data);
+            } catch (err) {
+                console.error('Analytics fetch failed:', err);
+            } finally {
+                if (overlay) overlay.classList.add('d-none');
+            }
+        }
+
+        const select = document.getElementById('periodSelect');
+        if (select) {
+            select.addEventListener('change', (e) => load(e.target.value));
+        }
+
+        load(select ? select.value : 'monthly');
+    })();
+</script>
+{% endif %}
+{% endblock %}
+{% endcomment %}
+
+{% block title %}Админ панел{% endblock %}
+
+{% block content %}
+<section class="container py-4">
+  <h1 class="h3">Админ панел</h1>
+  <p class="text-muted">Овој шаблон е заменет со admin_dashboard.html.</p>
+</section>
+{% endblock %}

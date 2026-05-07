@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: safety_reporter
+        ports:
+          - 5432:5432
+
+    env:
+      PYTHONPATH: .
+      DJANGO_SETTINGS_MODULE: config.settings
+      DATABASE_URL: postgresql://user:password@localhost:5432/safety_reporter
+      SECRET_KEY: test-secret-key-for-ci
+      DEBUG: "True"
+      ALLOWED_HOSTS: "localhost,127.0.0.1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: pip install -r requirements.txt
+
+      - run: pytest -v

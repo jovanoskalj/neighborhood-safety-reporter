@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: neighborhood-safety-reporter
+    runtime: python
+    plan: free
+    buildCommand: |
+      pip install -r requirements.txt
+      python manage.py collectstatic --no-input
+      python manage.py migrate --no-input
+    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+    healthCheckPath: /
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: neighborhood-safety-reporter.onrender.com
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://neighborhood-safety-reporter.onrender.com
+      - key: DATABASE_URL
+        fromDatabase:
+          name: neighborhood-safety-reporter-db
+          property: connectionString
+      - key: AI_CLASSIFICATION_ENABLED
+        value: "False"
+      - key: EMAIL_BACKEND
+        value: django.core.mail.backends.console.EmailBackend
+
+databases:
+  - name: neighborhood-safety-reporter-db
+    plan: free

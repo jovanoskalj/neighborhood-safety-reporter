@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+
+{% block title %}Мапа на пријави{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+
+<div class="container py-5">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+        <div>
+            <h1 class="h3 mb-1">Интерактивна мапа</h1>
+            <p class="text-muted mb-0">Филтрирај пријави и разгледај статуси по локација.</p>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-4">
+            <form id="map-filters" class="row g-2 mb-3">
+                <div class="col-12 col-md-3">
+                    <select name="category" class="form-select">
+                        <option value="">Категорија</option>
+                        {% for value, label in category_choices %}
+                            <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12 col-md-3">
+                    <select name="status" class="form-select">
+                        <option value="">Статус</option>
+                        {% for value, label in status_choices %}
+                            <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12 col-md-3">
+                    <select name="sector" class="form-select">
+                        <option value="">Сектор</option>
+                        {% for value, label in sector_choices %}
+                            <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12 col-md-3">
+                    <button class="btn btn-primary w-100" type="submit">Примени филтри</button>
+                </div>
+            </form>
+
+            <div id="reports-map" class="report-map"></div>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+  (function () {
+    const map = L.map("reports-map").setView([41.9981, 21.4254], 12);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
+
+    const statusColor = {
+      new: "#0d6efd",
+      in_progress: "#fd7e14",
+      resolved: "#198754",
+      unclassified: "#6c757d"
+    };
+
+    let markers = [];
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function formatDate(isoString) {
+      if (!isoString) return "-";
+      const date = new Date(isoString);
+      if (Number.isNaN(date.getTime())) return "-";
+      return date.toLocaleString("mk-MK", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+
+    function clearMarkers() {
+      markers.forEach((marker) => map.removeLayer(marker));
+      markers = [];
+    }
+
+    function renderMarkers(reports) {
+      clearMarkers();
+      reports.forEach((report) => {
+        if (typeof report.latitude !== "number" || typeof report.longitude !== "number") return;
+        const marker = L.circleMarker([report.latitude, report.longitude], {
+          radius: 7,
+          color: statusColor[report.status] || "#1a2238",
+          fillColor: statusColor[report.status] || "#1a2238",
+          fillOpacity: 0.9,
+        }).addTo(map);
+
+        const popupHtml = `
+          <div style="min-width:250px;max-width:280px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;">
+              <strong>#${report.id}</strong>
+              <span class="badge text-bg-light border">${escapeHtml(report.status_display || report.status)}</span>
+            </div>
+            <div style="font-size:12px;color:#64748b;margin-bottom:4px;">Категорија: <strong style="color:#0f172a;">${escapeHtml(report.category_display || report.category)}</strong></div>
+            <div style="font-size:12px;color:#64748b;margin-bottom:4px;">Приоритет: <strong style="color:#0f172a;">${escapeHtml(report.priority_display || report.priority)}</strong></div>
+            <div style="font-size:12px;color:#64748b;margin-bottom:8px;">Креирана: <strong style="color:#0f172a;">${formatDate(report.created_at)}</strong></div>
+            <div style="font-size:12px;line-height:1.45;color:#334155;margin-bottom:10px;">${escapeHtml((report.description || "").slice(0, 140))}${(report.description || "").length > 140 ? "…" : ""}</div>
+            <a href="${escapeHtml(report.detail_url || "#")}" class="btn btn-sm btn-primary">Отвори пријава</a>
+          </div>
+        `;
+
+        marker.bindPopup(
+          popupHtml
+        );
+        markers.push(marker);
+      });
+    }
+
+    function fetchReports(params = "") {
+      fetch(`{% url 'reports_api' %}?${params}`)
+        .then((response) => response.json())
+        .then((payload) => renderMarkers(payload.results || []))
+        .catch(() => renderMarkers([]));
+    }
+
+    const filterForm = document.getElementById("map-filters");
+    filterForm?.addEventListener("submit", function (event) {
+      event.preventDefault();
+      const searchParams = new URLSearchParams(new FormData(filterForm));
+      fetchReports(searchParams.toString());
+    });
+
+    fetchReports();
+  })();
+</script>
+{% endblock %}

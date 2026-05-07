@@ -1,0 +1,427 @@
+{% extends 'base.html' %}
+{% block title %}Пребарај пријави{% endblock %}
+{% block content %}
+<style>
+  .search-admin-page {
+    font-family: "Poppins", "Inter", "Segoe UI", Arial, sans-serif;
+    background: #f6f5f2;
+    min-height: calc(100vh - 90px);
+    padding: 28px 18px;
+  }
+  .search-shell {
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+  .search-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .search-head h1 {
+    color: #1a1916;
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0;
+  }
+  .search-head p {
+    color: #6b6760;
+    font-size: 13px;
+    margin: 4px 0 0;
+  }
+  .search-count-card {
+    background: #fff;
+    border: 1px solid #e8e5df;
+    border-radius: 10px;
+    padding: 10px 14px;
+    min-width: 145px;
+  }
+  .search-count-card span {
+    display: block;
+    color: #9e9a93;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  .search-count-card strong {
+    display: block;
+    color: #1a1916;
+    font-size: 26px;
+    line-height: 1.1;
+    margin-top: 4px;
+  }
+  .search-panel {
+    background: #fff;
+    border: 1px solid #e8e5df;
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+  .search-main-row { margin-bottom: 10px; }
+  .search-input-wrap {
+    position: relative;
+  }
+  .search-input-wrap i {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9e9a93;
+  }
+  .search-main-input {
+    width: 100%;
+    min-height: 44px;
+    border: 1px solid #d4cfc5;
+    border-radius: 9px;
+    padding: 10px 12px 10px 40px;
+    font-size: 14px;
+    color: #1a1916;
+  }
+  .search-main-input:focus,
+  .search-filter-select:focus {
+    border-color: #1a1916;
+    box-shadow: none;
+    outline: none;
+  }
+  .search-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(180px, 240px));
+    gap: 8px;
+  }
+  .search-filter-select {
+    min-height: 36px;
+    border: 1px solid #d4cfc5;
+    border-radius: 7px;
+    background: #fff;
+    color: #4b4740;
+    font-size: 13px;
+    padding: 7px 9px;
+  }
+  .search-results-card {
+    background: #fff;
+    border: 1px solid #e8e5df;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .search-table-wrap { overflow-x: auto; }
+  .search-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .search-table th {
+    background: #fbfaf8;
+    color: #9e9a93;
+    border-bottom: 1px solid #e8e5df;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    padding: 11px 12px;
+    white-space: nowrap;
+  }
+  .search-table td {
+    border-bottom: 1px solid #eeeae3;
+    color: #1a1916;
+    padding: 13px 12px;
+    vertical-align: top;
+  }
+  .search-table tbody tr:hover td { background: #fbfaf8; }
+  .search-id {
+    color: #2563eb;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .search-desc {
+    max-width: 420px;
+    line-height: 1.45;
+  }
+  .search-highlight {
+    background: #fde68a;
+    color: #1a1916;
+    border-radius: 4px;
+    padding: 0 2px;
+  }
+  .search-muted {
+    color: #6b6760;
+    font-size: 12px;
+  }
+  .search-pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    padding: 3px 9px;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .priority-urgent { color: #dc2626; background: #fef2f2; border-color: #fecaca; }
+  .priority-normal { color: #2563eb; background: #eff6ff; border-color: #bfdbfe; }
+  .priority-low { color: #6b6760; background: #f3f2ee; border-color: #e4e1d9; }
+  .status-new { color: #2563eb; background: #eff6ff; border-color: #bfdbfe; }
+  .status-in_progress { color: #b7791f; background: #fffbeb; border-color: #fde68a; }
+  .status-resolved { color: #15803d; background: #f0fdf4; border-color: #bbf7d0; }
+  .status-unclassified { color: #6b6760; background: #f3f2ee; border-color: #e4e1d9; }
+  .search-empty {
+    padding: 46px 18px;
+    text-align: center;
+    color: #6b6760;
+  }
+  .search-empty i {
+    color: #d4cfc5;
+    font-size: 34px;
+    display: block;
+    margin-bottom: 10px;
+  }
+  .search-pagination {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: center;
+    padding: 12px 14px;
+    border-top: 1px solid #e8e5df;
+  }
+  .search-page-link {
+    color: #1a1916;
+    text-decoration: none;
+    border: 1px solid #d4cfc5;
+    border-radius: 7px;
+    padding: 7px 10px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .search-page-link:hover { background: #fbfaf8; }
+  @media (max-width: 980px) {
+    .search-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 620px) {
+    .search-filter-grid { grid-template-columns: 1fr; }
+  }
+</style>
+
+<section class="search-admin-page">
+  <div class="search-shell">
+    <div class="search-head">
+      <div>
+        <h1>Пребарај пријави</h1>
+        <p>Пишувајте во полето за опис или сменете филтер. Резултатите се освежуваат автоматски.</p>
+      </div>
+      <div class="search-count-card">
+        <span>Резултати</span>
+        <strong id="searchResultCount">{{ reports_page.paginator.count }}</strong>
+      </div>
+    </div>
+
+    <form method="get" class="search-panel" id="liveSearchForm">
+      <div class="search-main-row">
+        <div class="search-input-wrap">
+          <i class="bi bi-search"></i>
+          <input class="search-main-input" id="liveSearchInput" type="search" name="keyword" value="{{ query.keyword|default:'' }}" placeholder="Пребарај по опис, пример: дупка, светилка, вода..." autocomplete="off">
+        </div>
+      </div>
+
+      <div class="search-filter-grid">
+        <select name="status" class="search-filter-select">
+          <option value="">Сите статуси</option>
+          {% for value, label in status_choices %}
+          <option value="{{ value }}" {% if query.status == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <select name="priority" class="search-filter-select">
+          <option value="">Сите приоритети</option>
+          {% for value, label in priority_choices %}
+          <option value="{{ value }}" {% if query.priority == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </form>
+
+    <div class="search-results-card">
+      <div class="search-table-wrap" id="searchTableWrap" {% if not reports_page.object_list %}style="display:none"{% endif %}>
+        <table class="search-table">
+          <thead>
+            <tr>
+              <th>ИД</th>
+              <th>Опис</th>
+              <th>Категорија</th>
+              <th>Статус</th>
+              <th>Приоритет</th>
+              <th>Сектор</th>
+              <th>Датум</th>
+            </tr>
+          </thead>
+          <tbody id="searchResultsBody">
+            {% for report in reports_page.object_list %}
+            <tr>
+              <td><a class="search-id" href="{% url 'report_detail' report.pk %}">ПРЈ-{{ report.pk|stringformat:'03d' }}</a></td>
+              <td>
+                <div class="search-desc">{{ report.description|truncatechars:150 }}</div>
+                <div class="search-muted">{{ report.get_municipality_display|default:"Без општина" }}</div>
+              </td>
+              <td>{{ report.get_category_display }}</td>
+              <td><span class="search-pill status-{{ report.status }}">{{ report.get_status_display }}</span></td>
+              <td><span class="search-pill priority-{{ report.priority }}">{{ report.get_priority_display }}</span></td>
+              <td>{{ report.get_sector_display }}</td>
+              <td class="search-muted">{{ report.created_at|date:'d.m.Y' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="search-empty" id="searchEmptyState" {% if reports_page.object_list %}style="display:none"{% endif %}>
+        <i class="bi bi-search"></i>
+        <strong>Нема резултати</strong>
+        <div id="searchEmptyText">Пробајте со друг збор од описот или отстранете дел од филтрите.</div>
+      </div>
+
+      <div class="search-pagination" id="searchPagination" {% if reports_page.paginator.num_pages <= 1 %}style="display:none"{% endif %}>
+        <div class="search-muted">Страна {{ reports_page.number }} од {{ reports_page.paginator.num_pages }}</div>
+        <div>
+          {% if reports_page.has_previous %}
+          <a class="search-page-link" href="?{% for key, value in query.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ reports_page.previous_page_number }}">Претходна</a>
+          {% endif %}
+          {% if reports_page.has_next %}
+          <a class="search-page-link" href="?{% for key, value in query.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ reports_page.next_page_number }}">Следна</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  const liveSearchEndpoint = "{% url 'reports_json' %}";
+  const resultCountEl = document.getElementById('searchResultCount');
+  const searchForm = document.getElementById('liveSearchForm');
+  const searchInput = document.getElementById('liveSearchInput');
+  const resultsBody = document.getElementById('searchResultsBody');
+  const tableWrap = document.getElementById('searchTableWrap');
+  const emptyState = document.getElementById('searchEmptyState');
+  const emptyText = document.getElementById('searchEmptyText');
+  const pagination = document.getElementById('searchPagination');
+  let liveSearchTimer = null;
+  let liveSearchController = null;
+
+  const labels = {
+    category: {
+      {% for value, label in category_choices %}"{{ value|escapejs }}": "{{ label|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}
+    },
+    status: {
+      {% for value, label in status_choices %}"{{ value|escapejs }}": "{{ label|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}
+    },
+    priority: {
+      {% for value, label in priority_choices %}"{{ value|escapejs }}": "{{ label|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}
+    },
+    sector: {
+      {% for value, label in sector_choices %}"{{ value|escapejs }}": "{{ label|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}
+    },
+    municipality: {
+      {% for value, label in municipalities %}"{{ value|escapejs }}": "{{ label|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}
+    }
+  };
+
+  function escapeHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    }[char]));
+  }
+
+  function highlightDescription(description, keyword) {
+    const escaped = escapeHtml(description);
+    const words = String(keyword || '').trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return escaped;
+    const pattern = words.map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+    return escaped.replace(new RegExp(`(${pattern})`, 'gi'), '<mark class="search-highlight">$1</mark>');
+  }
+
+  function buildLiveSearchParams() {
+    const params = new URLSearchParams(new FormData(searchForm));
+    const municipality = params.get('opshtina');
+    params.delete('opshtina');
+    params.delete('sort');
+    if (municipality) params.set('municipality', municipality);
+    [...params.entries()].forEach(([key, value]) => {
+      if (!value) params.delete(key);
+    });
+    return params;
+  }
+
+  function renderLiveResults(reports) {
+    const keyword = searchInput.value;
+    resultCountEl.textContent = reports.length;
+    pagination.style.display = 'none';
+
+    if (!reports.length) {
+      tableWrap.style.display = 'none';
+      emptyState.style.display = 'block';
+      emptyText.textContent = keyword.trim()
+        ? 'Нема опис што го содржи внесениот збор. Пробајте друг збор или отстранете филтер.'
+        : 'Нема пријави што одговараат на избраните филтри.';
+      resultsBody.innerHTML = '';
+      return;
+    }
+
+    tableWrap.style.display = '';
+    emptyState.style.display = 'none';
+    resultsBody.innerHTML = reports.map((report) => `
+      <tr>
+        <td><a class="search-id" href="${escapeHtml(report.detail_url)}">ПРЈ-${String(report.id).padStart(3, '0')}</a></td>
+        <td>
+          <div class="search-desc">${highlightDescription(report.description, keyword)}</div>
+          <div class="search-muted">${escapeHtml(labels.municipality[report.municipality] || report.municipality || 'Без општина')}</div>
+        </td>
+        <td>${escapeHtml(labels.category[report.category] || report.category_label || report.category || '-')}</td>
+        <td><span class="search-pill status-${escapeHtml(report.status)}">${escapeHtml(labels.status[report.status] || report.status_label || report.status)}</span></td>
+        <td><span class="search-pill priority-${escapeHtml(report.priority)}">${escapeHtml(labels.priority[report.priority] || report.priority_label || report.priority)}</span></td>
+        <td>${escapeHtml(labels.sector[report.sector] || report.sector_label || report.sector || '-')}</td>
+        <td class="search-muted">${escapeHtml((report.created_at || '').slice(0, 10))}</td>
+      </tr>
+    `).join('');
+  }
+
+  async function runLiveSearch() {
+    if (liveSearchController) liveSearchController.abort();
+    liveSearchController = new AbortController();
+    const params = buildLiveSearchParams();
+    emptyText.textContent = 'Се пребарува...';
+
+    try {
+      const response = await fetch(`${liveSearchEndpoint}?${params.toString()}`, {
+        headers: { Accept: 'application/json' },
+        signal: liveSearchController.signal
+      });
+      if (!response.ok) throw new Error('Search failed');
+      const payload = await response.json();
+      renderLiveResults(payload.results || []);
+    } catch (error) {
+      if (error.name === 'AbortError') return;
+      emptyState.style.display = 'block';
+      tableWrap.style.display = 'none';
+      emptyText.textContent = 'Неуспешно пребарување. Обидете се повторно.';
+    }
+  }
+
+  searchInput.addEventListener('input', () => {
+    clearTimeout(liveSearchTimer);
+    liveSearchTimer = setTimeout(runLiveSearch, 220);
+  });
+
+  searchForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    runLiveSearch();
+  });
+
+  searchForm.querySelectorAll('select').forEach((field) => {
+    field.addEventListener('change', runLiveSearch);
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+
+{% block title %}Верификација неуспешна{% endblock %}
+
+{% block content %}
+<style>
+  :root {
+    --error-red: #EF4444;
+    --primary-blue: #1A2238;
+    --primary-gradient: linear-gradient(135deg, #1A2238 0%, #2d3f66 100%);
+    --glass-bg: rgba(255, 255, 255, 0.9);
+  }
+
+  body {
+    background-color: #fcf8f8; /* Very slight red tint to the background */
+    background-image: 
+        radial-gradient(at 50% 0%, rgba(239, 68, 68, 0.05) 0px, transparent 50%);
+    font-family: 'Inter', sans-serif;
+  }
+
+  .error-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 35px;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.05);
+    padding: 4rem 2rem;
+    text-align: center;
+  }
+
+  /* Error Icon Animation */
+  .error-wrapper {
+    width: 100px;
+    height: 100px;
+    background: #fef2f2;
+    color: var(--error-red);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 2.5rem;
+    font-size: 50px;
+    animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+  }
+
+  @keyframes shake {
+    10%, 90% { transform: translate3d(-1px, 0, 0); }
+    20%, 80% { transform: translate3d(2px, 0, 0); }
+    30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+    40%, 60% { transform: translate3d(4px, 0, 0); }
+  }
+
+  .error-card h1 {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    color: #0F172A;
+    font-size: 28px;
+    margin-bottom: 1rem;
+  }
+
+  .error-text {
+    color: #64748B;
+    font-size: 16px;
+    margin-bottom: 2.5rem;
+    max-width: 320px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.6;
+  }
+
+  .btn-retry {
+    background: var(--primary-gradient);
+    color: white;
+    border: none;
+    border-radius: 16px;
+    padding: 1rem 2rem;
+    font-weight: 700;
+    font-size: 16px;
+    transition: all 0.3s;
+    text-decoration: none;
+    display: inline-block;
+  }
+
+  .btn-retry:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 15px 30px rgba(26, 34, 56, 0.2);
+    filter: brightness(1.05);
+    color: white;
+  }
+
+  .support-link {
+    display: block;
+    margin-top: 2rem;
+    font-size: 14px;
+    color: #94A3B8;
+    text-decoration: none;
+  }
+
+  .support-link:hover {
+    color: var(--primary-blue);
+    text-decoration: underline;
+  }
+</style>
+
+<div class="container d-flex justify-content-center align-items-center min-vh-100">
+    <div class="col-12 col-md-8 col-lg-5 col-xl-4">
+        <div class="card error-card border-0">
+            <div class="error-wrapper">
+                <i class="bi bi-x-circle"></i>
+            </div>
+            
+            <h1>Неуспешна верификација</h1>
+            <p class="error-text">
+                Линкот за верификација е <strong>невалиден</strong> или е <strong>истечен</strong>. Ова обично се случува ако поминало премногу време од неговото испраќање.
+            </p>
+
+            <a href="{% url 'register' %}" class="btn btn-retry">
+                Регистрирај се повторно
+            </a>
+
+            <a href="#" class="support-link">Контактирајте техничка поддршка</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

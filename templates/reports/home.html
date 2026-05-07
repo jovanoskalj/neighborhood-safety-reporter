@@ -1,0 +1,520 @@
+
+{% extends 'base.html' %}
+
+{% block title %}Дома{% endblock %}
+
+{% block content %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=Inter:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --blue: #1A2238;
+    --blue-light: #eef2f7;
+    --blue-mid: #1A223820;
+    --blue-border: #1A223830;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 20px;
+    --text: #0f172a;
+    --text-muted: #64748b;
+    --border: #e2e8f0;
+    --surface: #f8fafc;
+    --white: #ffffff;
+  }
+
+  .lp { font-family: 'Inter', sans-serif; color: var(--text); background: var(--white); }
+
+  /* ─── HERO ────────────────────────────── */
+  .lp-hero {
+    position: relative; overflow: hidden;
+    padding: 100px 48px 90px;
+    text-align: center;
+    background: var(--white);
+  }
+  .hero-grid-bg {
+    position: absolute; inset: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(26,34,56,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(26,34,56,0.05) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+  .hero-glow {
+    position: absolute; top: -80px; left: 50%; transform: translateX(-50%);
+    width: 700px; height: 420px;
+    background: radial-gradient(ellipse, rgba(26,34,56,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-content { position: relative; z-index: 1; max-width: 700px; margin: 0 auto; }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 16px; border-radius: 999px;
+    background: var(--blue-light); border: 1px solid var(--blue-border);
+    font-size: 12px; font-weight: 500; color: var(--blue);
+    margin-bottom: 32px;
+    animation: fadeUp 0.5s ease both;
+  }
+  .badge-pulse {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--blue);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+  }
+  .hero-h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 60px; font-weight: 700; line-height: 1.1;
+    color: var(--text); margin-bottom: 22px; letter-spacing: -2px;
+    animation: fadeUp 0.5s 0.1s ease both;
+  }
+  .hero-h1 em { font-style: normal; color: var(--blue); }
+  .hero-p {
+    font-size: 18px; color: var(--text-muted); line-height: 1.65;
+    margin-bottom: 40px; max-width: 480px; margin-left: auto; margin-right: auto;
+    animation: fadeUp 0.5s 0.2s ease both;
+  }
+  .hero-btns {
+    display: flex; gap: 12px; justify-content: center;
+    animation: fadeUp 0.5s 0.3s ease both;
+  }
+  .hero-btn-primary {
+    padding: 14px 30px; border-radius: var(--radius-md); font-size: 15px; font-weight: 500;
+    background: var(--blue); color: #fff; border: none; cursor: pointer;
+    text-decoration: none; display: inline-flex; align-items: center; gap: 8px;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 4px 20px rgba(26,34,56,0.3);
+  }
+  .hero-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(26,34,56,0.4); }
+  .hero-btn-secondary {
+    padding: 14px 30px; border-radius: var(--radius-md); font-size: 15px; font-weight: 500;
+    background: var(--white); color: var(--text); border: 1px solid var(--border);
+    cursor: pointer; text-decoration: none;
+    transition: background 0.2s;
+  }
+  .hero-btn-secondary:hover { background: var(--surface); }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ─── STATS ───────────────────────────── */
+  .lp-stats {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 0;
+  }
+  .stats-inner {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    max-width: 960px; margin: 0 auto;
+  }
+  .stat-item {
+    padding: 36px 24px; text-align: center;
+    border-right: 1px solid var(--border);
+  }
+  .stat-item:last-child { border-right: none; }
+  .stat-num {
+    font-family: 'Syne', sans-serif;
+    font-size: 38px; font-weight: 700; color: var(--blue);
+    letter-spacing: -1.5px; line-height: 1;
+  }
+  .stat-label { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+
+  /* ─── HOW IT WORKS ────────────────────── */
+  .lp-how {
+    padding: 96px 48px;
+    background: var(--white);
+  }
+  .section-header { text-align: center; margin-bottom: 60px; }
+  .section-tag {
+    display: inline-block; font-size: 11px; font-weight: 600;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--blue);
+    margin-bottom: 14px;
+  }
+  .section-h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 38px; font-weight: 700; color: var(--text);
+    letter-spacing: -1px; margin-bottom: 12px;
+  }
+  .section-sub { font-size: 16px; color: var(--text-muted); max-width: 440px; margin: 0 auto; line-height: 1.6; }
+
+  .steps-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px;
+    max-width: 960px; margin: 0 auto;
+  }
+  .step-card {
+    padding: 32px 28px; border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    background: var(--white);
+    transition: box-shadow 0.25s, transform 0.25s;
+    position: relative; overflow: hidden;
+  }
+  .step-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: var(--blue); opacity: 0;
+    transition: opacity 0.25s;
+  }
+  .step-card:hover { box-shadow: 0 12px 40px rgba(0,0,0,0.07); transform: translateY(-3px); }
+  .step-card:hover::before { opacity: 1; }
+  .step-num-badge {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--blue-light); border: 1px solid var(--blue-border);
+    color: var(--blue); font-size: 12px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 20px;
+  }
+  .step-icon {
+    width: 48px; height: 48px; border-radius: 12px;
+    background: var(--blue-light);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 18px;
+  }
+  .step-icon svg { width: 24px; height: 24px; color: var(--blue); stroke: var(--blue); }
+  .step-card h3 { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 600; color: var(--text); margin-bottom: 10px; }
+  .step-card p { font-size: 14px; color: var(--text-muted); line-height: 1.65; }
+
+  /* ─── FEATURES + MOCKUP ───────────────── */
+  .lp-features {
+    padding: 96px 48px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+  .features-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 64px;
+    max-width: 960px; margin: 0 auto; align-items: center;
+  }
+  .features-left .section-h2 { font-size: 32px; text-align: left; margin-bottom: 10px; }
+  .features-left .section-sub { text-align: left; margin: 0 0 32px; }
+  .feat-list { display: flex; flex-direction: column; gap: 22px; }
+  .feat-item { display: flex; gap: 14px; align-items: flex-start; }
+  .feat-check-wrap {
+    width: 22px; height: 22px; border-radius: 50%; background: var(--blue);
+    flex-shrink: 0; margin-top: 1px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .feat-check-wrap svg { width: 12px; height: 12px; }
+  .feat-item h4 { font-size: 15px; font-weight: 500; color: var(--text); margin-bottom: 3px; }
+  .feat-item p { font-size: 14px; color: var(--text-muted); line-height: 1.55; }
+
+  /* App Mockup */
+  .app-mockup {
+    background: var(--white); border-radius: 24px;
+    border: 1px solid var(--border);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.06);
+    overflow: hidden;
+  }
+  .mockup-top {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 18px; border-bottom: 1px solid var(--border);
+  }
+  .mockup-title { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 600; color: var(--text); }
+  .mockup-badge {
+    font-size: 11px; padding: 3px 10px; border-radius: 999px;
+    background: var(--blue-light); color: var(--blue);
+    border: 1px solid var(--blue-border); font-weight: 500;
+  }
+  .mockup-map {
+    height: 150px; background: #dbeafe; position: relative; overflow: hidden;
+  }
+  .mockup-map-grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(26,34,56,0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(26,34,56,0.07) 1px, transparent 1px);
+    background-size: 26px 26px;
+  }
+  .mockup-roads {
+    position: absolute; inset: 0;
+  }
+  .pin-wrap {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -60%);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pin-ring {
+    position: absolute; width: 44px; height: 44px; border-radius: 50%;
+    background: rgba(26,79,214,0.18);
+    animation: ripple 2s infinite;
+  }
+  .pin-dot {
+    width: 16px; height: 16px; border-radius: 50%; background: var(--blue);
+    border: 3px solid white; position: relative; z-index: 1;
+  }
+  @keyframes ripple {
+    0% { transform: scale(0.7); opacity: 0.8; }
+    100% { transform: scale(1.4); opacity: 0; }
+  }
+  .mockup-reports { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .mock-report {
+    background: var(--surface); border-radius: 10px;
+    border: 1px solid var(--border); padding: 12px 14px;
+  }
+  .mock-report-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+  .mock-report-name { font-size: 13px; font-weight: 500; color: var(--text); }
+  .mock-status {
+    font-size: 11px; padding: 3px 9px; border-radius: 999px; font-weight: 500;
+  }
+  .s-active { background: #dcfce7; color: #16a34a; border: 1px solid #86efac; }
+  .s-pending { background: #fef9c3; color: #a16207; border: 1px solid #fde047; }
+  .s-done { background: #dbeafe; color: #1d4ed8; border: 1px solid #93c5fd; }
+  .mock-addr { font-size: 11px; color: var(--text-muted); }
+  .mock-progress { height: 3px; border-radius: 999px; background: var(--border); margin-top: 8px; }
+  .mock-bar { height: 100%; border-radius: 999px; }
+
+  /* ─── CTA ─────────────────────────────── */
+  .lp-cta {
+    padding: 96px 48px;
+    background: var(--white);
+    border-top: 1px solid var(--border);
+    text-align: center;
+  }
+  .cta-box {
+    max-width: 640px; margin: 0 auto;
+    padding: 64px 56px; border-radius: 28px;
+    background: var(--blue); position: relative; overflow: hidden;
+  }
+  .cta-pattern {
+    position: absolute; inset: 0; pointer-events: none;
+    background-image: radial-gradient(rgba(255,255,255,0.1) 1.5px, transparent 1.5px);
+    background-size: 28px 28px;
+  }
+  .cta-box h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 36px; font-weight: 700; color: #fff;
+    letter-spacing: -1px; margin-bottom: 14px;
+    position: relative; z-index: 1;
+  }
+  .cta-box p {
+    font-size: 16px; color: rgba(255,255,255,0.75); line-height: 1.65;
+    margin-bottom: 32px; position: relative; z-index: 1;
+  }
+  .cta-actions { display: flex; gap: 12px; justify-content: center; position: relative; z-index: 1; }
+  .btn-white-solid {
+    padding: 13px 28px; border-radius: var(--radius-md); font-size: 15px; font-weight: 500;
+    background: #fff; color: var(--blue); border: none; cursor: pointer;
+    text-decoration: none; display: inline-block;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .btn-white-solid:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
+  .btn-white-ghost {
+    padding: 13px 28px; border-radius: var(--radius-md); font-size: 15px; font-weight: 500;
+    background: transparent; color: #fff; border: 1px solid rgba(255,255,255,0.35);
+    cursor: pointer; text-decoration: none; display: inline-block;
+    transition: background 0.2s;
+  }
+  .btn-white-ghost:hover { background: rgba(255,255,255,0.1); }
+
+</style>
+
+<div class="lp">
+
+  <!-- HERO -->
+  <section class="lp-hero">
+    <div class="hero-grid-bg"></div>
+    <div class="hero-glow"></div>
+    <div class="hero-content">
+      <div class="hero-badge">
+        <div class="badge-pulse"></div>
+        Платформа за граѓани на Северна Македонија
+      </div>
+      <h1 class="hero-h1">Пријави проблем во<br><em>твоето соседство</em></h1>
+      <p class="hero-p">Безбедна, брза и транспарентна платформа за пријавување на комунални проблеми во вашата заедница.</p>
+      <div class="hero-btns">
+        <a href="{% url 'submit_report' %}" class="hero-btn-primary">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 3v10M3 8l5 5 5-5"/>
+          </svg>
+          Поднеси пријава
+        </a>
+        <a href="#features" class="hero-btn-secondary">Дознај повеќе</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- STATS -->
+  <section class="lp-stats">
+    <div class="stats-inner">
+      <div class="stat-item">
+        <div class="stat-num">1,234</div>
+        <div class="stat-label">Решени пријави</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num">567</div>
+        <div class="stat-label">Активни корисници</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num">78%</div>
+        <div class="stat-label">Стапка на решавање</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num">2.3д</div>
+        <div class="stat-label">Просечен одговор</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="lp-how">
+    <div class="section-header">
+      <div class="section-tag">Процес</div>
+      <h2 class="section-h2">Kako функционира?</h2>
+      <p class="section-sub">Три едноставни чекори до решен проблем во вашата заедница.</p>
+    </div>
+    <div class="steps-grid">
+      <article class="step-card">
+        <div class="step-num-badge">1</div>
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 3H5a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+            <polyline points="14 3 14 8 19 8"/>
+            <line x1="8" y1="13" x2="16" y2="13"/>
+            <line x1="8" y1="17" x2="12" y2="17"/>
+          </svg>
+        </div>
+        <h3>Поднеси пријава</h3>
+        <p>Опишете го проблемот со локација и слика на мапата. Целосно анонимно доколку сакате.</p>
+      </article>
+      <article class="step-card">
+        <div class="step-num-badge">2</div>
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+        </div>
+        <h3>GPS Локација</h3>
+        <p>Автоматско лоцирање на проблемот за побрза интервенција од надлежните служби.</p>
+      </article>
+      <article class="step-card">
+        <div class="step-num-badge">3</div>
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 01-3.46 0"/>
+          </svg>
+        </div>
+        <h3>Следи го статусот</h3>
+        <p>Добивајте известувања за напредокот во реално време директно на вашиот уред.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- FEATURES + APP MOCKUP -->
+  <section id="features" class="lp-features">
+    <div class="features-grid">
+      <div class="features-left">
+        <div class="section-tag" style="text-align:left;">Функционалности</div>
+        <h2 class="section-h2">Сè за подобра заедница</h2>
+        <p class="section-sub">Платформата е дизајнирана за граѓани кои сакаат промена.</p>
+        <div class="feat-list">
+          <div class="feat-item">
+            <div class="feat-check-wrap">
+              <svg viewBox="0 0 12 12" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="2 6 5 9 10 3"/>
+              </svg>
+            </div>
+            <div>
+              <h4>Реално време следење</h4>
+              <p>Следете го статусот на вашата пријава во секое момент.</p>
+            </div>
+          </div>
+          <div class="feat-item">
+            <div class="feat-check-wrap">
+              <svg viewBox="0 0 12 12" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="2 6 5 9 10 3"/>
+              </svg>
+            </div>
+            <div>
+              <h4>Интерактивна карта</h4>
+              <p>Видете ги сите активни проблеми во вашата населба на карта.</p>
+            </div>
+          </div>
+          <div class="feat-item">
+            <div class="feat-check-wrap">
+              <svg viewBox="0 0 12 12" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="2 6 5 9 10 3"/>
+              </svg>
+            </div>
+            <div>
+              <h4>Директна комуникација</h4>
+              <p>Поврзете се со надлежните без посредници.</p>
+            </div>
+          </div>
+          <div class="feat-item">
+            <div class="feat-check-wrap">
+              <svg viewBox="0 0 12 12" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="2 6 5 9 10 3"/>
+              </svg>
+            </div>
+            <div>
+              <h4>Јавна транспарентност</h4>
+              <p>Историја на решени проблеми за секоја општина.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="app-mockup">
+        <div class="mockup-top">
+          <div class="mockup-title">Активни пријави</div>
+          <div class="mockup-badge">Ново</div>
+        </div>
+        <div class="mockup-map">
+          <div class="mockup-map-grid"></div>
+          <svg class="mockup-roads" viewBox="0 0 400 150" preserveAspectRatio="xMidYMid slice">
+            <path d="M0 75 Q100 40 200 75 T400 60" stroke="rgba(26,34,56,0.12)" stroke-width="10" fill="none"/>
+            <path d="M120 0 Q140 75 110 150" stroke="rgba(26,34,56,0.10)" stroke-width="8" fill="none"/>
+            <path d="M260 0 Q280 75 250 150" stroke="rgba(26,34,56,0.08)" stroke-width="6" fill="none"/>
+          </svg>
+          <div class="pin-wrap">
+            <div class="pin-ring"></div>
+            <div class="pin-dot"></div>
+          </div>
+        </div>
+        <div class="mockup-reports">
+          <div class="mock-report">
+            <div class="mock-report-row">
+              <div class="mock-report-name">Дупка на патот</div>
+              <div class="mock-status s-active">Активна</div>
+            </div>
+            <div class="mock-addr">ул. Маршал Тито, Охрид</div>
+            <div class="mock-progress"><div class="mock-bar" style="width:65%; background:#16a34a;"></div></div>
+          </div>
+          <div class="mock-report">
+            <div class="mock-report-row">
+              <div class="mock-report-name">Скршена светилка</div>
+              <div class="mock-status s-pending">Во тек</div>
+            </div>
+            <div class="mock-addr">бул. Туристичка, Охрид</div>
+            <div class="mock-progress"><div class="mock-bar" style="width:30%; background:#a16207;"></div></div>
+          </div>
+          <div class="mock-report">
+            <div class="mock-report-row">
+              <div class="mock-report-name">Нелегален отпад</div>
+              <div class="mock-status s-done">Решена</div>
+            </div>
+            <div class="mock-addr">кеј Коста Рацин, Охрид</div>
+            <div class="mock-progress"><div class="mock-bar" style="width:100%; background:#1d4ed8;"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="lp-cta">
+    <div class="cta-box">
+      <div class="cta-pattern"></div>
+      <h2>Подобри го твоето соседство денес</h2>
+      <p>Придружете се на илјадниците граѓани кои веќе пријавуваат проблеми и прават разлика во своите општини.</p>
+      <div class="cta-actions">
+        <a href="{% url 'submit_report' %}" class="btn-white-solid">Поднеси прва пријава</a>
+        <a href="{% url 'login' %}" class="btn-white-ghost">Најави се</a>
+      </div>
+    </div>
+  </section>
+
+</div>
+{% endblock %}

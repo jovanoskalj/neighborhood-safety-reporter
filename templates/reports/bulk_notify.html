@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+{% block title %}Масовно известување{% endblock %}
+
+{% block content %}
+<style>
+  .bulk-page {
+    font-family: "Poppins", "Inter", "Segoe UI", Arial, sans-serif;
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 32px 18px;
+  }
+  .bulk-shell {
+    background: #f6f5f2;
+    border: 1px solid #e8e5df;
+    border-radius: 14px;
+    padding: 20px;
+  }
+  .bulk-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .bulk-head h1 {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1a1916;
+    margin: 0;
+  }
+  .bulk-head p {
+    color: #6b6760;
+    font-size: 13px;
+    margin: 4px 0 0;
+  }
+  .bulk-count {
+    background: #fff;
+    border: 1px solid #e8e5df;
+    border-radius: 10px;
+    padding: 10px 14px;
+    min-width: 150px;
+  }
+  .bulk-count span {
+    display: block;
+    color: #9e9a93;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  .bulk-count strong {
+    display: block;
+    color: #1a1916;
+    font-size: 28px;
+    line-height: 1.1;
+    margin-top: 4px;
+  }
+  .bulk-grid {
+    display: grid;
+    grid-template-columns: 320px minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+  }
+  .bulk-panel {
+    background: #fff;
+    border: 1px solid #e8e5df;
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .bulk-panel h2 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a1916;
+    margin: 0 0 12px;
+  }
+  .bulk-panel label {
+    color: #6b6760;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .bulk-panel .form-control,
+  .bulk-panel .form-select {
+    border-color: #d4cfc5;
+    border-radius: 7px;
+    font-size: 13px;
+  }
+  .bulk-panel .form-control:focus,
+  .bulk-panel .form-select:focus {
+    border-color: #1a1916;
+    box-shadow: none;
+  }
+  .bulk-message textarea {
+    min-height: 190px;
+    resize: vertical;
+  }
+  .bulk-preview {
+    background: #fbfaf8;
+    border: 1px solid #e8e5df;
+    border-radius: 10px;
+    padding: 12px;
+    color: #6b6760;
+    font-size: 12.5px;
+    line-height: 1.5;
+    margin-top: 12px;
+  }
+  .bulk-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 14px;
+  }
+  .bulk-send-btn {
+    border: 0;
+    border-radius: 7px;
+    background: #1a1916;
+    color: #fff;
+    min-height: 40px;
+    padding: 9px 14px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .bulk-send-btn:hover { opacity: .88; color: #fff; }
+  .bulk-muted-link {
+    color: #6b6760;
+    font-size: 13px;
+    text-decoration: none;
+  }
+  .bulk-muted-link:hover { color: #1a1916; }
+  @media (max-width: 900px) {
+    .bulk-grid { grid-template-columns: 1fr; }
+  }
+</style>
+
+<section class="bulk-page">
+  <div class="bulk-shell">
+    <div class="bulk-head">
+      <div>
+        <h1>Масовно известување</h1>
+        <p>Изберете примачи и напишете ја пораката што ќе се испрати по email.</p>
+      </div>
+      <div class="bulk-count">
+        <span>Примачи</span>
+        <strong>{{ count }}</strong>
+      </div>
+    </div>
+
+    <div class="bulk-grid">
+      <div class="bulk-panel">
+        <h2>Филтри</h2>
+        <form method="get">
+          <div class="mb-3">
+            <label class="form-label" for="municipalityFilter">Општина</label>
+            <select id="municipalityFilter" name="municipality" class="form-select">
+              <option value="">Сите општини</option>
+              {% for key, label in municipality_choices %}
+              <option value="{{ key }}" {% if municipality == key %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="sectorFilter">Сектор</label>
+            <select id="sectorFilter" name="sector" class="form-select">
+              <option value="">Сите сектори</option>
+              {% for key, label in sector_choices %}
+              <option value="{{ key }}" {% if sector == key %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="btn btn-outline-dark w-100">
+            <i class="bi bi-funnel me-1"></i>Освежи примачи
+          </button>
+        </form>
+      </div>
+
+      <div class="bulk-panel bulk-message">
+        <h2>Порака</h2>
+        <form id="sendForm" method="post" action="{% url 'notifications_bulk_notify_send' %}">
+          {% csrf_token %}
+          <input type="hidden" name="municipality" value="{{ municipality }}">
+          <input type="hidden" name="sector" value="{{ sector }}">
+          <div class="mb-3">
+            <label class="form-label" for="bulkSubject">Наслов на email</label>
+            <input id="bulkSubject" class="form-control" type="text" name="subject" value="{{ default_subject }}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="bulkMessage">Broadcast порака</label>
+            <textarea id="bulkMessage" class="form-control" name="message" required>{{ default_message }}</textarea>
+          </div>
+          <div class="bulk-preview">
+            До секој email автоматски се додаваат името на корисникот и кратки податоци за неговата решена пријава.
+          </div>
+          <div class="bulk-actions">
+            <a href="{% url 'dashboard' %}?tab=analytics" class="bulk-muted-link">
+              <i class="bi bi-arrow-left me-1"></i>Назад кон админ панел
+            </a>
+            <button type="submit" class="bulk-send-btn" {% if count == 0 %}disabled{% endif %}>
+              <i class="bi bi-megaphone me-1"></i>Испрати до {{ count }} примачи
+            </button>
+          </div>
+        </form>
+        <div id="result" class="mt-3"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+document.getElementById('sendForm')?.addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = this.querySelector('button[type=submit]');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Испраќање...';
+
+  const resp = await fetch(this.action, {
+    method: 'POST',
+    body: new FormData(this),
+    headers: {'X-CSRFToken': '{{ csrf_token }}'}
+  });
+  const data = await resp.json();
+
+  if (!resp.ok) {
+    document.getElementById('result').innerHTML =
+      `<div class="alert alert-danger border-0">${data.error || 'Неуспешно испраќање.'}</div>`;
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-megaphone me-1"></i>Испрати до {{ count }} примачи';
+    return;
+  }
+
+  document.getElementById('result').innerHTML =
+    `<div class="alert alert-success border-0">
+       <i class="bi bi-check-circle me-2"></i>
+       Успешно испратени: <strong>${data.succeeded}</strong> / ${data.total}
+       ${data.failed ? `<br><span class="text-danger"><i class="bi bi-x-circle me-1"></i>Неуспешни: ${data.failed}</span>` : ''}
+     </div>`;
+
+  btn.innerHTML = '<i class="bi bi-check-lg me-2"></i>Завршено';
+});
+</script>
+{% endblock %}
