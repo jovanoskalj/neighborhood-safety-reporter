@@ -9,7 +9,9 @@ from apps.reports.models import Report, ReportStatusHistory
 
 
 @pytest.mark.django_db
-def test_report_creation_logs_initial_status_history(client, citizen_user):
+def test_report_creation_logs_initial_status_history(client, citizen_user, settings):
+    """Submitting via the JSON `create_report` endpoint logs an initial transition."""
+    settings.AI_CLASSIFICATION_ENABLED = True
     client.login(username="citizen", password="citizen123")
 
     payload = {
@@ -18,15 +20,14 @@ def test_report_creation_logs_initial_status_history(client, citizen_user):
         "longitude": "21.425400",
     }
 
-    with patch("apps.reports.views.classify_report") as mock_classify:
+    with patch("apps.reports.signals.classify_report") as mock_classify:
         mock_classify.return_value = {
             "category": "utilities",
             "priority": "normal",
             "sector": "utilities",
-            "status": "new",
         }
         response = client.post(
-            reverse("reports_api"),
+            reverse("create_report"),
             data=json.dumps(payload),
             content_type="application/json",
         )
@@ -121,14 +122,8 @@ def test_reports_api_includes_popup_detail_fields(client, citizen_user):
 
 @pytest.mark.django_db
 @patch("apps.reports.views.send_report_created_email")
-@patch("apps.reports.views.classify_report")
-def test_report_creation_triggers_email(mock_classify, mock_send_created, client, citizen_user):
-    mock_classify.return_value = {
-        "category": "other",
-        "priority": "normal",
-        "sector": "admin",
-        "status": "new",
-    }
+def test_report_creation_triggers_email(mock_send_created, client, citizen_user):
+    """Submitting via the HTML form sends a confirmation email."""
     client.login(username="citizen", password="citizen123")
 
     response = client.post(

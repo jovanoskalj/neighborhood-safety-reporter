@@ -3,9 +3,13 @@
 Admin dashboard CRUD lives in `admin_views.py`; pure helpers in `_view_helpers.py`.
 This module re-exports admin views so `urls.py` (which references `views.X`) keeps working.
 
-Functions that call test-patched names — `classify_report` and
-`send_report_status_changed_email` — must stay defined here so tests patching
-`apps.reports.views.X` intercept them via this module's globals.
+`send_report_status_changed_email` is imported here (rather than called from a
+helper module) so tests that `patch("apps.reports.views.send_report_status_changed_email")`
+intercept it via this module's globals.
+
+Report creation is centralised in `_persist_new_report`. The post_save signal
+in `apps/reports/signals.py` handles AI classification — both `create_report`
+(JSON) and `submit_report` (HTML form) go through the same path.
 """
 from django.conf import settings
 from django.contrib import messages
@@ -20,7 +24,6 @@ from django.views.decorators.http import require_GET, require_http_methods
 
 from apps.accounts.models import UserProfile
 from apps.accounts.utils import notify_report_reassigned
-from apps.ai_classifier.classifier import classify_report
 from apps.notifications.senders import send_status_change_email
 from apps.notifications.services import send_report_created_email, send_report_status_changed_email
 
@@ -65,20 +68,82 @@ from .duplicate_detection import find_potential_duplicate
 from .forms import ReportCreateForm, ReportSubmissionForm
 from .models import MUNICIPALITY_CHOICES, Report, ReportCategory, Sector
 
+_CATEGORY_TO_SECTOR_FALLBACK = {
+    "infrastructure": "infrastructure",
+    "utilities": "utilities",
+    "safety": "safety",
+    "health": "health",
+    "other": "admin",
+}
+
+
+def _persist_new_report(citizen, *, description, latitude, longitude, image=None,
+                        category=None, priority=None, municipality=None):
+    """Save a Report, run duplicate detection, log creation, send email.
+
+    Returns ``(report, duplicate)`` where ``duplicate`` is the matched Report
+    or ``None``. Callers decide how to surface the duplicate (HTML message vs
+    JSON field). Classification is handled by the post_save signal in
+    `apps/reports/signals.py`.
+    """
+    duplicate = find_potential_duplicate(
+        description=description,
+        latitude=float(latitude),
+        longitude=float(longitude),
+    )
+    extra = {}
+    if category:
+        extra["category"] = category
+    if priority:
+        extra["priority"] = priority
+    if municipality:
+        extra["municipality"] = municipality
+    if duplicate is not None:
+        extra["is_duplicate"] = True
+        extra["duplicate_of"] = duplicate
+        extra["duplicate_verdict"] = "pending"
+
+    report = Report.objects.create(
+        citizen=citizen,
+        description=description,
+        latitude=latitude,
+        longitude=longitude,
+        image=image,
+        **extra,
+    )
+
+    # When AI is disabled the post_save signal returns early; backfill sector
+    # from category so reports still route to the correct team.
+    if not getattr(settings, "AI_CLASSIFICATION_ENABLED", False):
+        derived_sector = _CATEGORY_TO_SECTOR_FALLBACK.get(report.category, "admin")
+        if derived_sector != report.sector:
+            Report.objects.filter(pk=report.pk).update(sector=derived_sector)
+
+    report.refresh_from_db()
+    _log_status_transition(report, None, report.status, changed_by=citizen, note="Креирана пријава")
+    send_report_created_email(report)
+    return report, duplicate
+
 
 def create_report(request):
     """JSON endpoint to create a report.
 
     Returns 401 (not 302 redirect) when unauthenticated so it's safe for SPA/API
-    clients. Classification is handled by the post_save signal in
-    ``apps.reports.signals.classify_report_on_create``.
+    clients. Accepts both ``application/json`` and form-encoded bodies.
     """
     if not request.user.is_authenticated:
         return JsonResponse({"detail": "Authentication required."}, status=401)
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
 
-    form = ReportCreateForm(request.POST, request.FILES)
+    payload = _parse_json_body(request)
+    if payload is None:
+        form = ReportCreateForm(request.POST, request.FILES)
+    elif not payload:
+        return JsonResponse({"errors": {"body": ["Invalid JSON body."]}}, status=400)
+    else:
+        form = ReportCreateForm(payload)
+
     if not form.is_valid():
         return JsonResponse({"errors": form.errors}, status=400)
 
@@ -92,30 +157,14 @@ def create_report(request):
             status=429,
         )
 
-    report = Report.objects.create(
-        citizen=request.user,
+    report, _duplicate = _persist_new_report(
+        request.user,
         description=form.cleaned_data["description"],
         latitude=form.cleaned_data["latitude"],
         longitude=form.cleaned_data["longitude"],
         image=form.cleaned_data.get("image"),
     )
-    report.refresh_from_db()  # signal may have updated category/priority/sector/ai_processed/status
     return JsonResponse(_serialize_report(report), status=201)
-
-
-def _apply_ai_classification(report: Report) -> None:
-    """Run the AI classifier and copy fields onto `report` (in-memory).
-
-    Stays in this module so `patch("apps.reports.views.classify_report")` in tests
-    intercepts the call. If you move this, every test that patches that name breaks.
-    """
-    result = classify_report(report.description)
-    report.category = result.get("category", "other")
-    report.priority = result.get("priority", "normal")
-    report.sector = result.get("sector", "admin")
-    report.status = result.get("status", "new")
-    report.ai_processed = True
-    report.status_changed_at = timezone.now()
 
 
 def home(request):
@@ -156,7 +205,7 @@ def home(request):
 
 @login_required
 def submit_report(request):
-    """Render and process report submission form."""
+    """Render and process the citizen report-submission form (HTML)."""
     if request.method == "POST":
         form = ReportSubmissionForm(request.POST, request.FILES)
         if form.is_valid():
@@ -176,38 +225,21 @@ def submit_report(request):
                     status=429,
                 )
 
-            report = form.save(commit=False)
-            report.citizen = request.user
-
-            duplicate = find_potential_duplicate(
-                description=report.description,
-                latitude=float(report.latitude),
-                longitude=float(report.longitude),
+            report, duplicate = _persist_new_report(
+                request.user,
+                description=form.cleaned_data["description"],
+                latitude=form.cleaned_data["latitude"],
+                longitude=form.cleaned_data["longitude"],
+                image=form.cleaned_data.get("image"),
+                category=form.cleaned_data.get("category"),
+                priority=form.cleaned_data.get("priority"),
+                municipality=form.cleaned_data.get("municipality"),
             )
             if duplicate is not None:
-                report.is_duplicate = True
-                report.duplicate_of = duplicate
-                report.duplicate_verdict = "pending"
                 messages.warning(
                     request,
                     f"Можно е оваа пријава да е дупликат на пријава #{duplicate.pk}. Администратор ќе одлучи дали навистина е дупликат.",
                 )
-
-            if not getattr(settings, "AI_CLASSIFICATION_ENABLED", False):
-                category_to_sector = {
-                    "infrastructure": "infrastructure",
-                    "utilities": "utilities",
-                    "safety": "safety",
-                    "health": "health",
-                    "other": "admin",
-                }
-                report.sector = category_to_sector.get(report.category, "admin")
-
-            report.save()
-            report.refresh_from_db()  # pick up any updates from the classification signal
-            _log_status_transition(report, None, report.status, changed_by=request.user, note="Креирана пријава")
-            send_report_created_email(report)
-
             messages.success(request, "Вашата пријава е успешно поднесена.")
             return redirect("report_detail", report_id=report.id)
         messages.error(request, "Ве молиме поправете ги грешките во формата.")
@@ -226,44 +258,9 @@ def submit_report(request):
 
 
 @login_required
-@require_http_methods(["GET", "POST"])
+@require_GET
 def reports_api(request):
-    """GET filtered reports, POST create new report with AI classification."""
-    if request.method == "POST":
-        payload = _parse_json_body(request)
-        if payload is None:
-            form = ReportCreateForm(request.POST, request.FILES)
-        elif not payload:
-            return JsonResponse({"errors": {"body": ["Invalid JSON body."]}}, status=400)
-        else:
-            form = ReportCreateForm(payload)
-
-        if not form.is_valid():
-            return JsonResponse({"errors": form.errors}, status=400)
-
-        if _is_submission_rate_limited(request.user):
-            return JsonResponse(
-                {
-                    "detail": "Daily limit reached: max 10 reports per 24 hours. Please try again tomorrow.",
-                    "limit": MAX_REPORTS_PER_24H,
-                    "window_hours": REPORT_WINDOW_HOURS,
-                },
-                status=429,
-            )
-
-        report = Report(
-            citizen=request.user,
-            description=form.cleaned_data["description"],
-            latitude=form.cleaned_data["latitude"],
-            longitude=form.cleaned_data["longitude"],
-            image=form.cleaned_data.get("image"),
-        )
-        _apply_ai_classification(report)
-        report.save()
-        _log_status_transition(report, None, report.status, changed_by=request.user, note="Креирана пријава")
-        send_report_created_email(report)
-        return JsonResponse(_serialize_report(report), status=201)
-
+    """List visible reports as paginated JSON. POST creation lives in `create_report`."""
     queryset = _visible_reports_for_user(request)
     queryset = _filter_queryset(request, queryset)
 

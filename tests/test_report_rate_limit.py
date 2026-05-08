@@ -1,5 +1,4 @@
 import json
-from unittest.mock import patch
 
 import pytest
 from django.urls import reverse
@@ -8,7 +7,8 @@ from apps.reports.models import Report
 
 
 @pytest.mark.django_db
-def test_reports_api_rate_limit_returns_429(client, citizen_user):
+def test_create_report_rate_limit_returns_429(client, citizen_user):
+    """The JSON `create_report` endpoint enforces the 10/24h cap."""
     client.login(username="citizen", password="citizen123")
 
     for i in range(10):
@@ -31,7 +31,7 @@ def test_reports_api_rate_limit_returns_429(client, citizen_user):
     }
 
     response = client.post(
-        reverse("reports_api"),
+        reverse("create_report"),
         data=json.dumps(payload),
         content_type="application/json",
     )
@@ -43,15 +43,8 @@ def test_reports_api_rate_limit_returns_429(client, citizen_user):
 
 
 @pytest.mark.django_db
-@patch("apps.reports.views.classify_report")
-def test_submit_report_ui_rate_limit_returns_429(mock_classify, client, citizen_user):
-    mock_classify.return_value = {
-        "category": "other",
-        "priority": "normal",
-        "sector": "admin",
-        "status": "new",
-    }
-
+def test_submit_report_ui_rate_limit_returns_429(client, citizen_user):
+    """The HTML `submit_report` form enforces the 10/24h cap and re-renders the form."""
     client.login(username="citizen", password="citizen123")
 
     for i in range(10):
