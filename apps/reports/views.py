@@ -886,20 +886,27 @@ def reports_json(request):
 def officer_panel(request):
     if not user_is_officer(request.user):
         return redirect('dashboard')
-    
+
     sector = get_user_sector(request.user)
     reports = Report.objects.filter(sector=sector).order_by('-created_at')
-    
+
     status_filter = request.GET.get('status')
     if status_filter:
         reports = reports.filter(status=status_filter)
-    
+
     priority_filter = request.GET.get('priority')
     if priority_filter:
         reports = reports.filter(priority=priority_filter)
-        
+
+    paginator = Paginator(reports, 20)
+    page_number = request.GET.get('page', 1)
+    try:
+        page_obj = paginator.page(page_number)
+    except (PageNotAnInteger, EmptyPage):
+        page_obj = paginator.page(1)
+
     return render(request, "reports/officer_panel.html", {
-        "reports": reports,
+        "reports": page_obj,
         "sector": sector,
     })
 
@@ -908,15 +915,13 @@ def officer_panel(request):
 def search_page(request):
     """Public search page with keyword, filters, list & map toggle."""
     filters = _build_report_filters(request)
-    
-  
+
     opshtina = request.GET.get("opshtina", "").strip()
     if opshtina:
         filters &= Q(municipality=opshtina)
-    
+
     queryset = Report.objects.filter(filters).order_by("-created_at")
-    
-    # Sorting
+
     sort_by = request.GET.get("sort", "date")
     if sort_by == "priority":
         priority_order = {"urgent": 0, "normal": 1, "low": 2}
@@ -937,13 +942,20 @@ def search_page(request):
         key=lambda item: item[1],
     )
 
+    paginator = Paginator(queryset, 20)
+    page_number = request.GET.get('page', 1)
+    try:
+        page_obj = paginator.page(page_number)
+    except (PageNotAnInteger, EmptyPage):
+        page_obj = paginator.page(1)
+
     context = {
-        "reports": queryset,
+        "reports": page_obj,
         "query": request.GET,
         "status_choices": Report.STATUS_CHOICES,
         "priority_choices": Report.PRIORITY_CHOICES,
         "municipalities": municipalities,
-        "total": len(queryset) if isinstance(queryset, list) else queryset.count(),
+        "total": paginator.count,
     }
     return render(request, "reports/search.html", context)
 
@@ -963,25 +975,27 @@ def my_reports(request):
     if status:    qs = qs.filter(status=status)
 
     map_pins = json.dumps([
-        {
-            'id':       r.id,
-            'lat':      float(r.latitude),
-            'lng':      float(r.longitude),
-            'category': r.get_category_display(),
-            'status':   r.get_status_display(),
-        }
+        {'id': r.id, 'lat': float(r.latitude), 'lng': float(r.longitude),
+         'category': r.get_category_display(), 'status': r.get_status_display()}
         for r in qs
     ])
 
+    paginator = Paginator(qs, 20)
+    page_number = request.GET.get('page', 1)
+    try:
+        page_obj = paginator.page(page_number)
+    except (PageNotAnInteger, EmptyPage):
+        page_obj = paginator.page(1)
+
     return render(request, 'reports/my_reports.html', {
-        'reports':           qs,
-        'map_pins':          map_pins,
-        'category_choices':  Report.CATEGORY_CHOICES,
-        'priority_choices':  Report.PRIORITY_CHOICES,
-        'status_choices':    Report.STATUS_CHOICES,
+        'reports': page_obj,
+        'map_pins': map_pins,
+        'category_choices': Report.CATEGORY_CHOICES,
+        'priority_choices': Report.PRIORITY_CHOICES,
+        'status_choices': Report.STATUS_CHOICES,
         'selected_category': category,
         'selected_priority': priority,
-        'selected_status':   status,
+        'selected_status': status,
     })
 
 def new_report(request):

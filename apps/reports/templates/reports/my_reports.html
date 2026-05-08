@@ -125,6 +125,26 @@
                                 {% endfor %}
                             </tbody>
                         </table>
+                        <!-- Пагинација -->
+                        <div class="d-flex justify-content-center py-3">
+                          <nav>
+                            <ul class="pagination pagination-sm mb-0">
+                              {% if reports.has_previous %}
+                                <li class="page-item">
+                                  <a class="page-link" href="?page={{ reports.previous_page_number }}&category={{ selected_category }}&priority={{ selected_priority }}&status={{ selected_status }}">‹</a>
+                                </li>
+                              {% endif %}
+                              <li class="page-item disabled">
+                                <span class="page-link">{{ reports.number }} / {{ reports.paginator.num_pages }}</span>
+                              </li>
+                              {% if reports.has_next %}
+                                <li class="page-item">
+                                  <a class="page-link" href="?page={{ reports.next_page_number }}&category={{ selected_category }}&priority={{ selected_priority }}&status={{ selected_status }}">›</a>
+                                </li>
+                              {% endif %}
+                            </ul>
+                          </nav>
+                        </div>
                     </div>
                 </div>
             </div>
