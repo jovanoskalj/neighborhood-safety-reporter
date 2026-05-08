@@ -151,6 +151,26 @@
           </tbody>
         </table>
       </div>
+      <!-- Пагинација -->
+      <div class="d-flex justify-content-center py-3">
+        <nav>
+          <ul class="pagination pagination-sm mb-0">
+            {% if reports.has_previous %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ reports.previous_page_number }}&keyword={{ query.keyword }}&category={{ query.category }}&status={{ query.status }}&priority={{ query.priority }}&sort={{ query.sort }}">‹</a>
+              </li>
+            {% endif %}
+            <li class="page-item disabled">
+              <span class="page-link">{{ reports.number }} / {{ reports.paginator.num_pages }}</span>
+            </li>
+            {% if reports.has_next %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ reports.next_page_number }}&keyword={{ query.keyword }}&category={{ query.category }}&status={{ query.status }}&priority={{ query.priority }}&sort={{ query.sort }}">›</a>
+              </li>
+            {% endif %}
+          </ul>
+        </nav>
+      </div>
       {% else %}
       <div class="no-results">
         <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>

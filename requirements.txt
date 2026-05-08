@@ -11,3 +11,4 @@ sendgrid
 django-debug-toolbar>=4.4.1
 openpyxl
 Faker
+locust

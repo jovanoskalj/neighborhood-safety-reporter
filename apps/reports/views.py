@@ -37,20 +37,61 @@ from .models import MUNICIPALITY_CHOICES, Report, ReportCategory, ReportStatusHi
 MAX_REPORTS_PER_24H = 10
 REPORT_WINDOW_HOURS = 24
 
+REPORT_EXPORT_COLUMNS = ['ID', 'Description', 'Category', 'Priority', 'Status', 'Sector', 'Latitude', 'Longitude', 'Created At']
+
 SEARCH_PARAMS = (
     "category", "status", "sector", "priority",
-    "from", "to", "keyword",
     "lat_min", "lat_max", "lng_min", "lng_max",
     "page",
 )
 
 
-def _parse_iso_date(value):
-    """Return a ``date`` parsed from ISO-8601 input, or ``None`` on failure."""
-    try:
-        return date.fromisoformat(value)
-    except (TypeError, ValueError):
+def _parse_decimal(value):
+    """Return a ``Decimal`` or ``None`` if the input is absent/invalid."""
+    if value is None or value == "":
         return None
+    try:
+        return Decimal(value)
+    except InvalidOperation:
+        return None
+
+
+def _filtered_admin_reports(request):
+    """Build filtered queryset for admin export based on GET parameters."""
+    queryset = Report.objects.all().order_by('-created_at')
+    
+    date_from = request.GET.get('from')
+    if date_from:
+        queryset = queryset.filter(created_at__date__gte=date_from)
+    
+    date_to = request.GET.get('to')
+    if date_to:
+        queryset = queryset.filter(created_at__date__lte=date_to)
+    
+    category = request.GET.get('category')
+    if category:
+        queryset = queryset.filter(category=category)
+    
+    status = request.GET.get('status')
+    if status:
+        queryset = queryset.filter(status=status)
+    
+    return queryset
+
+
+def _format_report_row(report):
+    """Format a report for CSV/Excel export."""
+    return [
+        report.id,
+        report.description,
+        report.category,
+        report.priority,
+        report.status,
+        report.sector,
+        report.latitude,
+        report.longitude,
+        report.created_at.strftime('%Y-%m-%d %H:%M')
+    ]
 
 
 def _parse_decimal(value):
@@ -641,31 +682,23 @@ def delete_sector(request: HttpRequest, sector_id: int) -> HttpResponse:
 @login_required
 @_admin_only()
 def export_reports_csv(request: HttpRequest) -> HttpResponse:
-    """Export current reports to CSV from dashboard."""
+    """Export filtered reports to CSV from dashboard."""
+    queryset = _filtered_admin_reports(request)
+    
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = 'attachment; filename="reports_export.csv"'
-
+    
     writer = csv.writer(response)
-    writer.writerow(["id", "citizen", "category", "sector", "status", "priority", "created_at"])
-    for report in Report.objects.select_related("citizen").order_by("-created_at"):
-        writer.writerow(
-            [
-                report.id,
-                report.citizen.username,
-                report.category,
-                report.sector,
-                report.status,
-                report.priority,
-                report.created_at.isoformat(),
-            ]
-        )
-
+    writer.writerow(REPORT_EXPORT_COLUMNS)
+    for report in queryset:
+        writer.writerow(_format_report_row(report))
+    
     _write_audit_log(
         request,
         action="export_reports_csv",
         target_model="Report",
         target_id=None,
-        details={"count": Report.objects.count()},
+        details={"count": queryset.count(), "filters": request.GET.dict()},
     )
     return response
 
@@ -971,6 +1004,85 @@ def update_report_status(request, report_id):
 
 
 @login_required
+@require_http_methods(["PATCH"])
+def reassign_report(request, report_id):
+    """Officer-only endpoint that reassigns a report to a different sector."""
+    if not user_is_officer(request.user):
+        return JsonResponse({"error": "Only officers may reassign reports."}, status=403)
+
+    report = get_object_or_404(Report, pk=report_id)
+    if report.sector != get_user_sector(request.user):
+        return JsonResponse({"error": "Officers may only reassign reports in their own sector."}, status=403)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON payload."}, status=400)
+
+    sector_id = payload.get("sector_id")
+    if not sector_id:
+        return JsonResponse({"error": "Missing sector_id."}, status=400)
+
+    try:
+        sector = Sector.objects.get(pk=sector_id)
+    except Sector.DoesNotExist:
+        return JsonResponse({"error": "Invalid sector_id."}, status=400)
+
+    old_sector = report.sector
+    report.sector = sector.key
+    report.save(update_fields=["sector", "updated_at"])
+
+    # Log the reassignment action
+    AuditLog.objects.create(
+        user=request.user,
+        action="REASSIGN",
+        target_model="Report",
+        target_id=report.pk,
+        details={
+            "old_sector": old_sector,
+            "new_sector": sector.key,
+            "sector_name": sector.name,
+        }
+    )
+
+    return JsonResponse({
+        "id": report.pk,
+        "sector": report.sector,
+        "sector_name": sector.name,
+        "updated_at": report.updated_at.isoformat(),
+    })
+
+
+def _serialize_report(report):
+    return {
+        "id": report.id,
+        "description": report.description,
+        "latitude": float(report.latitude),
+        "longitude": float(report.longitude),
+        "image": report.image.url if report.image else None,
+        "category": report.category,
+        "priority": report.priority,
+        "sector": report.sector,
+        "status": report.status,
+        "ai_processed": report.ai_processed,
+        "created_at": report.created_at.isoformat(),
+    }
+
+
+@login_required
+def get_sectors_json(request):
+    """Return list of active sectors as JSON for frontend dropdowns."""
+    if not user_is_officer(request.user):
+        return JsonResponse({"error": "Only officers can access this."}, status=403)
+    
+    sectors = Sector.objects.filter(is_active=True).values('id', 'key', 'name')
+    return JsonResponse({
+        "sectors": list(sectors)
+    })
+
+
+@login_required
+@csrf_exempt
 @require_http_methods(["POST"])
 def withdraw_report(request, report_id: int):
     """Allow citizens to withdraw their own report."""
@@ -1073,9 +1185,10 @@ def map_view(request):
 
 @login_required
 def reports_json(request):
-    """Return reports as JSON for AJAX-based Leaflet map rendering."""
+    """Return reports as JSON for AJAX-based Leaflet map rendering with bounding box filtering."""
     queryset = Report.objects.all().order_by("-created_at")
 
+    # Filter by category, status, municipality
     category = request.GET.get("category", "").strip()
     status = request.GET.get("status", "").strip()
     municipality = request.GET.get("municipality", "").strip()
@@ -1086,6 +1199,17 @@ def reports_json(request):
         queryset = queryset.filter(status=status)
     if municipality:
         queryset = queryset.filter(municipality=municipality)
+
+    # Filter by bounding box (map bounds)
+    min_lat = _parse_decimal(request.GET.get("minLat"))
+    max_lat = _parse_decimal(request.GET.get("maxLat"))
+    min_lng = _parse_decimal(request.GET.get("minLng"))
+    max_lng = _parse_decimal(request.GET.get("maxLng"))
+
+    if min_lat is not None and max_lat is not None:
+        queryset = queryset.filter(latitude__gte=min_lat, latitude__lte=max_lat)
+    if min_lng is not None and max_lng is not None:
+        queryset = queryset.filter(longitude__gte=min_lng, longitude__lte=max_lng)
 
     status_labels = dict(Report.STATUS_CHOICES)
     category_labels = dict(Report.CATEGORY_CHOICES)
@@ -1128,106 +1252,167 @@ def heatmap_data(request):
 @login_required
 def officer_panel(request):
     if not user_is_officer(request.user):
-        return redirect("dashboard")
+        return redirect('dashboard')
 
     sector = get_user_sector(request.user)
-    reports = Report.objects.filter(sector=sector).order_by("-created_at")
+    reports = Report.objects.filter(sector=sector).order_by('-created_at')
 
-    status_filter = request.GET.get("status")
+    status_filter = request.GET.get('status')
     if status_filter:
         reports = reports.filter(status=status_filter)
 
-    priority_filter = request.GET.get("priority")
+    priority_filter = request.GET.get('priority')
     if priority_filter:
         reports = reports.filter(priority=priority_filter)
-    return render(request, "reports/submit_report.html")
 
-
-@login_required
-def export_reports(request):
-    try:
-        profile = request.user.profile
-        if profile.role != 'admin' and not request.user.is_staff:
-            return redirect('dashboard')
-
-    except:
-        return redirect('dashboard')
-    fmt = request.GET.get('format', 'csv')
-    date_from = request.GET.get('from')
-    date_to = request.GET.get('to')
-    category = request.GET.get('category')
-    status = request.GET.get('status')
-
-    reports = Report.objects.all().order_by('-created_at')
-
-    if date_from:
-        reports = reports.filter(created_at__date__gte=date_from)
-    if date_to:
-        reports = reports.filter(created_at__date__lte=date_to)
-    if category:
-        reports = reports.filter(category=category)
-    if status:
-        reports = reports.filter(status=status)
-
-    headers = ['ID', 'Description', 'Category', 'Priority', 'Status', 'Sector', 'Latitude', 'Longitude', 'Created At']
-
-    def get_row(r):
-        return [r.id, r.description, r.category, r.priority, r.status, r.sector, r.latitude, r.longitude,
-                r.created_at.strftime('%Y-%m-%d %H:%M')]
-
-    if fmt == 'excel' and OPENPYXL_AVAILABLE:
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = 'Reports'
-        ws.append(headers)
-        for r in reports:
-            ws.append(get_row(r))
-        output = io.BytesIO()
-        wb.save(output)
-        output.seek(0)
-        response = HttpResponse(output.read(),
-                                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        response['Content-Disposition'] = 'attachment; filename="reports.xlsx"'
-        return response
-
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="reports.csv"'
-    writer = csv.writer(response)
-    writer.writerow(headers)
-    for r in reports:
-        writer.writerow(get_row(r))
-    return response
-
-    return render(
-        request,
-        "reports/officer_panel.html",
-        {
-            "reports": reports,
-            "sector": sector,
-            "status_choices": Report.STATUS_CHOICES,
-            "priority_choices": Report.PRIORITY_CHOICES,
-        },
-    )
-
-
-@login_required
-def search_page(request):
-    """Simple search page aligned with current branch UI."""
-    filters = _build_report_filters(request)
-    opshtina = request.GET.get("opshtina", "").strip()
-    if opshtina:
-        filters &= Q(municipality=opshtina)
-
-    queryset = Report.objects.filter(filters).order_by("-created_at")
-    paginator = Paginator(queryset, 20)
-    page_number = request.GET.get("page", 1)
+    paginator = Paginator(reports, 20)
+    page_number = request.GET.get('page', 1)
     try:
         page_obj = paginator.page(page_number)
     except (PageNotAnInteger, EmptyPage):
         page_obj = paginator.page(1)
 
-    return render(
-        request,
-        "reports/search_results.html",
-        {"reports_page": page_obj, "query": request.GET},
+    return render(request, "reports/officer_panel.html", {
+        "reports": page_obj,
+        "sector": sector,
+    })
+
+
+@login_required
+def search_page(request):
+    """Public search page with keyword, filters, list & map toggle."""
+    filters = _build_report_filters(request)
+
+    opshtina = request.GET.get("opshtina", "").strip()
+    if opshtina:
+        filters &= Q(municipality=opshtina)
+
+    queryset = Report.objects.filter(filters).order_by("-created_at")
+
+    sort_by = request.GET.get("sort", "date")
+    if sort_by == "priority":
+        priority_order = {"urgent": 0, "normal": 1, "low": 2}
+        queryset = sorted(queryset, key=lambda r: priority_order.get(r.priority, 99))
+    elif sort_by == "status":
+        queryset = queryset.order_by("status")
+    else:
+        queryset = queryset.order_by("-created_at")
+
+    municipality_labels = dict(MUNICIPALITY_CHOICES)
+    distinct_slugs = (
+        Report.objects.exclude(municipality="")
+        .values_list("municipality", flat=True)
+        .distinct()
     )
+    municipalities = sorted(
+        ((slug, municipality_labels.get(slug, slug)) for slug in distinct_slugs),
+        key=lambda item: item[1],
+    )
+
+    paginator = Paginator(queryset, 20)
+    page_number = request.GET.get('page', 1)
+    try:
+        page_obj = paginator.page(page_number)
+    except (PageNotAnInteger, EmptyPage):
+        page_obj = paginator.page(1)
+
+    context = {
+        "reports": page_obj,
+        "query": request.GET,
+        "status_choices": Report.STATUS_CHOICES,
+        "priority_choices": Report.PRIORITY_CHOICES,
+        "municipalities": municipalities,
+        "total": paginator.count,
+    }
+    return render(request, "reports/search.html", context)
+
+
+def my_reports(request):
+    if request.user.is_authenticated:
+        qs = Report.objects.filter(citizen=request.user)
+    else:
+        qs = Report.objects.none()
+
+    category = request.GET.get('category', '')
+    priority = request.GET.get('priority', '')
+    status   = request.GET.get('status', '')
+
+    if category: qs = qs.filter(category=category)
+    if priority:  qs = qs.filter(priority=priority)
+    if status:    qs = qs.filter(status=status)
+
+    map_pins = json.dumps([
+        {'id': r.id, 'lat': float(r.latitude), 'lng': float(r.longitude),
+         'category': r.get_category_display(), 'status': r.get_status_display()}
+        for r in qs
+    ])
+
+    paginator = Paginator(qs, 20)
+    page_number = request.GET.get('page', 1)
+    try:
+        page_obj = paginator.page(page_number)
+    except (PageNotAnInteger, EmptyPage):
+        page_obj = paginator.page(1)
+
+    return render(request, 'reports/my_reports.html', {
+        'reports': page_obj,
+        'map_pins': map_pins,
+        'category_choices': Report.CATEGORY_CHOICES,
+        'priority_choices': Report.PRIORITY_CHOICES,
+        'status_choices': Report.STATUS_CHOICES,
+        'selected_category': category,
+        'selected_priority': priority,
+        'selected_status': status,
+    })
+
+def new_report(request):
+    return render(request, 'reports/my_reports.html')
+
+@login_required
+@_admin_only()
+def export_reports_excel(request: HttpRequest) -> HttpResponse:
+    """Export filtered reports to XLSX from dashboard."""
+    if not OPENPYXL_AVAILABLE:
+        messages.error(request, "Excel извозот бара openpyxl. Користете CSV извоз.")
+        return redirect(f"{reverse('dashboard')}?tab=analytics")
+
+    queryset = _filtered_admin_reports(request)
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "Reports"
+    sheet.append(REPORT_EXPORT_COLUMNS)
+    for report in queryset:
+        sheet.append(_format_report_row(report))
+
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = 'attachment; filename="reports_export.xlsx"'
+    workbook.save(response)
+
+    _write_audit_log(
+        request,
+        action="export_reports_excel",
+        target_model="Report",
+        target_id=None,
+        details={"count": queryset.count(), "filters": request.GET.dict()},
+    )
+    return response
+
+
+@login_required
+@_admin_only()
+def delete_report(request: HttpRequest, report_id: int) -> HttpResponse:
+    """Soft-delete a report (reversible)."""
+    if request.method == "POST":
+        report = get_object_or_404(Report.all_objects, pk=report_id)
+        report.soft_delete()
+        _write_audit_log(
+            request,
+            action="soft_delete_report",
+            target_model="Report",
+            target_id=report_id,
+            details={"report_id": report_id},
+        )
+        messages.success(request, f"Пријавата #{report_id} е избришана (може да се врати).")
+    return redirect(f"{reverse('dashboard')}?tab=analytics")

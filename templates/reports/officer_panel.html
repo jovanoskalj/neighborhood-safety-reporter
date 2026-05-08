@@ -106,6 +106,26 @@ data-has-image="{% if report.image and report.image.url %}1{% else %}0{% endif %
             {% endfor %}
           </tbody>
         </table>
+        <!-- Пагинација -->
+        <div class="d-flex justify-content-center py-3">
+          <nav>
+            <ul class="pagination pagination-sm mb-0">
+              {% if reports.has_previous %}
+                <li class="page-item">
+                  <a class="page-link" href="?page={{ reports.previous_page_number }}&priority={{ request.GET.priority }}&status={{ request.GET.status }}">‹</a>
+                </li>
+              {% endif %}
+              <li class="page-item disabled">
+                <span class="page-link">{{ reports.number }} / {{ reports.paginator.num_pages }}</span>
+              </li>
+              {% if reports.has_next %}
+                <li class="page-item">
+                  <a class="page-link" href="?page={{ reports.next_page_number }}&priority={{ request.GET.priority }}&status={{ request.GET.status }}">›</a>
+                </li>
+              {% endif %}
+            </ul>
+          </nav>
+        </div>
       </div>
     </div>
 
@@ -165,6 +185,11 @@ data-has-image="{% if report.image and report.image.url %}1{% else %}0{% endif %
               <option value="resolved">Решена</option>
               <option value="unclassified">Некласифицирана</option>
             </select>
+          </div>
+          <div>
+            <div class="op-label">Преасигнирај на сектор</div>
+            <select class="op-select" id="d-reassign-sector"></select>
+            <button onclick="reassignReport()" style="width:100%;margin-top:8px;padding:8px;font-size:13px;font-weight:500;background:#667085;color:#fff;border:none;border-radius:8px;cursor:pointer;">Преасигнирај</button>
           </div>
           <div>
             <div class="op-label">Интерни белешки</div>
@@ -274,6 +299,60 @@ function openLightbox() {
 function closeLightbox() {
   document.getElementById('lightbox').style.display = 'none';
 }
+
+// Load sectors on page load
+let allSectors = [];
+function loadSectors() {
+  fetch('/reports/api/sectors/json/')
+    .then(r => r.json())
+    .then(data => {
+      allSectors = data.sectors || [];
+      populateSectorDropdown();
+    })
+    .catch(err => console.error('Failed to load sectors:', err));
+}
+
+function populateSectorDropdown() {
+  const dropdown = document.getElementById('d-reassign-sector');
+  dropdown.innerHTML = '<option value="">-- Избери сектор --</option>';
+  allSectors.forEach(sector => {
+    const option = document.createElement('option');
+    option.value = sector.id;
+    option.textContent = sector.name;
+    dropdown.appendChild(option);
+  });
+}
+
+function reassignReport() {
+  if (!currentId) return;
+  const sectorId = document.getElementById('d-reassign-sector').value;
+  if (!sectorId) {
+    alert('Молиме изберете сектор');
+    return;
+  }
+
+  fetch(`/reports/${currentId}/reassign/`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+    body: JSON.stringify({ sector_id: parseInt(sectorId) })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.id) {
+      const row = document.querySelector(`[data-id="${currentId}"]`);
+      if (row) {
+        row.dataset.sector = data.sector;
+      }
+      document.getElementById('d-meta').textContent = row.dataset.date + ' · ' + data.sector_name;
+      document.getElementById('d-reassign-sector').value = '';
+      alert('Пријавата е успешно преасигнирана');
+    }
+  })
+  .catch(err => console.error('Reassignment failed:', err));
+}
+
+// Load sectors when page loads
+window.addEventListener('load', loadSectors);
 </script>
 
 {% endblock %}
