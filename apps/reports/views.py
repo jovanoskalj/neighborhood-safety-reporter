@@ -124,6 +124,8 @@ def _persist_new_report(citizen, *, description, latitude, longitude, image=None
     send_report_created_email(report)
     return report, duplicate
 
+logger = logging.getLogger(__name__)
+
 
 def create_report(request):
     """JSON endpoint to create a report.
@@ -282,6 +284,8 @@ def reports_api(request):
 @login_required
 @require_GET
 def my_reports(request):
+    if _is_officer(request.user):
+        return redirect("officer_panel")
     if request.user.is_authenticated:
         base_qs = Report.objects.filter(citizen=request.user)
     else:
@@ -379,6 +383,7 @@ def report_detail(request, report_id: int):
                 "note": "Креирана пријава",
             }
         ]
+    detail_back_url_name = "officer_panel" if _is_officer(request.user) else "my_reports"
     return render(
         request,
         "reports/report_detail.html",
@@ -386,6 +391,7 @@ def report_detail(request, report_id: int):
             "report": report,
             "timeline": timeline,
             "can_view_duplicate_original": can_view_duplicate_original,
+            "detail_back_url_name": detail_back_url_name,
         },
     )
 

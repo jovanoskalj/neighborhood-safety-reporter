@@ -64,6 +64,14 @@ def test_officer_panel_redirects_non_officer(client, citizen_user):
 
 
 @pytest.mark.django_db
+def test_my_reports_redirects_officer_to_officer_panel(client, safety_officer):
+    client.login(username="safety_officer", password="password123")
+    response = client.get(reverse("my_reports"))
+    assert response.status_code == 302
+    assert response.url == reverse("officer_panel")
+
+
+@pytest.mark.django_db
 def test_officer_panel_lists_only_own_sector(client, safety_officer, sector_reports):
     client.login(username="safety_officer", password="password123")
     response = client.get(reverse("officer_panel"))
