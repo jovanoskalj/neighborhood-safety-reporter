@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import os
+import sys
 from urllib.parse import urlsplit, urlunsplit
 
 import dj_database_url
@@ -10,6 +11,8 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
+
+TESTING = "pytest" in sys.modules
 
 
 def _env_bool(name: str, default: str = "False") -> bool:
@@ -104,8 +107,7 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
-# Use simple storage for tests to avoid manifest issues
-if os.getenv('PYTEST_CURRENT_TEST'):
+if TESTING:
     STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
 else:
     STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
@@ -157,7 +159,7 @@ if not DEBUG:
 
 
 # Django Debug Toolbar - disabled for tests to avoid static file issues
-if DEBUG and not os.getenv('PYTEST_CURRENT_TEST'):
+if DEBUG and not TESTING:
     try:
         import debug_toolbar
         INSTALLED_APPS += ["debug_toolbar"]

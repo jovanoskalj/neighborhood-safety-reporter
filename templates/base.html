@@ -244,7 +244,7 @@
                     return;
                 }
                 menuItems.innerHTML = items.map((notification) => {
-                    const href = notification.report_id ? `/reports/reports/${notification.report_id}/` : '#';
+                    const href = notification.report_id ? `/reports/${notification.report_id}/` : '#';
                     const unreadClass = notification.is_read ? '' : 'unread-notification';
                     const unreadBadge = notification.is_read ? '' : '<span class="badge bg-primary me-2">Ново</span>';
                     const reportMeta = notification.report_id
