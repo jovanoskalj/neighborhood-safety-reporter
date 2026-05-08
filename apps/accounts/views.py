@@ -283,8 +283,8 @@ def profile_view(request):
 
 @staff_member_required
 def admin_user_list(request):
-    users = User.objects.select_related("profile").all().order_by("id").distinct()
-    return render(request, "accounts/admin_user_list.html", {"users": users})
+    users = User.objects.select_related('profile').all().order_by('id')
+    return render(request, 'accounts/admin_user_list.html', {'users': users})
 
 
 @staff_member_required
