@@ -17,11 +17,10 @@
     {% block extra_head %}{% endblock %}
     {% block extra_css %}{% endblock %}
 </head>
-
 <body class="app-body d-flex flex-column min-vh-100">
     <nav class="navbar navbar-expand-lg navbar-dark app-navbar" style="background-color:#1a2238 !important;">
         <div class="container app-navbar-wrap">
-            <a class="navbar-brand fw-bold text-white" href="{% url 'home' %}">
+            <a class="navbar-brand fw-bold text-white" href="/">
                 Безбеден Град
                 <small class="d-block text-white">Република Северна Македонија</small>
             </a>
@@ -32,8 +31,10 @@
             </button>
             <div class="collapse navbar-collapse" id="mainNavbar">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    {% if user|has_group:'officer' or user|has_group:'officers' or user|has_group:'admin' or user|has_group:'administrators' or user.is_superuser %}
                     <li class="nav-item"><a class="nav-link" href="{% url 'map_view' %}">Мапа</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'search_page' %}">Пребарај</a></li>
+                    {% endif %}
                     {% if user|has_group:'officer' or user|has_group:'officers' %}
                     <li class="nav-item"><a class="nav-link" href="{% url 'officer_panel' %}">Работен панел</a></li>
                     {% endif %}
@@ -42,27 +43,12 @@
                     <li class="nav-item"><a class="nav-link" href="{% url 'notifications_log' %}">Известувања</a></li>
                     {% endif %}
                 </ul>
-                <ul class="navbar-nav ms-auto">
-                    {% if user|has_group:'citizen' or user|has_group:'citizens' %}
-                    {% if not user|has_group:'officer' and not user|has_group:'officers' and not user|has_group:'admin' and not user|has_group:'administrators' and not user.is_superuser %}
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="reportsDropdown" role="button"
-                            data-bs-toggle="dropdown" aria-expanded="false">
-                            Пријави
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="reportsDropdown">
-                            <li><a class="dropdown-item" href="{% url 'submit_report' %}">Поднеси пријава</a></li>
-                            <li><a class="dropdown-item" href="{% url 'my_reports' %}">Мои пријави</a></li>
-                        </ul>
-                    </li>
-                    {% endif %}
-                    {% endif %}
-                    
+                <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-2">
                     <!-- Notifications (hidden from admins) -->
                     {% if request.user.profile.role != 'admin' %}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle position-relative" href="#" id="notificationsDropdown" role="button"
-                           data-bs-toggle="dropdown" aria-expanded="false">
+                        <a class="nav-link position-relative nav-icon" href="#" id="notificationsDropdown" role="button"
+                           data-bs-toggle="dropdown" aria-expanded="false" aria-label="Известувања">
                             <i class="bi bi-bell"></i>
                             {% if unread_notification_count > 0 %}
                             <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
@@ -71,7 +57,7 @@
                             </span>
                             {% endif %}
                         </a>
-                        <ul class="dropdown-menu dropdown-menu-start" aria-labelledby="notificationsDropdown" style="min-width: 360px; right: 0; left: auto;">
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notificationsDropdown" style="min-width: 360px;">
                             <li class="dropdown-header d-flex justify-content-between align-items-center bg-light">
                                 <span><i class="bi bi-bell me-2"></i>Известувања</span>
                                 {% if unread_notification_count > 0 %}
@@ -116,16 +102,31 @@
                             {% endfor %}
                             <li><hr class="dropdown-divider my-0"></li>
                             <li>
-                                <a class="dropdown-item text-center text-primary" href="{% url 'notifications_list' %}">
+                                <a class="dropdown-item text-center app-link" href="{% url 'notifications_list' %}">
                                     <i class="bi bi-list-ul me-1"></i>Види ги сите известувања
                                 </a>
                             </li>
                         </ul>
                     </li>
                     {% endif %}
-                    
-                    <li class="nav-item"><a class="nav-link" href="{% url 'profile' %}">Профил</a></li>
-                    <li class="nav-item"><a class="nav-link nav-link-logout" href="{% url 'logout' %}">Одјава</a></li>
+
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" id="userDropdown" role="button"
+                           data-bs-toggle="dropdown" aria-expanded="false">
+                            <span class="user-chip">{{ user.first_name|default:user.username|slice:":1"|upper }}</span>
+                            <span class="d-none d-lg-inline">{{ user.first_name|default:user.username }}</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                            <li class="dropdown-header">Мој профил</li>
+                            <li><a class="dropdown-item" href="{% url 'profile' %}"><i class="bi bi-person me-2"></i>Профил</a></li>
+                            {% if user|has_group:'citizen' or user|has_group:'citizens' %}
+                            <li><a class="dropdown-item" href="{% url 'my_reports' %}"><i class="bi bi-clipboard-check me-2"></i>Мои пријави</a></li>
+                            <li><a class="dropdown-item" href="{% url 'submit_report' %}"><i class="bi bi-plus-circle me-2"></i>Нова пријава</a></li>
+                            {% endif %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="{% url 'logout' %}"><i class="bi bi-box-arrow-right me-2"></i>Одјава</a></li>
+                        </ul>
+                    </li>
                 </ul>
             </div>
             {% else %}
@@ -255,6 +256,70 @@
 .unread-notification {
     border-left: 3px solid var(--bs-primary) !important;
     background-color: #f8f9fa;
+}
+
+.app-navbar .nav-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.app-navbar .nav-icon:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.app-navbar .user-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.app-navbar .dropdown-menu {
+    border-radius: 14px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+}
+
+.app-navbar .dropdown-menu .dropdown-header {
+    background: rgba(15, 23, 42, 0.06) !important;
+    color: #1a2238;
+}
+
+.app-navbar .dropdown-menu .btn-outline-primary {
+    border-color: #1a2238;
+    color: #1a2238;
+}
+
+.app-navbar .dropdown-menu .btn-outline-primary:hover {
+    background: #1a2238;
+    color: #fff;
+}
+
+.app-navbar .dropdown-menu .badge.bg-primary {
+    background: #1a2238 !important;
+}
+
+.app-navbar .dropdown-menu .app-link {
+    color: #1a2238 !important;
+    font-weight: 600;
+}
+
+.app-navbar .dropdown-menu .app-link:hover {
+    background: rgba(26, 34, 56, 0.06);
 }
 </style>
     

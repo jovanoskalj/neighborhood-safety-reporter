@@ -131,26 +131,33 @@ class AllObjectsManager(models.Manager):
 
 
 class Report(models.Model):
-    """Citizen-submitted neighborhood safety report awaiting or post classification."""
+    STATUS_CHOICES = [
+        ("new", "Нова"),
+        ("in_progress", "Во тек"),
+        ("resolved", "Завршена"),
+        ("unclassified", "Некласифицирана"),
+        ("withdrawn", "Повлечена"),
+    ]
 
-    STATUS_CHOICES = [('new', 'New'),
-                    ('in_progress', 'In Progress'),
-                    ('resolved', 'Resolved'),
-                    ('unclassified', 'Unclassified')]
-
-    PRIORITY_CHOICES = [('urgent', 'Urgent'),
-                        ('normal', 'Normal'),
-                        ('low', 'Low')]
-    CATEGORY_CHOICES = [('infrastructure', 'Infrastructure'),
-                        ('utilities', 'Utilities'),
-                        ('safety', 'Safety'),
-                        ('health', 'Health'),
-                        ('other', 'Other')]
-    SECTOR_CHOICES = [('infrastructure', 'Infrastructure'),
-                      ('utilities', 'Utilities'),
-                      ('safety', 'Safety'),
-                      ('health', 'Health'),
-                      ('admin', 'Administration')]
+    PRIORITY_CHOICES = [
+        ("urgent", "Итен"),
+        ("normal", "Нормален"),
+        ("low", "Низок"),
+    ]
+    CATEGORY_CHOICES = [
+        ("infrastructure", "Инфраструктура"),
+        ("utilities", "Комунални услуги"),
+        ("safety", "Безбедност"),
+        ("health", "Здравство"),
+        ("other", "Друго"),
+    ]
+    SECTOR_CHOICES = [
+        ("infrastructure", "Инфраструктура"),
+        ("utilities", "Комунални услуги"),
+        ("safety", "Безбедност"),
+        ("health", "Здравство"),
+        ("admin", "Администрација"),
+    ]
 
     citizen = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reports')
     description = models.TextField()
@@ -199,8 +206,8 @@ class Report(models.Model):
 
     def __str__(self) -> str:
         return f"Report #{self.pk} ({self.status})"
-    
-  
+
+
     def soft_delete(self):
         self.is_deleted = True
         self.deleted_at = timezone.now()
@@ -210,3 +217,18 @@ class Report(models.Model):
         self.is_deleted = False
         self.deleted_at = None
         self.save(update_fields=["is_deleted", "deleted_at"])
+
+
+class ReportStatusHistory(models.Model):
+    report = models.ForeignKey(Report, on_delete=models.CASCADE, related_name="status_history")
+    from_status = models.CharField(max_length=30, blank=True)
+    to_status = models.CharField(max_length=30)
+    changed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    note = models.CharField(max_length=255, blank=True)
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["changed_at"]
+
+    def __str__(self) -> str:
+        return f"Report #{self.report_id}: {self.from_status or '-'} -> {self.to_status}"

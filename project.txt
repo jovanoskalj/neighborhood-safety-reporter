@@ -281,10 +281,3 @@ Key values:
 * Interactive map visualization
 * Cloud deployment with low cost
 
----
-
-If you want, I can also:
-
-* convert this into a **PDF-ready document**
-* make a **short pitch version**
-* or adapt it for **presentation slides (PowerPoint)**

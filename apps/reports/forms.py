@@ -14,14 +14,7 @@ _COORD_QUANTUM = Decimal("0.000001")
 
 
 class _CoordinateField(forms.DecimalField):
-    """DecimalField that transparently quantizes to the model's precision.
-
-    Leaflet's map-click handler hands back full-float-precision lat/lng
-    values (~14 decimal places). The ``Report`` model stores coordinates
-    with ``decimal_places=6``, so the default ``DecimalField`` validator
-    would reject that input. Quantizing in ``to_python`` normalizes the
-    value before any validator runs.
-    """
+    """DecimalField that quantizes inputs to the model's precision."""
 
     def to_python(self, value):
         value = super().to_python(value)
@@ -34,7 +27,7 @@ class _CoordinateField(forms.DecimalField):
 
 
 class ReportCreateForm(forms.Form):
-    """JSON/multipart form for the REST-style ``create_report`` endpoint."""
+    """JSON/multipart form for the REST-style ``reports_api`` endpoint."""
 
     description = forms.CharField(required=True)
     latitude = _CoordinateField(max_digits=9, decimal_places=6, min_value=-90, max_value=90)
@@ -49,31 +42,53 @@ class ReportCreateForm(forms.Form):
 
 
 class ReportSubmissionForm(forms.ModelForm):
-    """Validates citizen-submitted report fields from the web form.
+    """Validates citizen-submitted report fields from the web form."""
 
-    ``citizen``, ``status``, ``sector`` and AI-driven fields are set
-    server-side (by the view and the AI classifier pipeline), so they
-    are intentionally excluded from the client-facing form.
-    """
-
-    latitude = _CoordinateField(max_digits=9, decimal_places=6)
-    longitude = _CoordinateField(max_digits=9, decimal_places=6)
+    latitude = _CoordinateField(max_digits=9, decimal_places=6, min_value=-90, max_value=90)
+    longitude = _CoordinateField(max_digits=9, decimal_places=6, min_value=-180, max_value=180)
 
     class Meta:
         model = Report
         fields = [
             "description",
-            "category",
-            "priority",
             "municipality",
             "latitude",
             "longitude",
             "image",
         ]
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 5}),
+            "image": forms.ClearableFileInput(attrs={"accept": "image/jpeg,image/png"}),
+        }
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.fields["municipality"].required = True
+        self.fields["municipality"].required = False
+
+    def clean_image(self):
+        """Reject uploads outside the allowed JPG/PNG MIME types (FR-08)."""
+        image = self.cleaned_data.get("image")
+        if not image:
+            return image
+        content_type = getattr(image, "content_type", "") or ""
+        if content_type not in {"image/jpeg", "image/png"}:
+            raise forms.ValidationError("Дозволени се само JPG или PNG слики.")
+        max_size_mb = 5
+        if image.size > max_size_mb * 1024 * 1024:
+            raise forms.ValidationError("Image size must be up to 5MB.")
+        return image
+
+
+class ReportStatusUpdateForm(forms.ModelForm):
+    """Officer form for status updates + internal notes."""
+
+    class Meta:
+        model = Report
+        fields = ["status", "internal_note"]
+        widgets = {
+            "status": forms.Select(attrs={"class": "form-select"}),
+            "internal_note": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
+        }
 
 
 class ReportCategoryForm(forms.ModelForm):

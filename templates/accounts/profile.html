@@ -3,90 +3,458 @@
 {% block title %}Профил{% endblock %}
 
 {% block content %}
-<div class="container py-4">
-    <div class="row justify-content-center gx-0">
-        <div class="col-12 col-md-10 col-lg-8">
-            <div class="card shadow-sm">
-                <div class="card-body p-4">
-                <h1 class="h4 mb-3">Профил</h1>
-                <p class="text-muted">Корисник: <strong>{{ request.user.username }}</strong></p>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 
-                <h2 class="h5 mt-4 mb-3">Измени основни податоци</h2>
-                <form method="post" novalidate>
-                    {% csrf_token %}
-                    {% if profile_form.non_field_errors %}
-                    <div class="alert alert-danger" role="alert">
-                        {{ profile_form.non_field_errors }}
-                    </div>
-                    {% endif %}
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-                    <div class="mb-3">
-                        <label class="form-label" for="{{ profile_form.first_name.id_for_label }}">{{ profile_form.first_name.label }}</label>
-                        {{ profile_form.first_name }}
-                        {% if profile_form.first_name.errors %}
-                        <div class="text-danger small mt-1">{{ profile_form.first_name.errors|striptags }}</div>
-                        {% endif %}
-                    </div>
+:root {
+  --bg:        #f4f7fb;
+  --s1:        #ffffff;
+  --s2:        #f8fafc;
+  --b1:        #e2e8f0;
+  --b2:        #cbd5e1;
+  --t1:        #0f172a;
+  --t2:        #475569;
+  --t3:        #64748b;
+  --blue:      #1A2238;
+  --blue2:     #2d3f66;
+  --green:     #2ecc71;
+  --green-soft:#ecfdf3;
+  --cyan:      #5b6f95;
+  --emerald:   #22a35a;
+  --font:      'DM Sans', sans-serif;
+  --mono:      'DM Mono', monospace;
+}
 
-                    <div class="mb-3">
-                        <label class="form-label" for="{{ profile_form.last_name.id_for_label }}">{{ profile_form.last_name.label }}</label>
-                        {{ profile_form.last_name }}
-                        {% if profile_form.last_name.errors %}
-                        <div class="text-danger small mt-1">{{ profile_form.last_name.errors|striptags }}</div>
-                        {% endif %}
-                    </div>
+body { font-family: var(--font); background: var(--bg); color: var(--t1); min-height: 100vh; }
 
-                    <div class="mb-3">
-                        <label class="form-label" for="{{ profile_form.email.id_for_label }}">{{ profile_form.email.label }}</label>
-                        {{ profile_form.email }}
-                        {% if profile_form.email.errors %}
-                        <div class="text-danger small mt-1">{{ profile_form.email.errors|striptags }}</div>
-                        {% endif %}
-                    </div>
+.pg { max-width: 1100px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
 
-                    <button class="btn btn-primary" type="submit" name="save_profile" value="1">Зачувај податоци</button>
-                </form>
+.pg-top { margin-bottom: 2rem; }
+.pg-top h1 { font-size: 18px; font-weight: 500; }
+.pg-top p  { font-size: 13px; color: var(--t3); margin-top: 3px; }
 
-                <hr class="my-4">
+.layout { display: grid; grid-template-columns: 310px 1fr; gap: 16px; align-items: start; }
 
-                <h2 class="h5 mb-3">Промени лозинка</h2>
-                <form method="post" novalidate>
-                    {% csrf_token %}
-                    {% if password_form.non_field_errors %}
-                    <div class="alert alert-danger" role="alert">
-                        {{ password_form.non_field_errors }}
-                    </div>
-                    {% endif %}
+.panel {
+  background: var(--s1); border: 1px solid var(--b1);
+  border-radius: 20px; overflow: hidden;
+}
+.panel + .panel { margin-top: 14px; }
 
-                    <div class="mb-3">
-                        <label class="form-label" for="{{ password_form.old_password.id_for_label }}">{{ password_form.old_password.label }}</label>
-                        {{ password_form.old_password }}
-                        {% if password_form.old_password.errors %}
-                        <div class="text-danger small mt-1">{{ password_form.old_password.errors|striptags }}</div>
-                        {% endif %}
-                    </div>
+.panel-head {
+  padding: 14px 18px; border-bottom: 1px solid var(--b1);
+  font-size: 11px; font-weight: 500; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--t3);
+  display: flex; align-items: center; gap: 7px;
+}
 
-                    <div class="mb-3">
-                        <label class="form-label" for="{{ password_form.new_password1.id_for_label }}">{{ password_form.new_password1.label }}</label>
-                        {{ password_form.new_password1 }}
-                        {% if password_form.new_password1.errors %}
-                        <div class="text-danger small mt-1">{{ password_form.new_password1.errors|striptags }}</div>
-                        {% endif %}
-                    </div>
+/* ── hero ── */
+.hero {
+  height: 88px; position: relative; overflow: hidden;
+  background: linear-gradient(180deg, #f8fbff 0%, #eef2f7 100%);
+}
+.orb {
+  position: absolute; border-radius: 50%;
+  filter: blur(28px); pointer-events: none;
+}
 
-                    <div class="mb-3">
-                        <label class="form-label" for="{{ password_form.new_password2.id_for_label }}">{{ password_form.new_password2.label }}</label>
-                        {{ password_form.new_password2 }}
-                        {% if password_form.new_password2.errors %}
-                        <div class="text-danger small mt-1">{{ password_form.new_password2.errors|striptags }}</div>
-                        {% endif %}
-                    </div>
+/* ── avatar ── */
+.av-wrap {
+  display: flex; flex-direction: column; align-items: center;
+  margin-top: -40px; padding: 0 20px 20px; text-align: center;
+}
+.av-ring {
+  width: 80px; height: 80px; border-radius: 50%;
+  padding: 3px; position: relative;
+  background: conic-gradient(from 0deg, var(--blue), var(--green), var(--cyan), var(--blue));
+}
+.av-inner {
+  width: 100%; height: 100%; border-radius: 50%;
+  border: 3px solid var(--s1);
+  background: var(--s2); overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; font-weight: 500; color: var(--t1);
+}
+.av-inner img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.uname { margin-top: 14px; font-size: 17px; font-weight: 500; }
+.uemail { font-size: 12px; color: var(--t3); margin-top: 2px; }
+.role-tag {
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 8px;
+  padding: 3px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 500;
+  background: #eef2f7; color: var(--blue);
+  border: 1px solid #d5deea;
+}
 
-                    <button class="btn btn-outline-primary" type="submit" name="change_password" value="1">Зачувај лозинка</button>
-                </form>
-                </div>
-            </div>
+/* ── form ── */
+.pf-form { padding: 4px 18px 18px; display: flex; flex-direction: column; gap: 13px; }
+.f-label {
+  display: block; font-size: 10.5px; font-weight: 500; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--t3); margin-bottom: 5px;
+}
+.pf-form input,
+.pf-form select {
+  width: 100%; border: 1px solid var(--b2); border-radius: 10px;
+  padding: 9px 12px; font-size: 13.5px; font-family: var(--font);
+  background: var(--s2); color: var(--t1);
+  transition: border-color .15s; appearance: none;
+}
+.pf-form select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%234e4d58' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px;
+}
+.pf-form input:focus,
+.pf-form select:focus {
+  outline: none; border-color: rgba(26,34,56,.42);
+  box-shadow: 0 0 0 3px rgba(26,34,56,.12);
+}
+.file-zone {
+  border: 1px dashed var(--b2); border-radius: 10px;
+  padding: 9px 12px; cursor: pointer; font-size: 13px; color: var(--t2);
+  display: flex; align-items: center; gap: 8px;
+  transition: border-color .15s, background .15s;
+}
+.file-zone:hover { border-color: rgba(26,34,56,.3); background: #f1f5f9; }
+.file-zone input { display: none; }
+.btn-save {
+  background: linear-gradient(135deg, var(--blue2), var(--blue));
+  color: #fff; border: none; border-radius: 10px;
+  padding: 10px 16px; font-size: 13.5px; font-family: var(--font); font-weight: 500;
+  cursor: pointer; width: 100%; transition: opacity .15s;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+}
+.btn-save:hover { opacity: .88; }
+
+/* ── stats ── */
+.stats-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px; }
+.s-card {
+  border-radius: 16px; padding: 14px 10px; text-align: center;
+  border: 1px solid var(--b1); background: var(--s1);
+}
+.s-card.g { background: var(--s1); border-color: var(--b1); }
+.s-card.e { background: var(--green-soft); border-color: #b7eacb; }
+.s-num { font-size: 28px; font-weight: 500; font-family: var(--mono); letter-spacing: -.03em; line-height: 1; }
+.s-card.g .s-num { color: var(--blue); }
+.s-card.e .s-num { color: var(--emerald); }
+.s-lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--t3); margin-top: 4px; }
+
+/* ── achievements ── */
+.ach-list { padding: 4px 8px 8px; display: flex; flex-direction: column; gap: 2px; }
+.ach-row {
+  display: grid; grid-template-columns: 56px 1fr auto;
+  gap: 14px; align-items: center; padding: 12px 10px;
+  border-radius: 14px; transition: background .12s;
+}
+.ach-row:hover { background: #f8fafc; }
+.ach-row.locked { opacity: .55; filter: grayscale(.7); }
+
+.ach-title { font-size: 14px; font-weight: 500; color: var(--t1); }
+.ach-desc  { font-size: 12px; color: var(--t3); margin-top: 2px; line-height: 1.4; }
+
+.ach-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; min-width: 76px; }
+.ach-tag {
+  font-size: 10.5px; font-weight: 500; padding: 2px 8px; border-radius: 6px; white-space: nowrap;
+}
+.ach-tag.done   { background: rgba(46,204,113,.14); color: var(--emerald); border: 1px solid rgba(46,204,113,.26); }
+.ach-tag.locked { background: #f8fafc; color: var(--t3); border: 1px solid var(--b1); }
+.prog-rail { width: 76px; height: 3px; background: #e2e8f0; border-radius: 99px; overflow: hidden; }
+.prog-bar  { height: 100%; border-radius: 99px; }
+.prog-bar.done { background: var(--emerald); }
+.prog-bar.pend { background: #94a3b8; }
+
+@media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+@media (max-width: 480px) { .pg { padding: 1rem 1rem 2rem; } }
+</style>
+
+<div class="pg">
+
+  <div class="pg-top"><h1>Мој профил</h1><p>Уреди информации и следи твој напредок.</p></div>
+
+  <div class="layout">
+
+    <!-- LEFT COLUMN -->
+    <div>
+      <div class="panel">
+
+        <!-- Animated colour hero -->
+        <div class="hero">
+          <div class="orb" style="width:140px;height:140px;background:rgba(26,34,56,.18);top:-60px;left:-30px;"></div>
+          <div class="orb" style="width:110px;height:110px;background:rgba(45,63,102,.12);top:-50px;right:10px;"></div>
+            <div class="orb" style="width:90px;height:90px;background:rgba(46,204,113,.18);bottom:-30px;left:70px;"></div>
         </div>
+
+        <!-- Avatar -->
+        <div class="av-wrap">
+          <div class="av-ring">
+            <div class="av-inner">
+              {% if profile.avatar %}<img src="{{ profile.avatar.url }}" alt="avatar">
+              {% else %}{{ request.user.username|first|upper }}{% endif %}
+            </div>
+          </div>
+          <div class="uname">{{ request.user.username }}</div>
+          <div class="uemail">{{ request.user.email }}</div>
+          <span class="role-tag">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              {% if profile.role == 'officer' %}<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              {% else %}<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>{% endif %}
+            </svg>
+            {% if profile.role == 'officer' %}Службеник{% else %}Граѓанин{% endif %}
+          </span>
+        </div>
+
+        <!-- Form -->
+        <div class="panel-head" style="border-top:1px solid var(--b1);">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Уреди профил
+        </div>
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+          <div class="pf-form">
+            {% if profile_form.non_field_errors %}
+            <div class="field-error">{{ profile_form.non_field_errors|striptags }}</div>
+            {% endif %}
+            <div>
+              <label class="f-label">Профилна слика</label>
+              <label class="file-zone">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <span id="av-txt">Избери слика…</span>
+                <input type="file" id="avatar" name="avatar" accept="image/*"
+                  onchange="document.getElementById('av-txt').textContent=this.files[0]?.name||'Избери слика…'">
+              </label>
+            </div>
+            <div>
+              <label class="f-label" for="phone">Телефон</label>
+              <input type="text" id="phone" name="phone" value="{{ profile.phone }}" placeholder="+389 …">
+            </div>
+            <div>
+              <label class="f-label" for="{{ profile_form.first_name.id_for_label }}">{{ profile_form.first_name.label }}</label>
+              {{ profile_form.first_name }}
+              {% if profile_form.first_name.errors %}
+              <div class="field-error">{{ profile_form.first_name.errors|striptags }}</div>
+              {% endif %}
+            </div>
+            <div>
+              <label class="f-label" for="{{ profile_form.last_name.id_for_label }}">{{ profile_form.last_name.label }}</label>
+              {{ profile_form.last_name }}
+              {% if profile_form.last_name.errors %}
+              <div class="field-error">{{ profile_form.last_name.errors|striptags }}</div>
+              {% endif %}
+            </div>
+            <div>
+              <label class="f-label" for="{{ profile_form.email.id_for_label }}">{{ profile_form.email.label }}</label>
+              {{ profile_form.email }}
+              {% if profile_form.email.errors %}
+              <div class="field-error">{{ profile_form.email.errors|striptags }}</div>
+              {% endif %}
+            </div>
+            {% if profile.role == 'officer' %}
+            <div>
+              <label class="f-label" for="sector">Сектор</label>
+              <select id="sector" name="sector">
+                {% for value, label in sector_choices %}
+                <option value="{{ value }}" {% if profile.sector == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            {% endif %}
+            <button class="btn-save" type="submit" name="save_profile" value="1">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              Зачувај промени
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
+
+    <!-- RIGHT COLUMN -->
+    <div>
+
+      <!-- Stats -->
+      <div class="stats-row">
+        <div class="s-card g"><div class="s-num">{{ total_reports|default:"0" }}</div><div class="s-lbl">Пријави</div></div>
+        <div class="s-card e"><div class="s-num">{{ resolved_reports|default:"0" }}</div><div class="s-lbl">Решени</div></div>
+      </div>
+
+      <!-- Achievements -->
+      <div class="panel">
+        <div class="panel-head">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>
+          Постигнувања
+        </div>
+        <div class="ach-list">
+          {% for item in achievements %}
+          <div class="ach-row {% if not item.unlocked %}locked{% endif %}">
+
+            <!-- SVG badge — unique per color/shape -->
+            <svg width="56" height="56" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                {% if item.color == 'gold' or item.color == '' %}
+                <radialGradient id="rg{{ forloop.counter }}" cx="42%" cy="28%" r="65%">
+                  <stop offset="0%" stop-color="#fef9c3"/><stop offset="100%" stop-color="#78350f"/>
+                </radialGradient>
+                <radialGradient id="sh{{ forloop.counter }}" cx="38%" cy="25%" r="50%">
+                  <stop offset="0%" stop-color="#fde68a" stop-opacity=".9"/><stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/>
+                </radialGradient>
+                {% elif item.color == 'violet' %}
+                <radialGradient id="rg{{ forloop.counter }}" cx="42%" cy="28%" r="65%">
+                  <stop offset="0%" stop-color="#ede9fe"/><stop offset="100%" stop-color="#3b0764"/>
+                </radialGradient>
+                <radialGradient id="sh{{ forloop.counter }}" cx="38%" cy="25%" r="50%">
+                  <stop offset="0%" stop-color="#ddd6fe" stop-opacity=".9"/><stop offset="100%" stop-color="#8b5cf6" stop-opacity="0"/>
+                </radialGradient>
+                {% elif item.color == 'cyan' %}
+                <radialGradient id="rg{{ forloop.counter }}" cx="42%" cy="28%" r="65%">
+                  <stop offset="0%" stop-color="#cffafe"/><stop offset="100%" stop-color="#0c4a6e"/>
+                </radialGradient>
+                <radialGradient id="sh{{ forloop.counter }}" cx="38%" cy="25%" r="50%">
+                  <stop offset="0%" stop-color="#a5f3fc" stop-opacity=".9"/><stop offset="100%" stop-color="#06b6d4" stop-opacity="0"/>
+                </radialGradient>
+                {% elif item.color == 'rose' %}
+                <radialGradient id="rg{{ forloop.counter }}" cx="42%" cy="28%" r="65%">
+                  <stop offset="0%" stop-color="#ffe4e6"/><stop offset="100%" stop-color="#4c0519"/>
+                </radialGradient>
+                <radialGradient id="sh{{ forloop.counter }}" cx="38%" cy="25%" r="50%">
+                  <stop offset="0%" stop-color="#fecdd3" stop-opacity=".9"/><stop offset="100%" stop-color="#f43f5e" stop-opacity="0"/>
+                </radialGradient>
+                {% elif item.color == 'emerald' %}
+                <radialGradient id="rg{{ forloop.counter }}" cx="42%" cy="28%" r="65%">
+                  <stop offset="0%" stop-color="#d1fae5"/><stop offset="100%" stop-color="#022c22"/>
+                </radialGradient>
+                <radialGradient id="sh{{ forloop.counter }}" cx="38%" cy="25%" r="50%">
+                  <stop offset="0%" stop-color="#a7f3d0" stop-opacity=".9"/><stop offset="100%" stop-color="#10b981" stop-opacity="0"/>
+                </radialGradient>
+                {% else %}
+                <radialGradient id="rg{{ forloop.counter }}" cx="42%" cy="28%" r="65%">
+                  <stop offset="0%" stop-color="#fef9c3"/><stop offset="100%" stop-color="#78350f"/>
+                </radialGradient>
+                <radialGradient id="sh{{ forloop.counter }}" cx="38%" cy="25%" r="50%">
+                  <stop offset="0%" stop-color="#fde68a" stop-opacity=".9"/><stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/>
+                </radialGradient>
+                {% endif %}
+              </defs>
+
+              <!-- glow halo for unlocked -->
+              {% if item.unlocked %}
+              <circle cx="28" cy="28" r="26" fill="none" stroke-width="1.5"
+                stroke="{% if item.color == 'gold' or item.color == '' %}#f59e0b{% elif item.color == 'violet' %}#8b5cf6{% elif item.color == 'cyan' %}#06b6d4{% elif item.color == 'rose' %}#f43f5e{% elif item.color == 'emerald' %}#10b981{% else %}#f59e0b{% endif %}"
+                opacity=".25"/>
+              {% endif %}
+
+              <!-- badge shape: 8-point star via polygon -->
+              <polygon
+                points="28,4 32.5,18 46,14 38,25.5 52,28 38,30.5 46,42 32.5,38 28,52 23.5,38 10,42 18,30.5 4,28 18,25.5 10,14 23.5,18"
+                fill="url(#rg{{ forloop.counter }})" />
+              <polygon
+                points="28,4 32.5,18 46,14 38,25.5 52,28 38,30.5 46,42 32.5,38 28,52 23.5,38 10,42 18,30.5 4,28 18,25.5 10,14 23.5,18"
+                fill="url(#sh{{ forloop.counter }})" />
+
+              <!-- center symbol based on icon_type -->
+              {% if item.icon_type == 'bolt' %}
+              <path d="M30 16 L23 28 L28 28 L26 40 L35 26 L29 26 Z" fill="rgba(0,0,0,.45)" stroke="rgba(0,0,0,.15)" stroke-width=".5"/>
+              {% elif item.icon_type == 'crown' %}
+              <path d="M18 34 L20 22 L25 28 L28 18 L31 28 L36 22 L38 34 Z" fill="none" stroke="rgba(0,0,0,.5)" stroke-width="1.6" stroke-linejoin="round"/>
+              <rect x="18" y="34" width="20" height="3" rx="1.5" fill="rgba(0,0,0,.35)"/>
+              {% elif item.icon_type == 'shield' %}
+              <path d="M28 16 L38 20 L38 28 C38 33.5 33.5 38 28 40 C22.5 38 18 33.5 18 28 L18 20 Z" fill="none" stroke="rgba(0,0,0,.5)" stroke-width="1.6" stroke-linejoin="round"/>
+              <path d="M23 28 L27 32 L34 24" fill="none" stroke="rgba(0,0,0,.45)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              {% elif item.icon_type == 'star' %}
+              <path d="M28 18 L30 24 L36 24 L31.5 28 L33.5 34 L28 30.5 L22.5 34 L24.5 28 L20 24 L26 24 Z" fill="rgba(0,0,0,.42)"/>
+              {% elif item.icon_type == 'fire' %}
+              <path d="M28 38 C22 35 19 30 20 25 C22 30 25 29 26 26 C27 30 30 31 31 28 C33 32 31 37 28 38Z" fill="rgba(0,0,0,.45)"/>
+              <path d="M28 38 C26 35 25 32 26 30 C27 32 28 31 28 29 C29 31 30 32 28 38Z" fill="rgba(0,0,0,.25)"/>
+              {% elif item.icon_type == 'leaf' %}
+              <path d="M28 36 C28 36 18 31 18 23 C18 17 24 14 30 17 C36 20 36 28 28 36Z" fill="none" stroke="rgba(0,0,0,.5)" stroke-width="1.5"/>
+              <path d="M28 36 L28 26" stroke="rgba(0,0,0,.35)" stroke-width="1.2" stroke-linecap="round"/>
+              <path d="M28 30 C28 30 22 27 22 23" stroke="rgba(0,0,0,.25)" stroke-width="1" stroke-linecap="round" fill="none"/>
+              {% elif item.icon_type == 'flag' %}
+              <line x1="22" y1="38" x2="22" y2="18" stroke="rgba(0,0,0,.5)" stroke-width="1.8" stroke-linecap="round"/>
+              <path d="M22 18 L34 22 L22 26 Z" fill="rgba(0,0,0,.42)"/>
+              {% else %}
+              <circle cx="28" cy="28" r="6" fill="none" stroke="rgba(0,0,0,.45)" stroke-width="1.6"/>
+              <circle cx="28" cy="28" r="2.5" fill="rgba(0,0,0,.35)"/>
+              {% endif %}
+
+              <!-- lock for locked items -->
+              {% if not item.unlocked %}
+              <circle cx="28" cy="28" r="26" fill="rgba(12,12,18,.65)"/>
+              <rect x="23" y="27" width="10" height="8" rx="2" fill="rgba(255,255,255,.18)"/>
+              <path d="M24.5 27 L24.5 24.5 C24.5 22.6 26.1 21 28 21 C29.9 21 31.5 22.6 31.5 24.5 L31.5 27" stroke="rgba(255,255,255,.22)" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+              {% endif %}
+
+              <!-- sparkle dots for unlocked -->
+              {% if item.unlocked %}
+              <circle cx="46" cy="12" r="1.8" fill="white" opacity=".65"/>
+              <circle cx="42" cy="7"  r="1.1" fill="white" opacity=".4"/>
+              <circle cx="10" cy="16" r="1.8" fill="white" opacity=".55"/>
+              <circle cx="48" cy="38" r="1.2" fill="white" opacity=".35"/>
+              <circle cx="14" cy="42" r="1"   fill="white" opacity=".3"/>
+              {% endif %}
+            </svg>
+
+            <div>
+              <div class="ach-title">{{ item.title }}</div>
+              <div class="ach-desc">{{ item.description }}</div>
+            </div>
+
+            <div class="ach-right">
+              {% if item.unlocked %}
+                <span class="ach-tag done">Отклучено</span>
+              {% else %}
+                <span class="ach-tag locked">{{ item.progress }}/{{ item.target }}</span>
+              {% endif %}
+              <div class="prog-rail">
+                <div class="prog-bar {% if item.unlocked %}done{% else %}pend{% endif %}"
+                  style="width:{% widthratio item.progress item.target 100 %}%"></div>
+              </div>
+            </div>
+
+          </div>
+          {% empty %}
+          <div style="padding:2.5rem;text-align:center;font-size:13px;color:var(--t3);">Сеуште нема постигнувања.</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:14px;">
+        <div class="panel-head">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 1v4"/><path d="M12 19v4"/><path d="M4.22 4.22l2.83 2.83"/><path d="M16.95 16.95l2.83 2.83"/><path d="M1 12h4"/><path d="M19 12h4"/><path d="M4.22 19.78l2.83-2.83"/><path d="M16.95 7.05l2.83-2.83"/></svg>
+          Промени лозинка
+        </div>
+        <form method="post" class="pf-form">
+          {% csrf_token %}
+          {% if password_form.non_field_errors %}
+          <div class="field-error">{{ password_form.non_field_errors|striptags }}</div>
+          {% endif %}
+          <div>
+            <label class="f-label" for="{{ password_form.old_password.id_for_label }}">{{ password_form.old_password.label }}</label>
+            {{ password_form.old_password }}
+            {% if password_form.old_password.errors %}
+            <div class="field-error">{{ password_form.old_password.errors|striptags }}</div>
+            {% endif %}
+          </div>
+          <div>
+            <label class="f-label" for="{{ password_form.new_password1.id_for_label }}">{{ password_form.new_password1.label }}</label>
+            {{ password_form.new_password1 }}
+            {% if password_form.new_password1.errors %}
+            <div class="field-error">{{ password_form.new_password1.errors|striptags }}</div>
+            {% endif %}
+          </div>
+          <div>
+            <label class="f-label" for="{{ password_form.new_password2.id_for_label }}">{{ password_form.new_password2.label }}</label>
+            {{ password_form.new_password2 }}
+            {% if password_form.new_password2.errors %}
+            <div class="field-error">{{ password_form.new_password2.errors|striptags }}</div>
+            {% endif %}
+          </div>
+          <button class="btn-save" type="submit" name="change_password" value="1">
+            Промени лозинка
+          </button>
+        </form>
+      </div>
+
+    </div>
+  </div>
 </div>
 {% endblock %}

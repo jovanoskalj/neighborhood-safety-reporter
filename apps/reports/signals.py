@@ -10,7 +10,6 @@ from .models import Report
 
 logger = logging.getLogger(__name__)
 
-
 CLASSIFICATION_TIMEOUT_SECONDS = 2
 
 
@@ -40,7 +39,9 @@ def _normalize_classification(classification):
 def classify_report_on_create(sender, instance, created, **kwargs):
     if not created:
         return
-    if not getattr(settings, "AI_CLASSIFICATION_ENABLED", True):
+    if not getattr(settings, "AI_CLASSIFICATION_ENABLED", False):
+        return
+    if instance.ai_processed or instance.status == "unclassified":
         return
 
     classification = None
