@@ -2,11 +2,11 @@
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django import forms
-
-from config.image_validation import validate_uploaded_jpeg_png
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as CoreValidationError
+
+from config.image_validation import validate_uploaded_jpeg_png
 
 from .models import MUNICIPALITY_CHOICES, Report, ReportCategory, Sector
 

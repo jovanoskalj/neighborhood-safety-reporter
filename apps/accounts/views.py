@@ -18,7 +18,6 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods
 
 from apps.reports.models import MUNICIPALITY_CHOICES, Report
-
 from config.image_validation import validate_uploaded_jpeg_png
 
 from .forms import LocalizedPasswordChangeForm, ProfileForm, RegisterForm

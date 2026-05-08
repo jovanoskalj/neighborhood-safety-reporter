@@ -10,6 +10,7 @@ from apps.reports.models import Report
 
 from .models import UserNotification, UserProfile
 from .utils import notify_report_status_changed
+
 logger = logging.getLogger(__name__)
 
 ROLE_GROUPS = {

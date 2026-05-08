@@ -11,6 +11,8 @@ Report creation is centralised in `_persist_new_report`. The post_save signal
 in `apps/reports/signals.py` handles AI classification — both `create_report`
 (JSON) and `submit_report` (HTML form) go through the same path.
 """
+import logging
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
