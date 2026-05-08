@@ -1,5 +1,8 @@
+from django.utils import timezone
 from django.contrib.auth.models import User
 from django.db import models
+from .validators import validate_image_content
+
 
 
 class ReportCategory(models.Model):
@@ -118,6 +121,14 @@ MUNICIPALITY_CHOICES = [
     ('shuto_orizari', 'Шуто Оризари'),
 ]
 
+class SoftDeleteManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(is_deleted=False)
+
+class AllObjectsManager(models.Manager):
+    """Includes soft-deleted reports — use only in admin/restore contexts."""
+    pass
+
 
 class Report(models.Model):
     STATUS_CHOICES = [
@@ -150,7 +161,7 @@ class Report(models.Model):
 
     citizen = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reports')
     description = models.TextField()
-    image = models.ImageField(upload_to='reports/', blank=True, null=True)
+    image = models.ImageField(upload_to='reports/', blank=True, null=True, validators=[validate_image_content])
     latitude = models.DecimalField(max_digits=9, decimal_places=6)
     longitude = models.DecimalField(max_digits=9, decimal_places=6)
     category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default='other')
@@ -171,7 +182,14 @@ class Report(models.Model):
         null=True,
         blank=True,
         related_name="duplicates",
-    )
+    )  
+    
+    
+    is_deleted = models.BooleanField(default=False, db_index=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()  
 
     class Meta:
         indexes = [
@@ -188,6 +206,17 @@ class Report(models.Model):
 
     def __str__(self) -> str:
         return f"Report #{self.pk} ({self.status})"
+
+
+    def soft_delete(self):
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.save(update_fields=["is_deleted", "deleted_at"])
+
+    def restore(self):
+        self.is_deleted = False
+        self.deleted_at = None
+        self.save(update_fields=["is_deleted", "deleted_at"])
 
 
 class ReportStatusHistory(models.Model):
