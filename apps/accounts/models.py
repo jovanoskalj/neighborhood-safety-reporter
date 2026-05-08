@@ -1,7 +1,8 @@
-from apps.reports.models import MUNICIPALITY_CHOICES
 from django.contrib.auth.models import User
 from django.db import models
 from django.utils import timezone
+
+from apps.reports.models import MUNICIPALITY_CHOICES
 
 
 class UserProfile(models.Model):
@@ -64,13 +65,13 @@ class EmailVerificationCode(models.Model):
 
 class UserNotification(models.Model):
     """In-app notification for users about report status changes and other events."""
-    
+
     TYPE_CHOICES = [
         ("status_change", "Промена на статус"),
         ("report_assigned", "Доделена пријава"),
         ("system", "Системско известување"),
     ]
-    
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
     type = models.CharField(max_length=50, choices=TYPE_CHOICES)
     title = models.CharField(max_length=255)
@@ -78,13 +79,13 @@ class UserNotification(models.Model):
     report = models.ForeignKey('reports.Report', on_delete=models.CASCADE, null=True, blank=True, related_name='notifications')
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['user', 'is_read'], name='notification_user_read_idx'),
             models.Index(fields=['created_at'], name='notification_created_idx'),
         ]
-    
+
     def __str__(self) -> str:
         return f"{self.type} за {self.user.username} [{'прочитано' if self.is_read else 'непрочитано'}]"

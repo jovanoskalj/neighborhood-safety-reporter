@@ -6,11 +6,10 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_http_methods
 
+from apps.reports.models import MUNICIPALITY_CHOICES, Report
+
 from .models import Notification
 from .senders import retry_notification
-
-from apps.reports.models import Report, MUNICIPALITY_CHOICES
-
 
 
 def _is_admin(user) -> bool:

@@ -7,6 +7,7 @@ urlpatterns = [
     path("dashboard/", views.dashboard, name="dashboard"),
     path("reports/", views.reports_api, name="reports_api"),
     path("submit/", views.submit_report, name="submit_report"),
+    path("create/", views.create_report, name="create_report"),
     path("my-reports/", views.my_reports, name="my_reports"),
     path("reports/<int:report_id>/", views.report_detail, name="report_detail"),
     path("reports/<int:report_id>/withdraw/", views.withdraw_report, name="withdraw_report"),
@@ -26,7 +27,7 @@ urlpatterns = [
     path("dashboard/sectors/create/", views.create_sector, name="create_sector"),
     path("dashboard/sectors/<int:sector_id>/update/", views.update_sector, name="update_sector"),
     path("dashboard/sectors/<int:sector_id>/delete/", views.delete_sector, name="delete_sector"),
-    path("dashboard/reports/<int:report_id>/classify/", views.classify_report, name="classify_report"),
+    path("dashboard/reports/<int:report_id>/classify/", views.admin_classify_report, name="classify_report"),
     path(
         "dashboard/reports/<int:report_id>/duplicate-review/",
         views.review_duplicate_report,

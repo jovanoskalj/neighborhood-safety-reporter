@@ -1,11 +1,12 @@
-from concurrent.futures import ThreadPoolExecutor
 import logging
+from concurrent.futures import ThreadPoolExecutor
 
 from django.conf import settings
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from apps.ai_classifier.classifier import classify_report
+
 from .models import Report
 
 logger = logging.getLogger(__name__)

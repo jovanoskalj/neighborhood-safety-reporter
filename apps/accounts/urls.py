@@ -1,10 +1,22 @@
-from django.urls import path
 from django.contrib.auth import views as auth_views
+from django.urls import path
+
 from .views import (
-    login_view, logout_view, profile_view, register_view, verify_email_code_view,
-    admin_user_list, admin_user_toggle, admin_user_update_role,
-    admin_system_log, admin_category_list,
-    notifications_list, notifications_summary, mark_notification_read, mark_all_notifications_read, delete_notification,
+    admin_category_list,
+    admin_system_log,
+    admin_user_list,
+    admin_user_toggle,
+    admin_user_update_role,
+    delete_notification,
+    login_view,
+    logout_view,
+    mark_all_notifications_read,
+    mark_notification_read,
+    notifications_list,
+    notifications_summary,
+    profile_view,
+    register_view,
+    verify_email_code_view,
 )
 
 urlpatterns = [

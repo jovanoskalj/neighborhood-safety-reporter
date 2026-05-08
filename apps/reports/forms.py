@@ -1,15 +1,14 @@
 """Forms for report submission (web + API) and admin dashboard CRUD."""
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django import forms
-
-from config.image_validation import validate_uploaded_jpeg_png
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as CoreValidationError
 
-from .models import MUNICIPALITY_CHOICES, Report, ReportCategory, Sector
+from config.image_validation import validate_uploaded_jpeg_png
 
+from .models import MUNICIPALITY_CHOICES, Report, ReportCategory, Sector
 
 _COORD_QUANTUM = Decimal("0.000001")
 
@@ -52,6 +51,8 @@ class ReportSubmissionForm(forms.ModelForm):
         model = Report
         fields = [
             "description",
+            "category",
+            "priority",
             "municipality",
             "latitude",
             "longitude",
@@ -64,7 +65,8 @@ class ReportSubmissionForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.fields["municipality"].required = False
+        self.fields["category"].required = False
+        self.fields["priority"].required = False
 
     def clean_image(self):
         """Reject invalid uploads; allow common JPEG MIME variants and sniff magic bytes."""

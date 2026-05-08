@@ -6,25 +6,22 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth import update_session_auth_hash
-from django.contrib.auth.models import User
-from django.contrib.auth.models import Group
+from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.models import Group, User
 from django.core.mail import send_mail
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.utils import timezone
-from django.contrib.admin.views.decorators import staff_member_required
 from django.views.decorators.http import require_GET, require_http_methods
-from apps.reports.models import MUNICIPALITY_CHOICES, Report
 
+from apps.reports.models import MUNICIPALITY_CHOICES, Report
 from config.image_validation import validate_uploaded_jpeg_png
 
 from .forms import LocalizedPasswordChangeForm, ProfileForm, RegisterForm
 from .models import AuditLog, EmailVerificationCode, UserNotification, UserProfile
-
 
 ROLE_GROUPS = {
     "citizen": ["citizen", "citizens"],

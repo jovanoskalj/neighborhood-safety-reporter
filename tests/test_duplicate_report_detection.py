@@ -76,6 +76,7 @@ def test_submit_report_not_duplicate_when_far_away(client, citizen_user):
 def test_submit_report_still_detects_duplicates_older_than_30_days(client, citizen_user):
     """Regression: do not silently miss duplicates due to small lookback window."""
     from datetime import timedelta
+
     from django.utils import timezone
 
     client.login(username="citizen", password="citizen123")

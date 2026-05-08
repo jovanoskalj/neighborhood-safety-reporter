@@ -9,7 +9,6 @@ from django.urls import reverse
 from apps.reports.forms import ReportSubmissionForm
 from apps.reports.models import Report
 
-
 VALID_PAYLOAD = {
     "description": "Голема дупка пред училиштето.",
     "category": "infrastructure",
@@ -26,10 +25,9 @@ def test_post_creates_report_and_redirects(client, citizen_user):
     response = client.post(reverse("submit_report"), data=VALID_PAYLOAD)
 
     assert response.status_code == 302
-    assert response.url == reverse("submit_report")
-    assert Report.objects.count() == 1
-
     report = Report.objects.get()
+    assert response.url == reverse("report_detail", args=[report.id])
+
     assert report.citizen == citizen_user
     assert report.category == "infrastructure"
     assert report.priority == "urgent"
@@ -72,15 +70,17 @@ def test_post_rejects_missing_coordinates(client, citizen_user):
 
 
 @pytest.mark.django_db
-def test_post_rejects_missing_municipality(client, citizen_user):
+def test_post_accepts_missing_municipality(client, citizen_user):
+    """Municipality is optional on the model (`blank=True`); missing means empty."""
     client.login(username="citizen", password="citizen123")
     payload = {**VALID_PAYLOAD}
     payload.pop("municipality")
 
     response = client.post(reverse("submit_report"), data=payload)
 
-    assert response.status_code == 200
-    assert Report.objects.count() == 0
+    assert response.status_code == 302
+    assert Report.objects.count() == 1
+    assert Report.objects.get().municipality == ""
 
 
 @pytest.mark.django_db

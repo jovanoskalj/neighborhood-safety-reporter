@@ -5,6 +5,7 @@
 # seed_reports.py
 
 import os
+
 import django
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "neighborhood_safety_reporter.settings")  # ⚠️ види подолу
