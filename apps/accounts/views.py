@@ -20,6 +20,8 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.views.decorators.http import require_GET, require_http_methods
 from apps.reports.models import MUNICIPALITY_CHOICES, Report
 
+from config.image_validation import validate_uploaded_jpeg_png
+
 from .forms import LocalizedPasswordChangeForm, ProfileForm, RegisterForm
 from .models import AuditLog, EmailVerificationCode, UserNotification, UserProfile
 
@@ -283,14 +285,26 @@ def profile_view(request):
             profile_form = ProfileForm(request.POST, instance=request.user, prefix="profile")
             if profile_form.is_valid():
                 profile_form.save()
-            profile.phone = request.POST.get("phone", profile.phone)
-            if request.FILES.get("avatar"):
-                profile.avatar = request.FILES["avatar"]
-            if profile.role == "officer":
-                profile.sector = request.POST.get("sector", profile.sector)
-            profile.save()
-            messages.success(request, "Профилот е успешно ажуриран.")
-            return redirect("profile")
+                profile.phone = request.POST.get("phone", profile.phone)
+                if profile.role == "officer":
+                    profile.sector = request.POST.get("sector", profile.sector)
+
+                avatar_file = request.FILES.get("avatar")
+                avatar_err = None
+                if avatar_file:
+                    avatar_err = validate_uploaded_jpeg_png(avatar_file, max_size_mb=5)
+                    if not avatar_err:
+                        profile.avatar = avatar_file
+                profile.save()
+                if avatar_err:
+                    messages.warning(
+                        request,
+                        "Профилот е ажуриран, но профилната слика не е зачувана: " + avatar_err,
+                    )
+                else:
+                    messages.success(request, "Профилот е успешно ажуриран.")
+                return redirect("profile")
+
 
     return render(
         request,

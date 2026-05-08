@@ -112,6 +112,12 @@ else:
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", str(BASE_DIR / "media")))
+# Ensure upload directory exists (e.g. fresh Render deploy; avoids ImageField save errors).
+if not os.getenv("PYTEST_CURRENT_TEST"):
+    try:
+        MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

@@ -1,5 +1,6 @@
 import logging
 
+from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
@@ -17,7 +18,12 @@ def _send_html_email(*, subject: str, to_email: str, template_name: str, context
     try:
         html_body = render_to_string(template_name, context)
         text_body = strip_tags(html_body)
-        message = EmailMultiAlternatives(subject=subject, body=text_body, to=[to_email])
+        message = EmailMultiAlternatives(
+            subject=subject,
+            body=text_body,
+            from_email=settings.DEFAULT_FROM_EMAIL or None,
+            to=[to_email],
+        )
         message.attach_alternative(html_body, "text/html")
         message.send(fail_silently=False)
         return True

@@ -1,5 +1,6 @@
 import csv
 import json
+import logging
 import os
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -42,6 +43,8 @@ from .models import MUNICIPALITY_CHOICES, Report, ReportCategory, ReportStatusHi
 
 MAX_REPORTS_PER_24H = 10
 REPORT_WINDOW_HOURS = 24
+
+logger = logging.getLogger(__name__)
 
 
 SEARCH_PARAMS = (
@@ -1139,7 +1142,13 @@ def submit_report(request):
 
             report.save()
             _log_status_transition(report, None, report.status, changed_by=request.user, note="Креирана пријава")
-            send_report_created_email(report)
+            try:
+                send_report_created_email(report)
+            except Exception:
+                logger.exception(
+                    "send_report_created_email failed after submit report_id=%s",
+                    getattr(report, "id", None),
+                )
 
             messages.success(request, "Вашата пријава е успешно поднесена.")
             return redirect("report_detail", report_id=report.id)

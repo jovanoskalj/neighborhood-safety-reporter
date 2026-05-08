@@ -1,5 +1,7 @@
 """Signal handlers for account lifecycle and role groups."""
 
+import logging
+
 from django.contrib.auth.models import Group, User
 from django.db.models.signals import post_migrate, post_save, pre_save
 from django.dispatch import receiver
@@ -7,6 +9,8 @@ from django.dispatch import receiver
 from .models import UserProfile, UserNotification
 from .utils import notify_report_status_changed
 from apps.reports.models import Report
+
+logger = logging.getLogger(__name__)
 
 ROLE_GROUPS = {
     "citizen": ["citizen", "citizens"],
@@ -69,18 +73,30 @@ def track_original_status(sender, instance, **kwargs):
 @receiver(post_save, sender=Report)
 def report_status_change_notification(sender, instance, created, **kwargs):
     """Create notification when report status changes or new report is submitted."""
-    if created:
-        # New report submitted - notify officers in the relevant sector
-        from apps.accounts.models import UserProfile
-        officer_profiles = UserProfile.objects.filter(sector=instance.sector, role='officer')
-        for profile in officer_profiles:
-            create_notification(
-                user=profile.user,
-                notification_type='report_assigned',
-                title='Нова пријава доделена',
-                message=f'Нова пријава #{instance.id} е доделена на вашиот сектор: {instance.get_sector_display()}.',
-                report=instance
-            )
-    elif instance.citizen and hasattr(instance, '_original_status'):
-        # Status changed - notify the citizen who submitted the report.
-        notify_report_status_changed(instance, instance._original_status, instance.status)
+    try:
+        if created:
+            # New report submitted - notify officers in the relevant sector
+            from apps.accounts.models import UserProfile
+
+            officer_profiles = UserProfile.objects.filter(sector=instance.sector, role="officer")
+            for profile in officer_profiles:
+                create_notification(
+                    user=profile.user,
+                    notification_type="report_assigned",
+                    title="Нова пријава доделена",
+                    message=(
+                        f"Нова пријава #{instance.id} е доделена на вашиот сектор: "
+                        f"{instance.get_sector_display()}."
+                    ),
+                    report=instance,
+                )
+        elif instance.citizen and hasattr(instance, "_original_status"):
+            # Status changed - notify the citizen who submitted the report.
+            notify_report_status_changed(instance, instance._original_status, instance.status)
+    except Exception:
+        # Never fail Report.save() because of notifications (would surface as HTTP 500).
+        logger.exception(
+            "report_status_change_notification failed for report_id=%s created=%s",
+            getattr(instance, "pk", None),
+            created,
+        )
