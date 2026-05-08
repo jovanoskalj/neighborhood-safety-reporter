@@ -3,6 +3,7 @@ import io
 import json
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
+from typing import Union
 
 from django.conf import settings
 from django.contrib import messages
@@ -19,9 +20,10 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods
 
 from apps.accounts.models import AuditLog, UserProfile
-from apps.ai_classifier.classifier import classify_report
+# from apps.ai_classifier.classifier import classify_report
 from apps.notifications.senders import send_status_change_email
 from apps.notifications.services import send_report_created_email, send_report_status_changed_email
+from apps.reports import signals
 
 from .duplicate_detection import find_potential_duplicate
 from .forms import (
@@ -244,7 +246,7 @@ def _serialize_report(report: Report) -> dict:
 
 
 def _apply_ai_classification(report: Report) -> None:
-    result = classify_report(report.description)
+    result = signals.classify_report(report.description) or {}
     report.category = result.get("category", "other")
     report.priority = result.get("priority", "normal")
     report.sector = result.get("sector", "admin")
@@ -339,7 +341,7 @@ def _remaining_reports_quota(user) -> int:
     return max(0, MAX_REPORTS_PER_24H - recent_reports_count)
 
 
-def _log_status_transition(report: Report, from_status: str | None, to_status: str, changed_by=None,
+def _log_status_transition(report: Report, from_status: Union[str, None], to_status: str, changed_by=None,
                            note: str = "") -> None:
     ReportStatusHistory.objects.create(
         report=report,
@@ -714,8 +716,6 @@ def import_reports_stub(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def submit_report(request):
-    """Render report submission page (login required)."""
-    return render(request, "reports/submit_report.html")
     """Render and process report submission form."""
     if request.method == "POST":
         form = ReportSubmissionForm(request.POST, request.FILES)
@@ -782,6 +782,7 @@ def submit_report(request):
 
             messages.success(request, "Вашата пријава е успешно поднесена.")
             return redirect("report_detail", report_id=report.id)
+
         messages.error(request, "Ве молиме поправете ги грешките во формата.")
     else:
         form = ReportSubmissionForm()
@@ -1179,6 +1180,7 @@ def map_view(request):
         "status_choices": Report.STATUS_CHOICES,
         "sector_choices": Report.SECTOR_CHOICES,
         "priority_choices": Report.PRIORITY_CHOICES,
+        "municipality_choices": MUNICIPALITY_CHOICES,
     }
     return render(request, "reports/map.html", context)
 
