@@ -679,31 +679,23 @@ def delete_sector(request: HttpRequest, sector_id: int) -> HttpResponse:
 @login_required
 @_admin_only()
 def export_reports_csv(request: HttpRequest) -> HttpResponse:
-    """Export current reports to CSV from dashboard."""
+    """Export filtered reports to CSV from dashboard."""
+    queryset = _filtered_admin_reports(request)
+    
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = 'attachment; filename="reports_export.csv"'
-
+    
     writer = csv.writer(response)
-    writer.writerow(["id", "citizen", "category", "sector", "status", "priority", "created_at"])
-    for report in Report.objects.select_related("citizen").order_by("-created_at"):
-        writer.writerow(
-            [
-                report.id,
-                report.citizen.username,
-                report.category,
-                report.sector,
-                report.status,
-                report.priority,
-                report.created_at.isoformat(),
-            ]
-        )
-
+    writer.writerow(REPORT_EXPORT_COLUMNS)
+    for report in queryset:
+        writer.writerow(_format_report_row(report))
+    
     _write_audit_log(
         request,
         action="export_reports_csv",
         target_model="Report",
         target_id=None,
-        details={"count": Report.objects.count()},
+        details={"count": queryset.count(), "filters": request.GET.dict()},
     )
     return response
 

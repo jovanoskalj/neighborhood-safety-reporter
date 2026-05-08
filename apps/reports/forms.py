@@ -63,7 +63,20 @@ class ReportSubmissionForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.fields["municipality"].required = True
+        self.fields["municipality"].required = False
+
+    def clean_image(self):
+        """Reject uploads outside the allowed JPG/PNG MIME types (FR-08)."""
+        image = self.cleaned_data.get("image")
+        if not image:
+            return image
+        content_type = getattr(image, "content_type", "") or ""
+        if content_type not in {"image/jpeg", "image/png"}:
+            raise forms.ValidationError("Дозволени се само JPG или PNG слики.")
+        max_size_mb = 5
+        if image.size > max_size_mb * 1024 * 1024:
+            raise forms.ValidationError("Image size must be up to 5MB.")
+        return image
 
 
 class ReportStatusUpdateForm(forms.ModelForm):
