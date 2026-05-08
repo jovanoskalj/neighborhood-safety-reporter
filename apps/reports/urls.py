@@ -31,4 +31,5 @@ urlpatterns = [
     path('new-report/', views.new_report, name='new_report'),
     path('reports/submit/', views.submit_report, name='submit_report'),
     path('reports/export/', views.export_reports, name='export_reports'),
+    path('dashboard/reports/<int:report_id>/delete/', views.delete_report, name='delete_report'),
 ]
