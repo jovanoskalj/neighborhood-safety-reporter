@@ -26,7 +26,7 @@ urlpatterns = [
     path("dashboard/sectors/create/", views.create_sector, name="create_sector"),
     path("dashboard/sectors/<int:sector_id>/update/", views.update_sector, name="update_sector"),
     path("dashboard/sectors/<int:sector_id>/delete/", views.delete_sector, name="delete_sector"),
-    path("dashboard/reports/<int:report_id>/classify/", views.classify_report, name="classify_report"),
+    path("dashboard/reports/<int:report_id>/classify/", views.admin_classify_report, name="classify_report"),
     path(
         "dashboard/reports/<int:report_id>/duplicate-review/",
         views.review_duplicate_report,
