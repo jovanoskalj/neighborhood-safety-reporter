@@ -24,6 +24,7 @@ from django.views.decorators.http import require_GET, require_http_methods
 from apps.accounts.models import AuditLog, UserProfile
 from apps.accounts.utils import notify_report_classified, notify_report_reassigned
 from apps.ai_classifier.classifier import classify_report
+from apps.notifications.senders import send_status_change_email
 from apps.notifications.services import send_report_created_email, send_report_status_changed_email
 
 from .duplicate_detection import find_potential_duplicate
@@ -1399,7 +1400,9 @@ def update_report_status(request, report_id: int):
             changed_by=request.user,
             note="Промена од службеник",
         )
-        email_sent = send_report_status_changed_email(report, old_status, report.status)
+        html_email_sent = send_report_status_changed_email(report, old_status, report.status)
+        notification = send_status_change_email(report)
+        email_sent = bool(html_email_sent or (notification and notification.status == "sent"))
 
     payload = _serialize_report(report)
     payload["internal_note"] = report.internal_note
