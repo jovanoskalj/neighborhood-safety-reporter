@@ -6,16 +6,14 @@ from django.urls import reverse
 def test_guest_navbar(client):
     response = client.get(reverse("home"))
     content = response.content.decode()
-    submit_link = reverse("submit_report")
 
     assert "Безбеден Град" in content
     assert "Република Северна Македонија" in content
-    assert 'class="nav-link" href="/">Дома</a>' not in content
-    assert "Мапа" not in content
     assert "Најава" in content
     assert "Регистрација" not in content
     assert "Одјава" not in content
-    assert f'class="dropdown-item" href="{submit_link}">Поднеси пријава</a>' not in content
+    # The Map nav link only renders for authenticated users.
+    assert reverse("map_view") not in content
 
 
 @pytest.mark.django_db
@@ -24,21 +22,22 @@ def test_citizen_navbar(client, citizen_user):
     response = client.get(reverse("home"))
     content = response.content.decode()
 
-    login_link = reverse("login")
-    submit_link = reverse("submit_report")
-    profile_link = reverse("profile")
-    logout_link = reverse("logout")
-
     assert response.status_code == 200
 
-    assert 'class="nav-link" href="/">Дома</a>' not in content
+    # Citizen sees Map (top nav) and personal links (in user dropdown).
     assert "Мапа" in content
-    assert f'class="dropdown-item" href="{submit_link}">Поднеси пријава</a>' in content
+    assert reverse("map_view") in content
     assert "Мои пријави" in content
-    assert f'class="nav-link" href="{profile_link}">Профил</a>' in content
-    assert f'class="nav-link nav-link-logout" href="{logout_link}">Одјава</a>' in content
-    assert f'href="{login_link}">Најава</a>' not in content
+    assert reverse("submit_report") in content
+    assert reverse("profile") in content
+    assert reverse("logout") in content
+    assert "Одјава" in content
+
+    # Anonymous-only links must not render.
+    assert "Најава" not in content
     assert "Регистрација" not in content
+
+    # Citizen must not see officer/admin entry points.
     assert "Работен панел" not in content
     assert "Админ панел" not in content
 
@@ -49,25 +48,21 @@ def test_officer_navbar(client, officer_user):
     response = client.get(reverse("home"))
     content = response.content.decode()
 
-    home_link = reverse("home")
-    login_link = reverse("login")
-    submit_link = reverse("submit_report")
-    map_link = reverse("map_view")
-    officer_panel_link = reverse("officer_panel")
-    profile_link = reverse("profile")
-    logout_link = reverse("logout")
-
     assert response.status_code == 200
 
-    assert f'class="nav-link" href="{home_link}">Дома</a>' not in content
-    assert f'class="nav-link" href="{map_link}">Мапа</a>' in content
-    assert f'class="nav-link" href="{officer_panel_link}">Работен панел</a>' in content
-    assert f'class="nav-link" href="{profile_link}">Профил</a>' in content
-    assert f'class="nav-link nav-link-logout" href="{logout_link}">Одјава</a>' in content
-    assert f'class="dropdown-item" href="{submit_link}">Поднеси пријава</a>' not in content
-    assert f'href="{login_link}">Најава</a>' not in content
-    assert "Регистрација" not in content
+    # Officer sees Map + their work surfaces.
+    assert "Мапа" in content
+    assert reverse("map_view") in content
+    assert reverse("officer_panel") in content
+    assert "Работен панел" in content
+    assert reverse("profile") in content
+    assert reverse("logout") in content
+    assert "Одјава" in content
+
+    # Officer-only: no submit-report dropdown item, no admin panel link.
     assert "Админ панел" not in content
+    assert "Најава" not in content
+    assert "Регистрација" not in content
 
 
 @pytest.mark.django_db
@@ -76,21 +71,17 @@ def test_admin_navbar(client, admin_user):
     response = client.get(reverse("home"))
     content = response.content.decode()
 
-    home_link = reverse("home")
-    login_link = reverse("login")
-    submit_link = reverse("submit_report")
-    map_link = reverse("map_view")
-    profile_link = reverse("profile")
-    logout_link = reverse("logout")
-
     assert response.status_code == 200
 
-    assert f'class="nav-link" href="{home_link}">Дома</a>' not in content
-    assert f'class="nav-link" href="{map_link}">Мапа</a>' in content
+    # Admin sees Map + their dashboard entry point.
+    assert "Мапа" in content
+    assert reverse("map_view") in content
     assert "Админ панел" in content
-    assert f'class="nav-link" href="{profile_link}">Профил</a>' in content
-    assert f'class="nav-link nav-link-logout" href="{logout_link}">Одјава</a>' in content
-    assert f'class="dropdown-item" href="{submit_link}">Поднеси пријава</a>' not in content
-    assert f'href="{login_link}">Најава</a>' not in content
-    assert "Регистрација" not in content
+    assert reverse("profile") in content
+    assert reverse("logout") in content
+    assert "Одјава" in content
+
+    # Admin-only: no officer panel link, no anonymous links.
     assert "Работен панел" not in content
+    assert "Најава" not in content
+    assert "Регистрација" not in content

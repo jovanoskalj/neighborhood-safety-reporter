@@ -49,6 +49,8 @@ class ReportSubmissionForm(forms.ModelForm):
         model = Report
         fields = [
             "description",
+            "category",
+            "priority",
             "municipality",
             "latitude",
             "longitude",
@@ -61,7 +63,8 @@ class ReportSubmissionForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.fields["municipality"].required = False
+        self.fields["category"].required = False
+        self.fields["priority"].required = False
 
     def clean_image(self):
         """Reject uploads outside the allowed JPG/PNG MIME types (FR-08)."""

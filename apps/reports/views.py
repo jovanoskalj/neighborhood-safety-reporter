@@ -66,6 +66,43 @@ from .forms import ReportCreateForm, ReportSubmissionForm
 from .models import MUNICIPALITY_CHOICES, Report, ReportCategory, Sector
 
 
+def create_report(request):
+    """JSON endpoint to create a report.
+
+    Returns 401 (not 302 redirect) when unauthenticated so it's safe for SPA/API
+    clients. Classification is handled by the post_save signal in
+    ``apps.reports.signals.classify_report_on_create``.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({"detail": "Authentication required."}, status=401)
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+
+    form = ReportCreateForm(request.POST, request.FILES)
+    if not form.is_valid():
+        return JsonResponse({"errors": form.errors}, status=400)
+
+    if _is_submission_rate_limited(request.user):
+        return JsonResponse(
+            {
+                "detail": "Daily limit reached: max 10 reports per 24 hours.",
+                "limit": MAX_REPORTS_PER_24H,
+                "window_hours": REPORT_WINDOW_HOURS,
+            },
+            status=429,
+        )
+
+    report = Report.objects.create(
+        citizen=request.user,
+        description=form.cleaned_data["description"],
+        latitude=form.cleaned_data["latitude"],
+        longitude=form.cleaned_data["longitude"],
+        image=form.cleaned_data.get("image"),
+    )
+    report.refresh_from_db()  # signal may have updated category/priority/sector/ai_processed/status
+    return JsonResponse(_serialize_report(report), status=201)
+
+
 def _apply_ai_classification(report: Report) -> None:
     """Run the AI classifier and copy fields onto `report` (in-memory).
 
@@ -156,21 +193,7 @@ def submit_report(request):
                     f"Можно е оваа пријава да е дупликат на пријава #{duplicate.pk}. Администратор ќе одлучи дали навистина е дупликат.",
                 )
 
-            if getattr(settings, "AI_CLASSIFICATION_ENABLED", False):
-                try:
-                    _apply_ai_classification(report)
-                except Exception:
-                    report.status = "unclassified"
-                    report.category = "other"
-                    report.priority = "normal"
-                    report.sector = "admin"
-                    report.ai_processed = False
-                    report.status_changed_at = timezone.now()
-            else:
-                if not report.category:
-                    report.category = "other"
-                if not report.priority:
-                    report.priority = "normal"
+            if not getattr(settings, "AI_CLASSIFICATION_ENABLED", False):
                 category_to_sector = {
                     "infrastructure": "infrastructure",
                     "utilities": "utilities",
@@ -181,6 +204,7 @@ def submit_report(request):
                 report.sector = category_to_sector.get(report.category, "admin")
 
             report.save()
+            report.refresh_from_db()  # pick up any updates from the classification signal
             _log_status_transition(report, None, report.status, changed_by=request.user, note="Креирана пријава")
             send_report_created_email(report)
 
@@ -517,6 +541,7 @@ def map_view(request):
         "status_choices": Report.STATUS_CHOICES,
         "sector_choices": active_sector_choices,
         "priority_choices": Report.PRIORITY_CHOICES,
+        "municipality_choices": MUNICIPALITY_CHOICES,
     }
     return render(request, "reports/map.html", context)
 

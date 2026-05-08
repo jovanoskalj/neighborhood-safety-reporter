@@ -167,6 +167,7 @@ def _serialize_report(report: Report) -> dict:
         "sector_display": report.get_sector_display(),
         "latitude": _as_float(report.latitude),
         "longitude": _as_float(report.longitude),
+        "ai_processed": report.ai_processed,
         "created_at": report.created_at.isoformat(),
         "updated_at": report.updated_at.isoformat(),
         "status_changed_at": report.status_changed_at.isoformat() if report.status_changed_at else None,
