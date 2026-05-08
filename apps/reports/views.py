@@ -38,21 +38,61 @@ from .models import MUNICIPALITY_CHOICES, Report, ReportCategory, ReportStatusHi
 MAX_REPORTS_PER_24H = 10
 REPORT_WINDOW_HOURS = 24
 
+REPORT_EXPORT_COLUMNS = ['ID', 'Description', 'Category', 'Priority', 'Status', 'Sector', 'Latitude', 'Longitude', 'Created At']
 
 SEARCH_PARAMS = (
     "category", "status", "sector", "priority",
-    "from", "to", "keyword",
     "lat_min", "lat_max", "lng_min", "lng_max",
     "page",
 )
 
 
-def _parse_iso_date(value):
-    """Return a ``date`` parsed from ISO-8601 input, or ``None`` on failure."""
-    try:
-        return date.fromisoformat(value)
-    except (TypeError, ValueError):
+def _parse_decimal(value):
+    """Return a ``Decimal`` or ``None`` if the input is absent/invalid."""
+    if value is None or value == "":
         return None
+    try:
+        return Decimal(value)
+    except InvalidOperation:
+        return None
+
+
+def _filtered_admin_reports(request):
+    """Build filtered queryset for admin export based on GET parameters."""
+    queryset = Report.objects.all().order_by('-created_at')
+    
+    date_from = request.GET.get('from')
+    if date_from:
+        queryset = queryset.filter(created_at__date__gte=date_from)
+    
+    date_to = request.GET.get('to')
+    if date_to:
+        queryset = queryset.filter(created_at__date__lte=date_to)
+    
+    category = request.GET.get('category')
+    if category:
+        queryset = queryset.filter(category=category)
+    
+    status = request.GET.get('status')
+    if status:
+        queryset = queryset.filter(status=status)
+    
+    return queryset
+
+
+def _format_report_row(report):
+    """Format a report for CSV/Excel export."""
+    return [
+        report.id,
+        report.description,
+        report.category,
+        report.priority,
+        report.status,
+        report.sector,
+        report.latitude,
+        report.longitude,
+        report.created_at.strftime('%Y-%m-%d %H:%M')
+    ]
 
 
 def _parse_decimal(value):
@@ -1236,7 +1276,10 @@ def officer_panel(request):
     except (PageNotAnInteger, EmptyPage):
         page_obj = paginator.page(1)
 
-    return render(request, "reports/submit_report.html")
+    return render(request, "reports/officer_panel.html", {
+        "reports": page_obj,
+        "sector": sector,
+    })
 
 
 @login_required
