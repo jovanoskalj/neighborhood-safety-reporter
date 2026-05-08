@@ -91,14 +91,14 @@ def stats(request) -> JsonResponse:
 def kpi_metrics(request) -> JsonResponse:
     """Provide KPI metrics (total reports, active users, resolution rate, avg time) based on filters."""
     queryset = _filtered_reports(request)
-    
+
     total_reports = queryset.count()
     resolved_reports = queryset.filter(status="resolved").count()
     open_reports = queryset.exclude(status__in=["resolved", "rejected", "withdrawn"]).count()
     high_priority_reports = queryset.filter(priority="urgent").count()
     unclassified_reports = queryset.filter(Q(category="other") | Q(status="unclassified")).count()
     resolve_rate = round((resolved_reports / total_reports) * 100, 1) if total_reports else 0
-    
+
     # Calculate average resolution time
     avg_resolution_data = (
         queryset.filter(status="resolved", status_changed_at__isnull=False)
@@ -114,10 +114,10 @@ def kpi_metrics(request) -> JsonResponse:
     avg_duration = avg_resolution_data.get("avg_duration")
     if avg_duration:
         avg_days = round(avg_duration.total_seconds() / 86400, 1)
-    
+
     # Get active users count (globally, not filtered)
     active_users = User.objects.filter(is_active=True).count()
-    
+
     return JsonResponse({
         "total_reports": total_reports,
         "active_users": active_users,

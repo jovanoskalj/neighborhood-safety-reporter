@@ -1,7 +1,7 @@
 # import json
 # import requests
 # from functools import lru_cache
-# from django.conf import settings 
+# from django.conf import settings
 # from apps.ai_classifier.prompts import CLASSIFICATION_PROMPT
 
 # OLLAMA_BASE_URL = settings.OLLAMA_BASE_URL
@@ -11,7 +11,7 @@
 #     Stub for AI classification using Ollama
 #     Returns a dict with category, priority, sector
 #     """
-    
+
 #      # Hardcoded description for testing
 #     description = report.get("description", "No description provided")
 
@@ -45,6 +45,7 @@
 import json
 import logging
 from typing import Optional, Set
+
 import requests
 from django.conf import settings
 

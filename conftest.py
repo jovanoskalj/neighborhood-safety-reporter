@@ -1,5 +1,5 @@
 import pytest
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import Group, User
 
 
 def pytest_configure(config):

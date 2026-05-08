@@ -2,8 +2,6 @@
 from django.db import models
 
 
-
-
 class Notification(models.Model):
     """One row per email send attempt — recorded by ``senders.py``."""
 

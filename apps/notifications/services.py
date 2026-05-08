@@ -6,7 +6,6 @@ from django.utils.html import strip_tags
 
 from apps.reports.models import Report
 
-
 logger = logging.getLogger(__name__)
 
 

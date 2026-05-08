@@ -18,7 +18,6 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.utils.text import slugify
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods
 
 from apps.accounts.models import AuditLog, UserProfile
@@ -29,16 +28,14 @@ from apps.notifications.services import send_report_created_email, send_report_s
 
 from .duplicate_detection import find_potential_duplicate
 from .forms import (
-    AdminUserUpdateForm,
     AdminUserCreateForm,
+    AdminUserUpdateForm,
     ReportCategoryForm,
     ReportCreateForm,
-    ReportStatusUpdateForm,
     ReportSubmissionForm,
     SectorForm,
 )
 from .models import MUNICIPALITY_CHOICES, Report, ReportCategory, ReportStatusHistory, Sector
-
 
 MAX_REPORTS_PER_24H = 10
 REPORT_WINDOW_HOURS = 24
@@ -109,7 +106,7 @@ def _build_report_filters(request):
     if to_date:
         filters &= Q(created_at__date__lte=to_date)
 
-   
+
     keyword = request.GET.get("keyword")
     if keyword:
         clean_keyword = keyword.strip()
@@ -158,7 +155,7 @@ try:
 except ImportError:
     OPENPYXL_AVAILABLE = False
 
-    
+
 def home(request):
     """Landing page (no params) or paginated search endpoint (with params)."""
     should_filter = _is_json_request(request) or any(
@@ -615,7 +612,7 @@ def dashboard(request):
     categories = ReportCategory.objects.order_by("name")
     sectors = Sector.objects.order_by("name")
     logs = AuditLog.objects.select_related("user").order_by("-timestamp")[:20]
-    
+
     # Unclassified reports - those with "other" category or "unclassified" status
     unclassified_reports = Report.objects.filter(
         Q(category="other") | Q(status="unclassified")
@@ -628,7 +625,7 @@ def dashboard(request):
         .order_by("-created_at")[:100]
     )
     pending_duplicate_count = Report.objects.filter(duplicate_verdict="pending").exclude(duplicate_of__isnull=True).count()
-    
+
     # For classification form: exclude "Друго" (other) from categories - it's the unclassified marker
     active_categories_for_classification = list(
         ReportCategory.objects.filter(is_active=True).exclude(key="other").values_list('key', 'name')
@@ -1471,15 +1468,15 @@ def reassign_report_sector(request, report_id: int):
 def admin_classify_report(request, report_id: int):
     """Admin endpoint to classify unclassified reports."""
     report = get_object_or_404(Report, pk=report_id)
-    
+
     category = (request.POST.get("category") or "").strip()
     priority = (request.POST.get("priority") or "").strip()
     sector = (request.POST.get("sector") or "").strip()
-    
+
     valid_categories = {value for value, _ in Report.CATEGORY_CHOICES}
     valid_priorities = {value for value, _ in Report.PRIORITY_CHOICES}
     valid_sectors = {value for value, _ in Report.SECTOR_CHOICES}
-    
+
     errors = {}
     if category and category not in valid_categories:
         errors["category"] = "Invalid category"
@@ -1487,32 +1484,32 @@ def admin_classify_report(request, report_id: int):
         errors["priority"] = "Invalid priority"
     if sector and sector not in valid_sectors:
         errors["sector"] = "Invalid sector"
-    
+
     if errors:
         return JsonResponse({"errors": errors}, status=400)
-    
+
     update_fields = []
     old_category = report.category
     old_priority = report.priority
     old_sector = report.sector
-    
+
     if category and category != "other":
         report.category = category
         update_fields.append("category")
-    
+
     if priority:
         report.priority = priority
         update_fields.append("priority")
-    
+
     if sector:
         report.sector = sector
         update_fields.append("sector")
-    
+
     # If classified (no longer "other"), update status if needed
     if category and category != "other" and report.status == "unclassified":
         report.status = "new"
         update_fields.append("status")
-    
+
     if update_fields:
         report.save(update_fields=update_fields)
         _write_audit_log(
@@ -1531,7 +1528,7 @@ def admin_classify_report(request, report_id: int):
         )
         notify_report_classified(report, classified_by=request.user)
         messages.success(request, "Извештајот е успешно класифициран.")
-    
+
     return redirect(f"{reverse('dashboard')}?tab=unclassified")
 
 
@@ -1716,7 +1713,7 @@ def search_page(request):
 
     active_sector_choices = list(Sector.objects.filter(is_active=True).values_list('key', 'name'))
     active_category_choices = list(ReportCategory.objects.filter(is_active=True).values_list('key', 'name'))
-    
+
     return render(
         request,
         "reports/search_results.html",

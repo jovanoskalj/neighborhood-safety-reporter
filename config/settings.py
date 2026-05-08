@@ -1,13 +1,12 @@
 """Django settings for Neighborhood Safety Reporter."""
 
-from pathlib import Path
 import os
 import sys
+from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
 import dj_database_url
 from dotenv import load_dotenv
-
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
@@ -161,7 +160,7 @@ if not DEBUG:
 # Django Debug Toolbar - disabled for tests to avoid static file issues
 if DEBUG and not TESTING:
     try:
-        import debug_toolbar
+        import debug_toolbar  # noqa: F401  presence check; activated via INSTALLED_APPS below
         INSTALLED_APPS += ["debug_toolbar"]
         MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")
         INTERNAL_IPS = ["127.0.0.1"]

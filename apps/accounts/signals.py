@@ -4,9 +4,10 @@ from django.contrib.auth.models import Group, User
 from django.db.models.signals import post_migrate, post_save, pre_save
 from django.dispatch import receiver
 
-from .models import UserProfile, UserNotification
-from .utils import notify_report_status_changed
 from apps.reports.models import Report
+
+from .models import UserNotification, UserProfile
+from .utils import notify_report_status_changed
 
 ROLE_GROUPS = {
     "citizen": ["citizen", "citizens"],

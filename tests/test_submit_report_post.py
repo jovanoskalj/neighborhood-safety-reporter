@@ -9,7 +9,6 @@ from django.urls import reverse
 from apps.reports.forms import ReportSubmissionForm
 from apps.reports.models import Report
 
-
 VALID_PAYLOAD = {
     "description": "Голема дупка пред училиштето.",
     "category": "infrastructure",

@@ -1,5 +1,5 @@
 """Forms for report submission (web + API) and admin dashboard CRUD."""
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django import forms
 from django.contrib.auth.models import User
@@ -7,7 +7,6 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as CoreValidationError
 
 from .models import MUNICIPALITY_CHOICES, Report, ReportCategory, Sector
-
 
 _COORD_QUANTUM = Decimal("0.000001")
 

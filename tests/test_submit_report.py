@@ -6,7 +6,6 @@ from django.urls import reverse
 
 from apps.reports.models import Report
 
-
 VALID_PAYLOAD = {
     "description": "Улично светло не работи на плоштад",
     "category": "utilities",

@@ -24,10 +24,8 @@ def test_citizen_navbar(client, citizen_user):
     response = client.get(reverse("home"))
     content = response.content.decode()
 
-    home_link = reverse("home")
     login_link = reverse("login")
     submit_link = reverse("submit_report")
-    map_link = reverse("map_view")
     profile_link = reverse("profile")
     logout_link = reverse("logout")
 
