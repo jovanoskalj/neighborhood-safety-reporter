@@ -95,7 +95,7 @@ def kpi_metrics(request) -> JsonResponse:
     total_reports = queryset.count()
     resolved_reports = queryset.filter(status="resolved").count()
     open_reports = queryset.exclude(status__in=["resolved", "rejected", "withdrawn"]).count()
-    high_priority_reports = queryset.filter(priority="high").count()
+    high_priority_reports = queryset.filter(priority="urgent").count()
     unclassified_reports = queryset.filter(Q(category="other") | Q(status="unclassified")).count()
     resolve_rate = round((resolved_reports / total_reports) * 100, 1) if total_reports else 0
     
