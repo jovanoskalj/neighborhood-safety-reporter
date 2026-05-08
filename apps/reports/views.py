@@ -34,7 +34,6 @@ from .forms import (
 )
 from .models import MUNICIPALITY_CHOICES, Report, ReportCategory, ReportStatusHistory, Sector
 
-
 MAX_REPORTS_PER_24H = 10
 REPORT_WINDOW_HOURS = 24
 
@@ -110,10 +109,10 @@ def _build_report_filters(request):
     filters = Q()
 
     for param, field in (
-        ("category", "category"),
-        ("status", "status"),
-        ("sector", "sector"),
-        ("priority", "priority"),
+            ("category", "category"),
+            ("status", "status"),
+            ("sector", "sector"),
+            ("priority", "priority"),
     ):
         value = request.GET.get(param)
         if value:
@@ -127,7 +126,6 @@ def _build_report_filters(request):
     if to_date:
         filters &= Q(created_at__date__lte=to_date)
 
-   
     keyword = request.GET.get("keyword")
     if keyword:
         clean_keyword = keyword.strip()
@@ -138,16 +136,16 @@ def _build_report_filters(request):
             if keyword.lower() in label.lower()
         ]
         filters &= (
-            Q(description__icontains=keyword) |
-            Q(id__icontains=clean_keyword) |
-            Q(municipality__in=matching_slugs) |
-            Q(category__icontains=keyword)
+                Q(description__icontains=keyword) |
+                Q(id__icontains=clean_keyword) |
+                Q(municipality__in=matching_slugs) |
+                Q(category__icontains=keyword)
         )
     for param, lookup in (
-        ("lat_min", "latitude__gte"),
-        ("lat_max", "latitude__lte"),
-        ("lng_min", "longitude__gte"),
-        ("lng_max", "longitude__lte"),
+            ("lat_min", "latitude__gte"),
+            ("lat_max", "latitude__lte"),
+            ("lng_min", "longitude__gte"),
+            ("lng_max", "longitude__lte"),
     ):
         value = _parse_decimal(request.GET.get(param))
         if value is not None:
@@ -170,13 +168,15 @@ def _serialize_reports_page(page):
         "results": [_serialize_report(report) for report in page.object_list],
     }
 
+
 try:
     import openpyxl
+
     OPENPYXL_AVAILABLE = True
 except ImportError:
     OPENPYXL_AVAILABLE = False
 
-    
+
 def home(request):
     """Landing page (no params) or paginated search endpoint (with params)."""
     should_filter = _is_json_request(request) or any(
@@ -209,6 +209,7 @@ def home(request):
         "reports/search_results.html",
         {"reports_page": page_obj, "query": request.GET},
     )
+
 
 def _as_float(value):
     try:
@@ -338,7 +339,8 @@ def _remaining_reports_quota(user) -> int:
     return max(0, MAX_REPORTS_PER_24H - recent_reports_count)
 
 
-def _log_status_transition(report: Report, from_status: str | None, to_status: str, changed_by=None, note: str = "") -> None:
+def _log_status_transition(report: Report, from_status: str | None, to_status: str, changed_by=None,
+                           note: str = "") -> None:
     ReportStatusHistory.objects.create(
         report=report,
         from_status=from_status or "",
@@ -346,6 +348,7 @@ def _log_status_transition(report: Report, from_status: str | None, to_status: s
         changed_by=changed_by,
         note=note,
     )
+
 
 def _is_admin_user(user: User) -> bool:
     """Allow dashboard access to superusers and admin group users."""
@@ -704,7 +707,8 @@ def export_reports_csv(request: HttpRequest) -> HttpResponse:
 @_admin_only()
 def import_reports_stub(request: HttpRequest) -> HttpResponse:
     """Temporary import action endpoint for dashboard UI button."""
-    messages.info(request, "Import функцијата е подготвена во UI и ќе биде поврзана со обработка на датотеки во следен task.")
+    messages.info(request,
+                  "Import функцијата е подготвена во UI и ќе биде поврзана со обработка на датотеки во следен task.")
     return redirect(f"{reverse('dashboard')}?tab=analytics")
 
 
