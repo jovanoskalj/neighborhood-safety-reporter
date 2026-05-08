@@ -26,8 +26,14 @@ services:
           property: connectionString
       - key: AI_CLASSIFICATION_ENABLED
         value: "False"
-      - key: EMAIL_BACKEND
-        value: django.core.mail.backends.console.EmailBackend
+      # SendGrid over HTTPS (Render free tier blocks outbound SMTP to 587/465/25).
+      # Set EMAIL_HOST_PASSWORD or SENDGRID_API_KEY + DEFAULT_FROM_EMAIL in the Render dashboard.
+      - key: USE_SENDGRID_API
+        value: "True"
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
 
 databases:
   - name: neighborhood-safety-reporter-db

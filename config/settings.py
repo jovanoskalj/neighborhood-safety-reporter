@@ -119,15 +119,26 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # requests without a referrer header.
 SECURE_REFERRER_POLICY = os.getenv("SECURE_REFERRER_POLICY", "strict-origin-when-cross-origin")
 
-# Email (SendGrid SMTP configuration; safe fallback for local development)
-EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
-EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.sendgrid.net")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
-EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True") == "True"
-EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "apikey")
-# Prefer the standard Django SMTP variable and fallback to SENDGRID_API_KEY for backward compatibility.
-EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD") or os.getenv("SENDGRID_API_KEY", "")
+# Email: local dev often uses console; production may use SMTP or SendGrid HTTP API.
+# Render free web services block outbound SMTP (ports 25/465/587) — use USE_SENDGRID_API=True there.
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "safetyreport.mk@gmail.com")
+_sendgrid_key = os.getenv("EMAIL_HOST_PASSWORD") or os.getenv("SENDGRID_API_KEY", "")
+
+if _env_bool("USE_SENDGRID_API", "False") and _sendgrid_key:
+    EMAIL_BACKEND = "sendgrid_backend.SendgridBackend"
+    SENDGRID_API_KEY = _sendgrid_key
+    EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.sendgrid.net")
+    EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+    EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True") == "True"
+    EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "apikey")
+    EMAIL_HOST_PASSWORD = _sendgrid_key
+else:
+    EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+    EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.sendgrid.net")
+    EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+    EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True") == "True"
+    EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "apikey")
+    EMAIL_HOST_PASSWORD = _sendgrid_key
 
 # django-verify-email
 SUBJECT = "Email Verification"

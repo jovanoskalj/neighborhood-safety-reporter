@@ -8,6 +8,7 @@ django-verify-email>=3.0.3
 pytest>=8.2.0
 pytest-django>=4.8.0
 sendgrid
+django-sendgrid-v5>=1.2.3
 django-debug-toolbar>=4.4.1
 openpyxl
 gunicorn>=22.0.0
