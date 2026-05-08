@@ -4,6 +4,8 @@ services:
     runtime: python
     plan: free
     buildCommand: |
+      pip install --upgrade pip
+      pip install whitenoise>=6.7.0
       pip install -r requirements.txt
       python manage.py collectstatic --no-input
       python manage.py migrate --no-input

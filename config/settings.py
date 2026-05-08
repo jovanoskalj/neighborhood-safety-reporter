@@ -104,7 +104,11 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+# Use simple storage for tests to avoid manifest issues
+if os.getenv('PYTEST_CURRENT_TEST'):
+    STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
+else:
+    STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", str(BASE_DIR / "media")))
@@ -152,8 +156,8 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = True
 
 
-# Django Debug Toolbar
-if DEBUG:
+# Django Debug Toolbar - disabled for tests to avoid static file issues
+if DEBUG and not os.getenv('PYTEST_CURRENT_TEST'):
     try:
         import debug_toolbar
         INSTALLED_APPS += ["debug_toolbar"]

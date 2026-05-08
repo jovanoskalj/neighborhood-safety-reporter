@@ -44,7 +44,7 @@
 
 import json
 import logging
-
+from typing import Optional, Set
 import requests
 from django.conf import settings
 
@@ -152,11 +152,11 @@ def _fallback() -> dict:
     }
 
 
-def _contains_any(text: str, keywords: set[str]) -> bool:
+def _contains_any(text: str, keywords: Set[str]) -> bool:
     return any(keyword in text for keyword in keywords)
 
 
-def _heuristic_classify(description: str) -> dict | None:
+def _heuristic_classify(description: str) -> Optional[dict]:
     """Deterministic keyword routing for MK/EN local complaints."""
     text = (description or "").strip().lower()
     if not text:
