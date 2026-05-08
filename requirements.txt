@@ -12,3 +12,4 @@ django-debug-toolbar>=4.4.1
 openpyxl
 gunicorn>=22.0.0
 whitenoise>=6.7.0
+ruff>=0.6.0
