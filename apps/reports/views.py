@@ -3,6 +3,7 @@ import io
 import json
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
+from typing import Union
 
 from django.conf import settings
 from django.contrib import messages
@@ -340,7 +341,7 @@ def _remaining_reports_quota(user) -> int:
     return max(0, MAX_REPORTS_PER_24H - recent_reports_count)
 
 
-def _log_status_transition(report: Report, from_status: str | None, to_status: str, changed_by=None,
+def _log_status_transition(report: Report, from_status: Union[str, None], to_status: str, changed_by=None,
                            note: str = "") -> None:
     ReportStatusHistory.objects.create(
         report=report,
