@@ -459,3 +459,31 @@ def admin_ai_audit_log(request):
         action__icontains='classify'
     ).select_related('user').order_by('-timestamp')[:200]
     return render(request, 'accounts/admin_ai_audit.html', {'logs': logs})
+
+@staff_member_required
+def admin_override_classification(request, report_id):
+    """Allow admin to manually override AI classification."""
+    from apps.reports.models import Report
+    report = Report.objects.get(id=report_id)
+    if request.method == 'POST':
+        new_category = request.POST.get('category')
+        new_priority = request.POST.get('priority')
+        if new_category in dict(Report.CATEGORY_CHOICES):
+            report.category = new_category
+        if new_priority in dict(Report.PRIORITY_CHOICES):
+            report.priority = new_priority
+        report.save()
+        AuditLog.objects.create(
+            user=request.user,
+            action='manual_override',
+            target_model='Report',
+            target_id=report_id,
+            details={'category': new_category, 'priority': new_priority}
+        )
+        messages.success(request, 'Classification overridden.')
+        return redirect('admin_user_list')
+    return render(request, 'accounts/admin_override.html', {
+        'report': report,
+        'categories': Report.CATEGORY_CHOICES,
+        'priorities': Report.PRIORITY_CHOICES,
+    })

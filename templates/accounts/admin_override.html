@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Override Classification — Report #{{ report.id }}</h2>
+  <p>{{ report.description }}</p>
+  <form method="post">
+    {% csrf_token %}
+    <div class="mb-3">
+      <label>Category</label>
+      <select name="category" class="form-select">
+        {% for value, label in categories %}
+        <option value="{{ value }}" {% if report.category == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="mb-3">
+      <label>Priority</label>
+      <select name="priority" class="form-select">
+        {% for value, label in priorities %}
+        <option value="{{ value }}" {% if report.priority == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button class="btn btn-primary">Save Override</button>
+  </form>
+</div>
+{% endblock %}
