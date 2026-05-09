@@ -19,7 +19,8 @@ Including another URLconf
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import include, path
+from django.urls import include, path, re_path
+from django.views.static import serve
 
 urlpatterns = [
     path("", include("apps.reports.urls")),
@@ -30,6 +31,24 @@ urlpatterns = [
     path("verify/", include("verify_email.urls")),
 ]
 
+
+def _user_media_urls():
+    """Serve uploaded files (/media/). DEBUG uses static(); production needs this for Gunicorn-only hosts."""
+    media_url = (settings.MEDIA_URL or "").strip()
+    if media_url.startswith(("http://", "https://")):
+        return []
+    prefix = media_url.lstrip("/").rstrip("/")
+    if not prefix:
+        return []
+    return [
+        re_path(
+            rf"^{prefix}/(?P<path>.*)$",
+            serve,
+            {"document_root": settings.MEDIA_ROOT},
+        ),
+    ]
+
+
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     try:
@@ -37,3 +56,5 @@ if settings.DEBUG:
         urlpatterns += [path("__debug__/", include(debug_toolbar.urls))]
     except ImportError:
         pass
+else:
+    urlpatterns += _user_media_urls()
