@@ -450,3 +450,12 @@ def admin_health_dashboard(request):
         'dead_emails': dead_emails,
     }
     return render(request, 'accounts/admin_health.html', context)
+
+@staff_member_required
+def admin_ai_audit_log(request):
+    """Show AI classification audit log entries."""
+    logs = AuditLog.objects.filter(
+        target_model='Report',
+        action__icontains='classify'
+    ).select_related('user').order_by('-timestamp')[:200]
+    return render(request, 'accounts/admin_ai_audit.html', {'logs': logs})

@@ -51,6 +51,9 @@ from django.conf import settings
 
 from apps.ai_classifier.prompts import CLASSIFICATION_PROMPT
 
+from apps.accounts.models import AuditLog
+
+
 logger = logging.getLogger(__name__)
 
 SAFETY_KEYWORDS = {
@@ -230,6 +233,18 @@ def classify_report(report, timeout=10):
             if key not in classification:
                 raise ValueError(f"Missing key '{key}' in classification response")
         classification.setdefault("status", "new")
+        try:
+            from apps.reports.models import Report as ReportModel
+            if hasattr(report, 'id'):
+                AuditLog.objects.create(
+                    user=None,
+                    action='ai_classify',
+                    target_model='Report',
+                    target_id=report.id,
+                    details=classification
+        )
+        except Exception:
+                pass
         return classification
     except Exception:
         logger.exception("AI classification failed; falling back to defaults.")
