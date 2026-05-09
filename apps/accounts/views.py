@@ -404,3 +404,10 @@ def delete_notification(request, notification_id):
         return JsonResponse({"success": True})
 
     return redirect("notifications_list")
+
+@staff_member_required
+def admin_dead_emails(request):
+    """Show permanently failed emails."""
+    from apps.notifications.models import Notification
+    dead = Notification.objects.filter(status='dead').order_by('-created_at')
+    return render(request, 'accounts/admin_dead_emails.html', {'notifications': dead})

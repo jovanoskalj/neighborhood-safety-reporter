@@ -3,7 +3,7 @@ from django.contrib.auth import views as auth_views
 from .views import (
     login_view, logout_view, profile_view, register_view, verify_email_code_view,
     admin_user_list, admin_user_toggle, admin_user_update_role,
-    admin_system_log, admin_category_list,
+    admin_system_log, admin_category_list, admin_dead_emails,
     notifications_list, mark_notification_read, mark_all_notifications_read, delete_notification,
 )
 
@@ -18,6 +18,7 @@ urlpatterns = [
     path("admin-panel/users/<int:user_id>/role/", admin_user_update_role, name="admin_user_update_role"),
     path("admin-panel/system-log/", admin_system_log, name="admin_system_log"),
     path("admin-panel/categories/", admin_category_list, name="admin_category_list"),
+    path("admin-panel/dead-emails/", admin_dead_emails, name="admin_dead_emails"),
     path(
         "password-reset/",
         auth_views.PasswordResetView.as_view(

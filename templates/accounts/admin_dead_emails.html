@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Dead Email Queue</h2>
+  <table class="table table-bordered">
+    <thead>
+      <tr><th>ID</th><th>Report</th><th>Citizen</th><th>Retries</th><th>Created</th></tr>
+    </thead>
+    <tbody>
+      {% for n in notifications %}
+      <tr>
+        <td>{{ n.id }}</td>
+        <td>{{ n.report_id }}</td>
+        <td>{{ n.recipient }}</td>
+        <td>{{ n.retry_count }}</td>
+        <td>{{ n.created_at }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
