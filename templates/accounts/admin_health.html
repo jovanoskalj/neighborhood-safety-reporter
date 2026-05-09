@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>System Health</h2>
+  <div class="row">
+    <div class="col-md-3">
+      <div class="card text-center p-3">
+        <h5>Total Reports</h5>
+        <h2>{{ total_reports }}</h2>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center p-3">
+        <h5>New Reports</h5>
+        <h2>{{ new_reports }}</h2>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center p-3">
+        <h5>Active Users</h5>
+        <h2>{{ active_users }} / {{ total_users }}</h2>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center p-3">
+        <h5>AI Status</h5>
+        <h2>{{ ai_status }}</h2>
+      </div>
+    </div>
+    <div class="col-md-3 mt-3">
+      <div class="card text-center p-3">
+        <h5>Failed Emails</h5>
+        <h2>{{ failed_emails }}</h2>
+      </div>
+    </div>
+    <div class="col-md-3 mt-3">
+      <div class="card text-center p-3">
+        <h5>Dead Emails</h5>
+        <h2>{{ dead_emails }}</h2>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

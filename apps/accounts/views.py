@@ -411,3 +411,42 @@ def admin_dead_emails(request):
     from apps.notifications.models import Notification
     dead = Notification.objects.filter(status='dead').order_by('-created_at')
     return render(request, 'accounts/admin_dead_emails.html', {'notifications': dead})
+
+@staff_member_required
+def admin_health_dashboard(request):
+    """System health metrics for admin."""
+    from apps.reports.models import Report
+    from django.contrib.auth.models import User
+    import requests as req
+
+    total_reports = Report.objects.count()
+    new_reports = Report.objects.filter(status='new').count()
+    total_users = User.objects.count()
+    active_users = User.objects.filter(is_active=True).count()
+
+    # Check AI (Ollama) status
+    try:
+        ai_response = req.get('http://ollama:11434/api/tags', timeout=2)
+        ai_status = 'Online' if ai_response.status_code == 200 else 'Offline'
+    except Exception:
+        ai_status = 'Offline'
+
+    # Check failed emails
+    try:
+        from apps.notifications.models import Notification
+        failed_emails = Notification.objects.filter(status='failed').count()
+        dead_emails = Notification.objects.filter(status='dead').count()
+    except Exception:
+        failed_emails = 0
+        dead_emails = 0
+
+    context = {
+        'total_reports': total_reports,
+        'new_reports': new_reports,
+        'total_users': total_users,
+        'active_users': active_users,
+        'ai_status': ai_status,
+        'failed_emails': failed_emails,
+        'dead_emails': dead_emails,
+    }
+    return render(request, 'accounts/admin_health.html', context)
