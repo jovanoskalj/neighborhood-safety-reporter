@@ -20,7 +20,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods
 
 from apps.accounts.models import AuditLog, UserProfile
-# from apps.ai_classifier.classifier import classify_report
+from apps.ai_classifier.classifier import classify_report
 from apps.notifications.senders import send_status_change_email
 from apps.notifications.services import send_report_created_email, send_report_status_changed_email
 from apps.reports import signals

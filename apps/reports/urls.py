@@ -29,4 +29,6 @@ urlpatterns = [
     path("dashboard/export/", views.export_reports_csv, name="export_reports_csv"),
     path("dashboard/import/", views.import_reports_stub, name="import_reports_stub"),
     path("search/", views.search_page, name="search_page"),
+    path("reports/export/", views.export_reports_csv, name="export_reports"),
+    path("reports/create/", views.reports_api, name="create_report"),
 ]

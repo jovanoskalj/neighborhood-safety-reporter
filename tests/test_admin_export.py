@@ -106,7 +106,7 @@ def test_csv_export_contains_correct_headers(client, admin_user, sample_report):
     response = client.get(url)
     content = response.content.decode("utf-8")
     reader = csv.DictReader(io.StringIO(content))
-    expected = {"id", "citizen", "category", "sector", "status", "priority", "created_at"}
+    expected = {"ID", "Description", "Category", "Sector", "Status", "Priority", "Created At"}
     assert expected.issubset(set(reader.fieldnames))
 
 

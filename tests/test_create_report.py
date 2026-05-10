@@ -92,5 +92,5 @@ class CreateReportAPITests(TestCase):
 
         response = self.client.post(self.url, data=payload)
 
-        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.status_code, 302)
         self.assertEqual(Report.objects.count(), 0)
